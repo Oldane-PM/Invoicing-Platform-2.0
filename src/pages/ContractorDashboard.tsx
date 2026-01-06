@@ -29,7 +29,8 @@ const mockSubmissions: ContractorSubmission[] = [
     regularHours: 160,
     overtimeHours: 8,
     totalAmount: 8600,
-    description: "Regular development work including overtime for critical deployment phase.",
+    description:
+      "Regular development work including overtime for critical deployment phase.",
     workPeriodStart: new Date(2025, 11, 1),
     workPeriodEnd: new Date(2025, 11, 31),
   },
@@ -68,10 +69,15 @@ const statusStyles: Record<ContractorSubmission["status"], string> = {
 
 interface ContractorDashboardProps {
   onNavigateToSubmit?: () => void;
+  onNavigateToSubmissions?: () => void;
 }
 
-export function ContractorDashboard({ onNavigateToSubmit }: ContractorDashboardProps) {
-  const [selectedSubmission, setSelectedSubmission] = React.useState<ContractorSubmission | null>(null);
+export function ContractorDashboard({
+  onNavigateToSubmit,
+  onNavigateToSubmissions,
+}: ContractorDashboardProps) {
+  const [selectedSubmission, setSelectedSubmission] =
+    React.useState<ContractorSubmission | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [pdfViewerOpen, setPdfViewerOpen] = React.useState(false);
   const [pdfInvoiceData, setPdfInvoiceData] = React.useState<any>(null);
@@ -81,12 +87,15 @@ export function ContractorDashboard({ onNavigateToSubmit }: ContractorDashboardP
     setDrawerOpen(true);
   };
 
-  const handleViewPDF = (e: React.MouseEvent, submission: ContractorSubmission) => {
+  const handleViewPDF = (
+    e: React.MouseEvent,
+    submission: ContractorSubmission
+  ) => {
     e.stopPropagation(); // Prevent card click
-    
+
     // Mock contractor profile data - in real app, fetch from backend
     const hasBankingDetails = true; // Check if banking info is complete
-    
+
     if (!hasBankingDetails) {
       toast.error("Banking details required to generate invoice.", {
         description: "Please complete your banking details in your profile.",
@@ -104,30 +113,32 @@ export function ContractorDashboard({ onNavigateToSubmit }: ContractorDashboardP
       regularHours: submission.regularHours,
       overtimeHours: submission.overtimeHours,
       regularDescription: submission.description,
-      overtimeDescription: submission.overtimeHours > 0 
-        ? "Additional hours for critical deployment phase" 
-        : undefined,
-      
+      overtimeDescription:
+        submission.overtimeHours > 0
+          ? "Additional hours for critical deployment phase"
+          : undefined,
+
       // Contractor Personal Info (live from profile)
       contractorName: "Sarah Johnson",
       contractorAddress: "123 Main Street, Apartment 4B, California 90210",
       contractorCountry: "United States",
       contractorEmail: "sarah.johnson@email.com",
-      
+
       // Contract Info
       hourlyRate: 50,
       overtimeRate: 75,
       position: "Senior Developer",
-      
+
       // Banking Details (live from profile)
       bankName: "First National Bank",
-      bankAddress: "456 Banking Boulevard, Financial District, New York, NY 10004",
+      bankAddress:
+        "456 Banking Boulevard, Financial District, New York, NY 10004",
       swiftCode: "FNBAUS33",
       routingNumber: "021000021",
       accountType: "Checking",
       accountNumber: "9876543210",
       currency: "USD",
-      
+
       // Company/Client Info
       companyName: "TechCorp Inc.",
       companyAddress: "789 Business Park, Suite 100, San Francisco, CA 94102",
@@ -156,9 +167,20 @@ export function ContractorDashboard({ onNavigateToSubmit }: ContractorDashboardP
 
         {/* Recent Submissions Section */}
         <div className="max-w-[1040px] mx-auto px-6 pb-12">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            Recent Submissions
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Recent Submissions
+            </h2>
+            {mockSubmissions.length > 0 && onNavigateToSubmissions && (
+              <Button
+                variant="ghost"
+                onClick={onNavigateToSubmissions}
+                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+              >
+                View All
+              </Button>
+            )}
+          </div>
 
           {/* Submission Cards */}
           <div className="space-y-6">
@@ -184,7 +206,9 @@ export function ContractorDashboard({ onNavigateToSubmit }: ContractorDashboardP
                         {format(submission.submissionDate, "MMM d, yyyy")}
                       </p>
                     </div>
-                    <Badge className={`${statusStyles[submission.status]} border`}>
+                    <Badge
+                      className={`${statusStyles[submission.status]} border`}
+                    >
                       {submission.status}
                     </Badge>
                   </div>
@@ -196,7 +220,9 @@ export function ContractorDashboard({ onNavigateToSubmit }: ContractorDashboardP
 
                   {/* Row 3: Work Description */}
                   <div className="mb-4">
-                    <p className="text-xs text-gray-500 mb-1">Work Description</p>
+                    <p className="text-xs text-gray-500 mb-1">
+                      Work Description
+                    </p>
                     <p className="text-sm text-gray-700 line-clamp-2">
                       {submission.description}
                     </p>
@@ -205,7 +231,9 @@ export function ContractorDashboard({ onNavigateToSubmit }: ContractorDashboardP
                   {/* Row 4: Hours & Amount Summary */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-100">
                     <div>
-                      <p className="text-xs text-gray-500 mb-1">Regular Hours</p>
+                      <p className="text-xs text-gray-500 mb-1">
+                        Regular Hours
+                      </p>
                       <p className="text-lg font-semibold text-gray-900">
                         {submission.regularHours}h
                       </p>
