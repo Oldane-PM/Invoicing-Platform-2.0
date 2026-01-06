@@ -56,3 +56,23 @@ export interface MetricData {
   totalPayout: number;
   payoutChange: number;
 }
+
+// Contractor Submissions types
+export type SubmissionStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "PAID"
+  | "REJECTED"
+  | "NEEDS_CLARIFICATION";
+
+export interface ContractorSubmission {
+  id: string;
+  submissionDate: string;
+  projectName: string;
+  description: string;
+  regularHours: number;
+  overtimeHours: number;
+  totalAmount: number;
+  status: SubmissionStatus;
+  invoiceUrl?: string | null;
+}

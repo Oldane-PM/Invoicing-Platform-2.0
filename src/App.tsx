@@ -31,6 +31,7 @@ import { UserAccessManagement } from "./pages/UserAccessManagement";
 import { AdminCalendar } from "./pages/AdminCalendar";
 import { NotificationsDrawer } from "./pages/NotificationsDrawer";
 import { ContractorDetailDrawer } from "./pages/ContractorDetailDrawer";
+import { ContractorSubmissions } from "./pages/ContractorSubmissions";
 import {
   mockMetrics,
   mockSubmissions,
@@ -40,22 +41,30 @@ import {
   mockEmployees,
   mockUsers,
   mockNotifications,
+  mockContractorSubmissions,
 } from "./lib/data/mockData";
 import type { Employee, User } from "./lib/types";
 
 type Screen = "dashboard" | "directory" | "access" | "calendar";
 type ManagerScreen = "dashboard" | "team";
-type ContractorScreen = "dashboard" | "profile" | "submit-hours";
+type ContractorScreen =
+  | "dashboard"
+  | "profile"
+  | "submit-hours"
+  | "submissions";
 type UserRole = "Admin" | "Manager" | "Contractor" | null;
 
 function App() {
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
   const [currentScreen, setCurrentScreen] = React.useState<Screen>("dashboard");
-  const [managerScreen, setManagerScreen] = React.useState<ManagerScreen>("dashboard");
-  const [contractorScreen, setContractorScreen] = React.useState<ContractorScreen>("dashboard");
+  const [managerScreen, setManagerScreen] =
+    React.useState<ManagerScreen>("dashboard");
+  const [contractorScreen, setContractorScreen] =
+    React.useState<ContractorScreen>("dashboard");
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const [contractorDrawerOpen, setContractorDrawerOpen] = React.useState(false);
-  const [selectedEmployee, setSelectedEmployee] = React.useState<Employee | null>(null);
+  const [selectedEmployee, setSelectedEmployee] =
+    React.useState<Employee | null>(null);
   const [employees, setEmployees] = React.useState(mockEmployees);
   const [users, setUsers] = React.useState(mockUsers);
 
@@ -85,7 +94,9 @@ function App() {
   };
 
   const handleUserUpdate = (updatedUser: User) => {
-    setUsers(users.map((user) => (user.id === updatedUser.id ? updatedUser : user)));
+    setUsers(
+      users.map((user) => (user.id === updatedUser.id ? updatedUser : user))
+    );
   };
 
   const getPageInfo = () => {
@@ -108,7 +119,8 @@ function App() {
       case "calendar":
         return {
           title: "Calendar",
-          subtitle: "Manage holidays and special time off that affect employee submissions",
+          subtitle:
+            "Manage holidays and special time off that affect employee submissions",
         };
       default:
         return { title: "", subtitle: "" };
@@ -136,7 +148,9 @@ function App() {
                 <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
                   Manager Portal
                 </h1>
-                <p className="text-xs md:text-sm text-gray-600">Review and approve team submissions</p>
+                <p className="text-xs md:text-sm text-gray-600">
+                  Review and approve team submissions
+                </p>
               </div>
               <div className="flex items-center gap-2 md:gap-3">
                 <Button
@@ -145,7 +159,10 @@ function App() {
                   className="relative hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
                   onClick={() => setNotificationsOpen(true)}
                 >
-                  <Bell className="w-4 h-4 md:w-5 md:h-5 text-gray-600" strokeWidth={2} />
+                  <Bell
+                    className="w-4 h-4 md:w-5 md:h-5 text-gray-600"
+                    strokeWidth={2}
+                  />
                   {unreadCount > 0 && (
                     <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs border-2 border-white">
                       {unreadCount}
@@ -157,7 +174,10 @@ function App() {
                   size="icon"
                   className="hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
                 >
-                  <Settings className="w-4 h-4 md:w-5 md:h-5 text-gray-600" strokeWidth={2} />
+                  <Settings
+                    className="w-4 h-4 md:w-5 md:h-5 text-gray-600"
+                    strokeWidth={2}
+                  />
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -198,7 +218,9 @@ function App() {
                 }`}
               >
                 <LayoutDashboard className="w-4 h-4" />
-                <span className="font-medium text-sm md:text-base">Dashboard</span>
+                <span className="font-medium text-sm md:text-base">
+                  Dashboard
+                </span>
               </button>
               <button
                 onClick={() => setManagerScreen("team")}
@@ -209,7 +231,9 @@ function App() {
                 }`}
               >
                 <Users className="w-4 h-4" />
-                <span className="font-medium text-sm md:text-base">My Team</span>
+                <span className="font-medium text-sm md:text-base">
+                  My Team
+                </span>
               </button>
             </div>
           </div>
@@ -234,7 +258,7 @@ function App() {
   // Contractor Portal - Simple View
   if (currentUser === "Contractor") {
     const lastLogin = "Jan 31, 2026 at 9:14 AM";
-    
+
     return (
       <div className="min-h-screen bg-[#F9FAFB]">
         <Toaster position="top-right" />
@@ -244,8 +268,12 @@ function App() {
           <div className="max-w-[1440px] mx-auto px-4 md:px-6 h-16 md:h-[72px] flex items-center justify-between">
             {/* Left Section */}
             <div>
-              <p className="font-semibold text-gray-900 text-sm md:text-base">Welcome, Sarah</p>
-              <p className="text-xs md:text-sm text-gray-500 hidden sm:block">Last login: {lastLogin}</p>
+              <p className="font-semibold text-gray-900 text-sm md:text-base">
+                Welcome, Sarah
+              </p>
+              <p className="text-xs md:text-sm text-gray-500 hidden sm:block">
+                Last login: {lastLogin}
+              </p>
             </div>
 
             {/* Right Section */}
@@ -253,7 +281,11 @@ function App() {
               {/* Contractor Profile Button */}
               <Button
                 variant="ghost"
-                onClick={() => setContractorScreen(contractorScreen === "profile" ? "dashboard" : "profile")}
+                onClick={() =>
+                  setContractorScreen(
+                    contractorScreen === "profile" ? "dashboard" : "profile"
+                  )
+                }
                 className={`h-8 md:h-9 px-2 md:px-4 rounded-lg transition-colors ${
                   contractorScreen === "profile"
                     ? "bg-purple-50 text-purple-700 hover:bg-purple-100"
@@ -295,7 +327,9 @@ function App() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={() => setContractorScreen("profile")}>
+                  <DropdownMenuItem
+                    onClick={() => setContractorScreen("profile")}
+                  >
                     Profile
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout}>
@@ -311,13 +345,27 @@ function App() {
         {/* Contractor Content */}
         <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
           {contractorScreen === "dashboard" && (
-            <ContractorDashboard onNavigateToSubmit={() => setContractorScreen("submit-hours")} />
+            <ContractorDashboard
+              onNavigateToSubmit={() => setContractorScreen("submit-hours")}
+              onNavigateToSubmissions={() => setContractorScreen("submissions")}
+            />
           )}
           {contractorScreen === "profile" && (
-            <ContractorProfile onCancel={() => setContractorScreen("dashboard")} />
+            <ContractorProfile
+              onCancel={() => setContractorScreen("dashboard")}
+            />
           )}
           {contractorScreen === "submit-hours" && (
-            <SubmitHoursPage onCancel={() => setContractorScreen("dashboard")} />
+            <SubmitHoursPage
+              onCancel={() => setContractorScreen("dashboard")}
+            />
+          )}
+          {contractorScreen === "submissions" && (
+            <ContractorSubmissions
+              submissions={mockContractorSubmissions}
+              onSubmitHours={() => setContractorScreen("submit-hours")}
+              onBack={() => setContractorScreen("dashboard")}
+            />
           )}
         </main>
 
@@ -344,7 +392,9 @@ function App() {
               <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
                 {pageInfo.title}
               </h1>
-              <p className="text-xs md:text-sm text-gray-600">{pageInfo.subtitle}</p>
+              <p className="text-xs md:text-sm text-gray-600">
+                {pageInfo.subtitle}
+              </p>
             </div>
             <div className="flex items-center gap-2 md:gap-3">
               <Button
@@ -353,7 +403,10 @@ function App() {
                 className="relative hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
                 onClick={() => setNotificationsOpen(true)}
               >
-                <Bell className="w-4 h-4 md:w-5 md:h-5 text-gray-600" strokeWidth={2} />
+                <Bell
+                  className="w-4 h-4 md:w-5 md:h-5 text-gray-600"
+                  strokeWidth={2}
+                />
                 {unreadCount > 0 && (
                   <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs border-2 border-white">
                     {unreadCount}
@@ -365,7 +418,10 @@ function App() {
                 size="icon"
                 className="hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
               >
-                <Settings className="w-4 h-4 md:w-5 md:h-5 text-gray-600" strokeWidth={2} />
+                <Settings
+                  className="w-4 h-4 md:w-5 md:h-5 text-gray-600"
+                  strokeWidth={2}
+                />
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -382,7 +438,9 @@ function App() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem>Profile</DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout}>
+                    Logout
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -403,7 +461,9 @@ function App() {
               }`}
             >
               <LayoutDashboard className="w-4 h-4" />
-              <span className="font-medium text-sm md:text-base">Dashboard</span>
+              <span className="font-medium text-sm md:text-base">
+                Dashboard
+              </span>
             </button>
             <button
               onClick={() => setCurrentScreen("directory")}
@@ -414,7 +474,9 @@ function App() {
               }`}
             >
               <Users className="w-4 h-4" />
-              <span className="font-medium text-sm md:text-base"><span className="hidden sm:inline">Employee </span>Directory</span>
+              <span className="font-medium text-sm md:text-base">
+                <span className="hidden sm:inline">Employee </span>Directory
+              </span>
             </button>
             <button
               onClick={() => setCurrentScreen("access")}
@@ -425,7 +487,9 @@ function App() {
               }`}
             >
               <Shield className="w-4 h-4" />
-              <span className="font-medium text-sm md:text-base"><span className="hidden sm:inline">User </span>Access</span>
+              <span className="font-medium text-sm md:text-base">
+                <span className="hidden sm:inline">User </span>Access
+              </span>
             </button>
             <button
               onClick={() => setCurrentScreen("calendar")}
