@@ -1,12 +1,10 @@
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import { ErrorBoundary } from "./pages/ErrorBoundary";
+import "./styles/index.css";
 
-  import { createRoot } from "react-dom/client";
-  import App from "./app/App.tsx";
-  import { ErrorBoundary } from "./app/components/pages/ErrorBoundary.tsx";
-  import "./styles/index.css";
-
-  createRoot(document.getElementById("root")!).render(
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  );
-  
+createRoot(document.getElementById("root")!).render(
+  <ErrorBoundary> 
+    <App />
+  </ErrorBoundary>
+);
