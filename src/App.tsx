@@ -41,8 +41,8 @@ import {
   mockEmployees,
   mockUsers,
   mockNotifications,
-  mockContractorSubmissions,
 } from "./lib/data/mockData";
+import { useAuth } from "./lib/hooks/useAuth";
 import type { Employee, User } from "./lib/types";
 
 type Screen = "dashboard" | "directory" | "access" | "calendar";
@@ -55,6 +55,9 @@ type ContractorScreen =
 type UserRole = "Admin" | "Manager" | "Contractor" | null;
 
 function App() {
+  // Supabase auth for Contractor
+  const { isAuthenticated, user, signIn, signOut, loading: authLoading } = useAuth();
+
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
   const [currentScreen, setCurrentScreen] = React.useState<Screen>("dashboard");
   const [managerScreen, setManagerScreen] =
@@ -71,13 +74,39 @@ function App() {
   const unreadCount = mockNotifications.filter((n) => !n.read).length;
   const currentUserId = "USER-004"; // John Administrator
 
+  // Sync Supabase auth state with currentUser
+  React.useEffect(() => {
+    if (isAuthenticated && user) {
+      // User is authenticated via Supabase - set as Contractor
+      setCurrentUser("Contractor");
+    } else if (!authLoading && currentUser === "Contractor" && !isAuthenticated) {
+      // User was logged out from Supabase
+      setCurrentUser(null);
+    }
+  }, [isAuthenticated, user, authLoading, currentUser]);
+
+  // Handle mock login for Admin/Manager
   const handleLogin = (username: string) => {
-    setCurrentUser(username as UserRole);
+    if (username === "Admin" || username === "Manager") {
+      setCurrentUser(username as UserRole);
+    }
+    // Contractor login is handled via Supabase auth
   };
 
-  const handleLogout = () => {
+  // Handle contractor login success (after Supabase signIn)
+  const handleContractorLogin = () => {
+    setCurrentUser("Contractor");
+  };
+
+  // Handle logout for all user types
+  const handleLogout = async () => {
+    if (currentUser === "Contractor") {
+      // Sign out from Supabase for contractors
+      await signOut();
+    }
     setCurrentUser(null);
     setCurrentScreen("dashboard");
+    setContractorScreen("dashboard");
   };
 
   const handleEmployeeClick = (employee: Employee) => {
@@ -131,7 +160,14 @@ function App() {
 
   // Show login screen if not authenticated
   if (!currentUser) {
-    return <Login onLogin={handleLogin} />;
+    return (
+      <Login
+        onLogin={handleLogin}
+        onContractorLogin={handleContractorLogin}
+        signIn={signIn}
+        authLoading={authLoading}
+      />
+    );
   }
 
   // Manager Portal - Limited View
@@ -358,11 +394,11 @@ function App() {
           {contractorScreen === "submit-hours" && (
             <SubmitHoursPage
               onCancel={() => setContractorScreen("dashboard")}
+              onSuccess={() => setContractorScreen("submissions")}
             />
           )}
           {contractorScreen === "submissions" && (
             <ContractorSubmissions
-              submissions={mockContractorSubmissions}
               onSubmitHours={() => setContractorScreen("submit-hours")}
               onBack={() => setContractorScreen("dashboard")}
             />

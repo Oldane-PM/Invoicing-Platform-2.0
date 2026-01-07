@@ -75,4 +75,21 @@ export interface ContractorSubmission {
   totalAmount: number;
   status: SubmissionStatus;
   invoiceUrl?: string | null;
+  workPeriod?: string; // "YYYY-MM"
+  excludedDates?: string[]; // ["YYYY-MM-DD", ...]
+  overtimeDescription?: string | null;
+}
+
+// Type for excluded dates in calendar
+export type ExcludedDate = string; // "YYYY-MM-DD"
+
+// Draft type for creating a new submission
+export interface SubmissionDraft {
+  workPeriod: string; // "YYYY-MM"
+  excludedDates: ExcludedDate[];
+  hoursSubmitted: number;
+  description: string;
+  overtimeHours: number;
+  overtimeDescription?: string | null;
+  projectName?: string; // optional for now if app doesn't have project selection
 }

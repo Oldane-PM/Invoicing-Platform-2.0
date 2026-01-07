@@ -1,10 +1,8 @@
-import * as React from "react";
 import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
 import { Sheet, SheetContent, SheetHeader } from "../components/ui/sheet";
-import { X, Calendar, Clock, DollarSign, FileText } from "lucide-react";
-import { format } from "date-fns";
-import type { ContractorSubmission } from "./ContractorDashboard";
+import { Calendar, Clock, DollarSign, FileText } from "lucide-react";
+import { format, parse } from "date-fns";
+import type { ContractorSubmission, SubmissionStatus } from "../lib/types";
 
 interface ContractorSubmissionDrawerProps {
   submission: ContractorSubmission | null;
@@ -12,7 +10,25 @@ interface ContractorSubmissionDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const statusStyles: Record<ContractorSubmission["status"], string> = {
+// Map SubmissionStatus to display status
+type DisplayStatus = "Paid" | "Approved" | "Pending" | "Rejected";
+
+function mapStatusToDisplay(status: SubmissionStatus): DisplayStatus {
+  switch (status) {
+    case "PAID":
+      return "Paid";
+    case "APPROVED":
+      return "Approved";
+    case "REJECTED":
+      return "Rejected";
+    case "PENDING":
+    case "NEEDS_CLARIFICATION":
+    default:
+      return "Pending";
+  }
+}
+
+const statusStyles: Record<DisplayStatus, string> = {
   Paid: "bg-purple-600 text-white border-purple-600",
   Approved: "bg-green-600 text-white border-green-600",
   Pending: "bg-gray-400 text-white border-gray-400",
@@ -25,6 +41,23 @@ export function ContractorSubmissionDrawer({
   onOpenChange,
 }: ContractorSubmissionDrawerProps) {
   if (!submission) return null;
+
+  const displayStatus = mapStatusToDisplay(submission.status);
+
+  // Parse work period to get start/end dates for display
+  const workPeriodDate = submission.workPeriod
+    ? parse(submission.workPeriod, "yyyy-MM", new Date())
+    : new Date();
+  const workPeriodStart = new Date(
+    workPeriodDate.getFullYear(),
+    workPeriodDate.getMonth(),
+    1
+  );
+  const workPeriodEnd = new Date(
+    workPeriodDate.getFullYear(),
+    workPeriodDate.getMonth() + 1,
+    0
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -47,8 +80,8 @@ export function ContractorSubmissionDrawer({
           <div className="mb-6 pb-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-600 uppercase tracking-wide">Status</span>
-              <Badge className={`${statusStyles[submission.status]} border`}>
-                {submission.status}
+              <Badge className={`${statusStyles[displayStatus]} border`}>
+                {displayStatus}
               </Badge>
             </div>
           </div>
@@ -65,7 +98,7 @@ export function ContractorSubmissionDrawer({
                 </div>
                 <div className="flex-1">
                   <div className="text-xs text-gray-600 mb-0.5">Project</div>
-                  <div className="text-sm font-medium text-gray-900">{submission.project}</div>
+                  <div className="text-sm font-medium text-gray-900">{submission.projectName}</div>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -75,8 +108,8 @@ export function ContractorSubmissionDrawer({
                 <div className="flex-1">
                   <div className="text-xs text-gray-600 mb-0.5">Work Period</div>
                   <div className="text-sm font-medium text-gray-900">
-                    {format(submission.workPeriodStart, "MMM d")} –{" "}
-                    {format(submission.workPeriodEnd, "MMM d, yyyy")}
+                    {format(workPeriodStart, "MMM d")} –{" "}
+                    {format(workPeriodEnd, "MMM d, yyyy")}
                   </div>
                 </div>
               </div>
@@ -125,6 +158,14 @@ export function ContractorSubmissionDrawer({
                 {submission.description}
               </p>
             </div>
+            {submission.overtimeDescription && (
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="text-xs text-gray-600 mb-1">Overtime Description</div>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {submission.overtimeDescription}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -133,7 +174,7 @@ export function ContractorSubmissionDrawer({
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Clock className="w-4 h-4" />
             <span>
-              Submitted on {format(submission.submissionDate, "MMM d, yyyy 'at' h:mm a")}
+              Submitted on {format(new Date(submission.submissionDate), "MMM d, yyyy 'at' h:mm a")}
             </span>
           </div>
         </div>

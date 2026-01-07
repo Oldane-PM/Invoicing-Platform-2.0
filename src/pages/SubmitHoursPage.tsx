@@ -3,14 +3,35 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
 import { toast } from "sonner";
-import { CalendarIcon, Info, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
-import { format, eachDayOfInterval, isWeekend, isSameDay, startOfMonth, endOfMonth } from "date-fns";
+import {
+  CalendarIcon,
+  Info,
+  ChevronLeft,
+  ChevronRight,
+  ArrowLeft,
+  Loader2,
+} from "lucide-react";
+import {
+  format,
+  eachDayOfInterval,
+  isWeekend,
+  isSameDay,
+  startOfMonth,
+  endOfMonth,
+} from "date-fns";
 import { motion, AnimatePresence } from "motion/react";
+import { useCreateSubmission } from "../lib/hooks/useCreateSubmission";
+import type { SubmissionDraft } from "../lib/types";
 
 interface SubmitHoursPageProps {
   onCancel: () => void;
+  onSuccess?: () => void;
 }
 
 type DayState = "working" | "excluded" | "weekend";
@@ -21,20 +42,37 @@ interface DayInfo {
 }
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
-export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
+export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = React.useState<number | null>(null);
-  const [selectedYear, setSelectedYear] = React.useState<number>(currentDate.getFullYear());
+  const [selectedYear, setSelectedYear] = React.useState<number>(
+    currentDate.getFullYear()
+  );
   const [monthPickerOpen, setMonthPickerOpen] = React.useState(false);
   const [excludedDates, setExcludedDates] = React.useState<Date[]>([]);
   const [hoursSubmitted, setHoursSubmitted] = React.useState("");
+  const [isHoursManuallyEdited, setIsHoursManuallyEdited] =
+    React.useState(false);
   const [description, setDescription] = React.useState("");
   const [overtimeHours, setOvertimeHours] = React.useState("");
   const [overtimeDescription, setOvertimeDescription] = React.useState("");
+
+  // Use the create submission hook
+  const { create, loading: isSubmitting } = useCreateSubmission();
 
   // Check if overtime description is required
   const isOvertimeDescriptionRequired = React.useMemo(() => {
@@ -75,21 +113,22 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
 
   const autoCalculatedHours = workingDaysCount * 8;
 
-  // Update hours when working days change
+  // Update hours when working days change (only if not manually edited)
   React.useEffect(() => {
-    if (workingDaysCount > 0) {
+    if (workingDaysCount > 0 && !isHoursManuallyEdited) {
       setHoursSubmitted(autoCalculatedHours.toString());
     }
-  }, [workingDaysCount, autoCalculatedHours]);
+  }, [workingDaysCount, autoCalculatedHours, isHoursManuallyEdited]);
 
   const handleMonthSelect = (monthIndex: number) => {
     setSelectedMonth(monthIndex);
     setExcludedDates([]); // Reset exclusions when month changes
+    setIsHoursManuallyEdited(false); // Reset manual edit flag when period changes
     setMonthPickerOpen(false);
   };
 
   const handleYearChange = (direction: "prev" | "next") => {
-    setSelectedYear((prev) => direction === "prev" ? prev - 1 : prev + 1);
+    setSelectedYear((prev) => (direction === "prev" ? prev - 1 : prev + 1));
   };
 
   const handleDayClick = (dayInfo: DayInfo) => {
@@ -108,7 +147,12 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setHoursSubmitted(e.target.value);
+    setIsHoursManuallyEdited(true);
+  };
+
+  const handleSubmit = async () => {
     if (selectedMonth === null) {
       toast.error("Please select a work period");
       return;
@@ -129,12 +173,41 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
       return;
     }
 
-    toast.success("Hours submitted successfully", {
-      description: "Your submission has been sent for review",
-    });
+    // Build the submission draft
+    const workPeriod = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}`;
+    const excludedDatesStrings = excludedDates.map((d) =>
+      format(d, "yyyy-MM-dd")
+    );
 
-    // Reset form and return to dashboard
-    onCancel();
+    const draft: SubmissionDraft = {
+      workPeriod,
+      excludedDates: excludedDatesStrings,
+      hoursSubmitted: parseInt(hoursSubmitted),
+      description: description.trim(),
+      overtimeHours: parseInt(overtimeHours) || 0,
+      overtimeDescription: overtimeDescription.trim() || null,
+      projectName: "General Work", // Could be enhanced with project selection later
+    };
+
+    // Create submission via hook
+    const result = await create(draft);
+
+    if (result) {
+      toast.success("Hours submitted successfully", {
+        description: "Your submission has been sent for review",
+      });
+
+      // Navigate to submissions page on success
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        onCancel();
+      }
+    } else {
+      toast.error("Failed to submit hours", {
+        description: "Please try again later",
+      });
+    }
   };
 
   const handleCancel = () => {
@@ -142,15 +215,15 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
     setSelectedYear(currentDate.getFullYear());
     setExcludedDates([]);
     setHoursSubmitted("");
+    setIsHoursManuallyEdited(false);
     setDescription("");
     setOvertimeHours("");
     setOvertimeDescription("");
     onCancel();
   };
 
-  const displayValue = selectedMonth !== null
-    ? `${MONTHS[selectedMonth]} ${selectedYear}`
-    : "";
+  const displayValue =
+    selectedMonth !== null ? `${MONTHS[selectedMonth]} ${selectedYear}` : "";
 
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
@@ -180,7 +253,10 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
           <div className="space-y-5">
             {/* Work Period - Month & Year Picker */}
             <div>
-              <Label htmlFor="work-period" className="text-sm font-medium text-gray-900 mb-1.5 block">
+              <Label
+                htmlFor="work-period"
+                className="text-sm font-medium text-gray-900 mb-1.5 block"
+              >
                 Work Period <span className="text-red-600">*</span>
               </Label>
               <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
@@ -191,7 +267,11 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
                     className="w-full h-11 justify-start text-left font-normal bg-white border-gray-300 rounded-lg hover:bg-gray-50"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                    {displayValue || <span className="text-gray-500">Select month and year</span>}
+                    {displayValue || (
+                      <span className="text-gray-500">
+                        Select month and year
+                      </span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[300px] p-0" align="start">
@@ -225,7 +305,9 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
                       {MONTHS.map((month, index) => (
                         <Button
                           key={month}
-                          variant={selectedMonth === index ? "default" : "outline"}
+                          variant={
+                            selectedMonth === index ? "default" : "outline"
+                          }
                           size="sm"
                           onClick={() => handleMonthSelect(index)}
                           className={`h-9 ${
@@ -251,9 +333,12 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
                   <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-sm text-blue-900 leading-relaxed">
-                      <span className="font-semibold">{workingDaysCount} working days selected</span>
+                      <span className="font-semibold">
+                        {workingDaysCount} working days selected
+                      </span>
                       <br />
-                      Click on days to exclude them from calculation. Weekends are automatically excluded.
+                      Click on days to exclude them from calculation. Weekends
+                      are automatically excluded.
                     </p>
                   </div>
                 </div>
@@ -273,6 +358,7 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
                           setSelectedMonth(selectedMonth - 1);
                         }
                         setExcludedDates([]);
+                        setIsHoursManuallyEdited(false);
                       }}
                       className="h-8 w-8 hover:bg-gray-100 rounded-lg"
                     >
@@ -292,6 +378,7 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
                           setSelectedMonth(selectedMonth + 1);
                         }
                         setExcludedDates([]);
+                        setIsHoursManuallyEdited(false);
                       }}
                       className="h-8 w-8 hover:bg-gray-100 rounded-lg"
                     >
@@ -315,8 +402,11 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
                   <div className="grid grid-cols-7 gap-1">
                     {/* Padding for first week - adjust for Monday start */}
                     {calendarDays.length > 0 &&
-                      Array.from({ 
-                        length: calendarDays[0].date.getDay() === 0 ? 6 : calendarDays[0].date.getDay() - 1 
+                      Array.from({
+                        length:
+                          calendarDays[0].date.getDay() === 0
+                            ? 6
+                            : calendarDays[0].date.getDay() - 1,
                       }).map((_, i) => (
                         <div key={`pad-${i}`} className="aspect-square" />
                       ))}
@@ -335,8 +425,8 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
                             dayInfo.state === "weekend"
                               ? "Weekend - not counted"
                               : dayInfo.state === "excluded"
-                              ? "Click to include this day"
-                              : "Click to exclude this day"
+                                ? "Click to include this day"
+                                : "Click to exclude this day"
                           }
                           className={`
                             aspect-square flex items-center justify-center rounded-full text-xs font-semibold transition-all
@@ -344,8 +434,8 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
                               dayInfo.state === "working"
                                 ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow-sm"
                                 : dayInfo.state === "excluded"
-                                ? "bg-white border-2 border-red-400 text-red-500 hover:bg-red-50 cursor-pointer"
-                                : "bg-blue-50 text-blue-200 cursor-not-allowed"
+                                  ? "bg-white border-2 border-red-400 text-red-500 hover:bg-red-50 cursor-pointer"
+                                  : "bg-blue-50 text-blue-200 cursor-not-allowed"
                             }
                           `}
                         >
@@ -359,15 +449,21 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
                 {/* Legend */}
                 <div className="flex items-center justify-center gap-6 text-xs text-gray-600">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-xs">5</div>
+                    <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-xs">
+                      5
+                    </div>
                     <span>Working Day</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-white border-2 border-red-400 flex items-center justify-center text-red-500 font-semibold text-xs">5</div>
+                    <div className="w-7 h-7 rounded-full bg-white border-2 border-red-400 flex items-center justify-center text-red-500 font-semibold text-xs">
+                      5
+                    </div>
                     <span>Excluded Day</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-blue-200 font-semibold text-xs">5</div>
+                    <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-blue-200 font-semibold text-xs">
+                      5
+                    </div>
                     <span>Weekend</span>
                   </div>
                 </div>
@@ -376,34 +472,41 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
 
             {/* Hours Submitted */}
             <div>
-              <Label htmlFor="hours-submitted" className="text-sm font-medium text-gray-900 mb-1.5 block">
+              <Label
+                htmlFor="hours-submitted"
+                className="text-sm font-medium text-gray-900 mb-1.5 block"
+              >
                 Hours Submitted
               </Label>
               <Input
                 id="hours-submitted"
                 type="number"
                 value={hoursSubmitted}
-                onChange={(e) => setHoursSubmitted(e.target.value)}
+                onChange={handleHoursChange}
                 className="h-11 bg-white border-gray-300 rounded-lg"
                 placeholder="0"
               />
               {workingDaysCount > 0 && (
                 <p className="text-xs text-gray-500 mt-1.5">
-                  Auto-calculated: {workingDaysCount} days × 8 hours = {autoCalculatedHours} hours (editable)
+                  Auto-calculated: {workingDaysCount} days x 8 hours ={" "}
+                  {autoCalculatedHours} hours (editable)
                 </p>
               )}
             </div>
 
             {/* Description */}
             <div>
-              <Label htmlFor="description" className="text-sm font-medium text-gray-900 mb-1.5 block">
+              <Label
+                htmlFor="description"
+                className="text-sm font-medium text-gray-900 mb-1.5 block"
+              >
                 Description <span className="text-red-600">*</span>
               </Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the work completed during this period…"
+                placeholder="Describe the work completed during this period..."
                 rows={4}
                 className="bg-white border-gray-300 rounded-lg resize-none"
               />
@@ -411,8 +514,12 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
 
             {/* Overtime Hours */}
             <div>
-              <Label htmlFor="overtime" className="text-sm font-medium text-gray-900 mb-1.5 block">
-                Overtime Hours <span className="text-gray-500 font-normal">(Optional)</span>
+              <Label
+                htmlFor="overtime"
+                className="text-sm font-medium text-gray-900 mb-1.5 block"
+              >
+                Overtime Hours{" "}
+                <span className="text-gray-500 font-normal">(Optional)</span>
               </Label>
               <Input
                 id="overtime"
@@ -435,8 +542,12 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
                   style={{ overflow: "hidden" }}
                 >
                   <div className="pt-1">
-                    <Label htmlFor="overtime-description" className="text-sm font-medium text-gray-900 mb-1.5 block">
-                      Overtime Description <span className="text-red-600">*</span>
+                    <Label
+                      htmlFor="overtime-description"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
+                      Overtime Description{" "}
+                      <span className="text-red-600">*</span>
                     </Label>
                     <Textarea
                       id="overtime-description"
@@ -457,15 +568,24 @@ export function SubmitHoursPage({ onCancel }: SubmitHoursPageProps) {
             <Button
               variant="outline"
               onClick={handleCancel}
+              disabled={isSubmitting}
               className="h-11 px-6 rounded-lg border-gray-300"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSubmit}
+              disabled={isSubmitting}
               className="h-11 px-6 rounded-lg bg-purple-600 hover:bg-purple-700"
             >
-              Submit Hours
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Hours"
+              )}
             </Button>
           </div>
         </div>
