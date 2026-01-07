@@ -1,19 +1,25 @@
+import { useEffect } from "react";
 import { Button } from "../components/ui/button";
 import { SubmissionCard } from "../components/SubmissionCard";
-import { Clock, Plus, ArrowLeft } from "lucide-react";
-import type { ContractorSubmission } from "../lib/types";
+import { Clock, Plus, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
+import { useSubmissions } from "../lib/hooks/useSubmissions";
 
 interface ContractorSubmissionsProps {
-  submissions: ContractorSubmission[];
   onSubmitHours?: () => void;
   onBack?: () => void;
 }
 
 export function ContractorSubmissions({
-  submissions,
   onSubmitHours,
   onBack,
 }: ContractorSubmissionsProps) {
+  const { submissions, loading, error, refetch } = useSubmissions();
+
+  // Refetch when component mounts (to get latest data after navigation)
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
   // Sort submissions by date in reverse chronological order (most recent first)
   const sortedSubmissions = [...submissions].sort(
     (a, b) =>
@@ -33,17 +39,55 @@ export function ContractorSubmissions({
           <ArrowLeft className="w-4 h-4 md:w-5 md:h-5 mr-2" />
           Back to Dashboard
         </Button>
-        <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-          Recent Submissions
-        </h1>
-        <p className="text-sm text-gray-600">
-          View your submitted hours and invoice status
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+              Recent Submissions
+            </h1>
+            <p className="text-sm text-gray-600">
+              View your submitted hours and invoice status
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={loading}
+            className="h-9"
+          >
+            <RefreshCw
+              className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Submissions List */}
       <div className="max-w-[1040px] mx-auto px-6 pb-12">
-        {sortedSubmissions.length === 0 ? (
+        {loading && submissions.length === 0 ? (
+          // Loading State
+          <div className="bg-white rounded-[14px] border border-gray-200 p-12 text-center">
+            <Loader2 className="w-12 h-12 text-purple-500 mx-auto mb-3 animate-spin" />
+            <p className="text-gray-600 font-medium">Loading submissions...</p>
+          </div>
+        ) : error ? (
+          // Error State
+          <div className="bg-white rounded-[14px] border border-red-200 p-12 text-center">
+            <p className="text-red-600 font-medium mb-2">
+              Failed to load submissions
+            </p>
+            <p className="text-sm text-gray-500 mb-4">{error.message}</p>
+            <Button
+              onClick={() => refetch()}
+              variant="outline"
+              className="border-red-200 text-red-600 hover:bg-red-50"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
+        ) : sortedSubmissions.length === 0 ? (
           // Empty State
           <div className="bg-white rounded-[14px] border border-gray-200 p-12 text-center">
             <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
