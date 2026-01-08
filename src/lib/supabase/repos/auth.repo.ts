@@ -92,6 +92,7 @@ export async function getSession(): Promise<AuthSession | null> {
 
 /**
  * Get user profile by ID
+ * Uses maybeSingle() to handle missing profiles gracefully
  */
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const supabaseClient = getSupabaseClient();
@@ -100,14 +101,25 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     .from("profiles")
     .select("id, role, full_name, email")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    console.error("[auth.repo] getUserProfile error:", error);
+    // Log full error details for debugging
+    console.error("[auth.repo] getUserProfile error:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
     return null;
   }
 
   if (!data) {
+    // No profile row found - this is actionable info for debugging
+    console.warn(
+      `[auth.repo] getUserProfile: Missing profiles row for auth user ${userId}. ` +
+      `Run migration 008 or manually insert: INSERT INTO profiles (id, email, role) VALUES ('${userId}', 'user@email.com', 'CONTRACTOR');`
+    );
     return null;
   }
 
