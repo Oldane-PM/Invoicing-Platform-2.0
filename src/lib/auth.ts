@@ -14,6 +14,21 @@ export const auth = betterAuth({
   baseURL: getEnv("BETTER_AUTH_URL", "http://localhost:5001"),
   secret: getEnv("BETTER_AUTH_SECRET", "development-secret-change-in-production"),
 
+  // Stateless session management (no database required)
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      strategy: "jwe",
+      refreshCache: true,
+    },
+  },
+
+  account: {
+    storeStateStrategy: "cookie",
+    storeAccountCookie: true,
+  },
+
   socialProviders: {
     google: {
       clientId: getEnv("GOOGLE_CLIENT_ID", ""),

@@ -52,7 +52,13 @@ app.get("/api/submissions", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(` Server listening on http://localhost:${port}`);
-  console.log(` Auth endpoint: http://localhost:${port}/api/auth`);
-});
+// Start server with error handling
+try {
+  app.listen(port, () => {
+    console.log(` Server listening on http://localhost:${port}`);
+    console.log(` Auth endpoint: http://localhost:${port}/api/auth`);
+  });
+} catch (error) {
+  console.error("Failed to start server:", error);
+  process.exit(1);
+}
