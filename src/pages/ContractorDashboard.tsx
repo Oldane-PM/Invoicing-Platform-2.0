@@ -1,11 +1,10 @@
 import * as React from "react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import { InvoiceActionButton } from "../components/InvoiceActionButton";
 import { ContractorSubmissionDrawer } from "./ContractorSubmissionDrawer";
-import { PDFInvoiceViewer } from "./PDFInvoiceViewer";
-import { Plus, Clock, FileText, Loader2, RefreshCw } from "lucide-react";
-import { format, parse } from "date-fns";
-import { toast } from "sonner";
+import { Plus, Clock, Loader2, RefreshCw } from "lucide-react";
+import { format } from "date-fns";
 import { useSubmissions } from "../lib/hooks/useSubmissions";
 import type { ContractorSubmission, SubmissionStatus } from "../lib/types";
 
@@ -60,83 +59,10 @@ export function ContractorDashboard({
   const [selectedSubmission, setSelectedSubmission] =
     React.useState<ContractorSubmission | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const [pdfViewerOpen, setPdfViewerOpen] = React.useState(false);
-  const [pdfInvoiceData, setPdfInvoiceData] = React.useState<any>(null);
 
   const handleCardClick = (submission: ContractorSubmission) => {
     setSelectedSubmission(submission);
     setDrawerOpen(true);
-  };
-
-  const handleViewPDF = (
-    e: React.MouseEvent,
-    submission: ContractorSubmission
-  ) => {
-    e.stopPropagation(); // Prevent card click
-
-    // Check if invoice URL exists
-    if (!submission.invoiceUrl) {
-      toast.info("Invoice not yet available.", {
-        description: "Invoice will be generated once the submission is approved.",
-      });
-      return;
-    }
-
-    // Parse work period to get start/end dates
-    const workPeriodDate = submission.workPeriod
-      ? parse(submission.workPeriod, "yyyy-MM", new Date())
-      : new Date();
-    const workPeriodStart = new Date(
-      workPeriodDate.getFullYear(),
-      workPeriodDate.getMonth(),
-      1
-    );
-    const workPeriodEnd = new Date(
-      workPeriodDate.getFullYear(),
-      workPeriodDate.getMonth() + 1,
-      0
-    );
-
-    // Generate invoice data dynamically
-    const invoiceData = {
-      // Submission Data
-      submissionId: submission.id,
-      submissionDate: new Date(submission.submissionDate),
-      workPeriodStart,
-      workPeriodEnd,
-      regularHours: submission.regularHours,
-      overtimeHours: submission.overtimeHours,
-      regularDescription: submission.description,
-      overtimeDescription: submission.overtimeDescription || undefined,
-
-      // Contractor Personal Info (live from profile)
-      contractorName: "Sarah Johnson",
-      contractorAddress: "123 Main Street, Apartment 4B, California 90210",
-      contractorCountry: "United States",
-      contractorEmail: "sarah.johnson@email.com",
-
-      // Contract Info
-      hourlyRate: 75,
-      overtimeRate: 112.5,
-      position: "Senior Developer",
-
-      // Banking Details (live from profile)
-      bankName: "First National Bank",
-      bankAddress:
-        "456 Banking Boulevard, Financial District, New York, NY 10004",
-      swiftCode: "FNBAUS33",
-      routingNumber: "021000021",
-      accountType: "Checking",
-      accountNumber: "9876543210",
-      currency: "USD",
-
-      // Company/Client Info
-      companyName: "TechCorp Inc.",
-      companyAddress: "789 Business Park, Suite 100, San Francisco, CA 94102",
-    };
-
-    setPdfInvoiceData(invoiceData);
-    setPdfViewerOpen(true);
   };
 
   return (
@@ -242,6 +168,11 @@ export function ContractorDashboard({
                             "MMM d, yyyy"
                           )}
                         </p>
+                        {submission.invoiceNumber && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {submission.invoiceNumber}
+                          </p>
+                        )}
                       </div>
                       <Badge
                         className={`${statusStyles[displayStatus]} border`}
@@ -293,20 +224,10 @@ export function ContractorDashboard({
 
                     {/* Row 5: View Invoice Button */}
                     <div className="mt-4">
-                      <Button
-                        onClick={(e) => handleViewPDF(e, submission)}
-                        disabled={!submission.invoiceUrl}
-                        className={`h-10 rounded-[10px] px-4 ${
-                          submission.invoiceUrl
-                            ? "bg-blue-600 hover:bg-blue-700"
-                            : "bg-gray-300 cursor-not-allowed"
-                        }`}
-                      >
-                        <FileText className="w-4 h-4 mr-2" />
-                        {submission.invoiceUrl
-                          ? "View Invoice"
-                          : "Invoice Pending"}
-                      </Button>
+                      <InvoiceActionButton
+                        submissionId={submission.id}
+                        invoiceStatus={submission.invoiceStatus}
+                      />
                     </div>
                   </div>
                 );
@@ -321,13 +242,6 @@ export function ContractorDashboard({
         submission={selectedSubmission}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-      />
-
-      {/* PDF Invoice Viewer */}
-      <PDFInvoiceViewer
-        invoiceData={pdfInvoiceData}
-        open={pdfViewerOpen}
-        onOpenChange={setPdfViewerOpen}
       />
     </>
   );

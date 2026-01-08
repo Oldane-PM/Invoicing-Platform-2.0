@@ -9,14 +9,23 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app: Express = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(helmet()); // Security headers
+
+// CORS configuration - explicitly allow Authorization header
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5173',
+  ],
   credentials: true,
-})); // Enable CORS
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+}));
+
 app.use(compression()); // Compress responses
 app.use(morgan('dev')); // Logging
 app.use(express.json()); // Parse JSON bodies
@@ -31,22 +40,22 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
-// Import routes here
+// Import routes
 import exampleRoutes from './routes/example.routes';
+import invoiceRoutes from './routes/invoice.routes';
 
 // Register routes
 app.use('/api/example', exampleRoutes);
-// Add more routes:
-// app.use('/api/invoices', invoiceRoutes);
-// app.use('/api/users', userRoutes);
+// Invoice routes (e.g., /api/submissions/:id/invoice)
+app.use('/api/submissions', invoiceRoutes);
 
 // Error handling middleware
-app.use((err: Error, req: Request, res: Response, next: any) => {
+app.use((err: Error, req: Request, res: Response, _next: any) => {
   console.error(err.stack);
   res.status(500).json({
     status: 'error',
-    message: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
+    message: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
       : err.message,
   });
 });
@@ -67,4 +76,3 @@ app.listen(PORT, () => {
 });
 
 export default app;
-

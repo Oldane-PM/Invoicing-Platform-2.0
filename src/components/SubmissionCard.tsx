@@ -1,6 +1,6 @@
 import { Card } from "./ui/card";
 import { SubmissionStatusPill } from "./SubmissionStatusPill";
-import { InvoiceButton } from "./InvoiceButton";
+import { InvoiceActionButton } from "./InvoiceActionButton";
 import { formatDate, formatCurrency } from "../lib/utils";
 import type { ContractorSubmission } from "../lib/types";
 
@@ -56,7 +56,10 @@ export function SubmissionCard({ submission }: SubmissionCardProps) {
 
       {/* View Invoice Button */}
       <div className="mt-4">
-        <InvoiceButton invoiceUrl={submission.invoiceUrl} />
+        <InvoiceActionButton
+          submissionId={submission.id}
+          invoiceStatus={submission.invoiceStatus}
+        />
       </div>
     </Card>
   );
