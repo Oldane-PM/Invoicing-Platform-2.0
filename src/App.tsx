@@ -131,7 +131,7 @@ function App() {
 
   // Show login screen if not authenticated
   if (!currentUser) {
-    return <Login onLogin={handleLogin} />;
+    return <Login />;
   }
 
   // Manager Portal - Limited View
