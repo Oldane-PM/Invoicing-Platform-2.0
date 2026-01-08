@@ -4,33 +4,48 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { AlertCircle, Loader2, Mail, User } from "lucide-react";
 import { isSupabaseConfigured } from "../lib/supabase/client";
+import type { UserRole } from "../lib/supabase/repos/auth.repo";
 
 type LoginMode = "role" | "email";
+type AuthUserType = "contractor" | "manager";
 
 interface LoginProps {
   onLogin: (username: string) => void;
-  onContractorLogin?: () => void;
-  signIn?: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  onSupabaseLogin?: (role: UserRole) => void;
+  signIn?: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: UserRole }>;
   authLoading?: boolean;
 }
 
-export function Login({ onLogin, onContractorLogin, signIn, authLoading }: LoginProps) {
+export function Login({ onLogin, onSupabaseLogin, signIn, authLoading }: LoginProps) {
   const [mode, setMode] = React.useState<LoginMode>("role");
+  const [authUserType, setAuthUserType] = React.useState<AuthUserType>("contractor");
   const [username, setUsername] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(false);
 
-  // Role-based login (Admin/Manager - mock)
+  // Role-based login (Admin - mock) or switch to email mode for Manager/Contractor
   const handleRoleLogin = () => {
     setError("");
 
-    if (username === "Admin" || username === "Manager") {
+    if (username === "Admin") {
+      // Admin still uses mock login
       onLogin(username);
-    } else if (username === "Contractor") {
-      // Switch to email login mode for contractors
+    } else if (username === "Manager") {
+      // Switch to email login mode for Manager
       if (isSupabaseConfigured && signIn) {
+        setAuthUserType("manager");
+        setMode("email");
+        setUsername("");
+      } else {
+        // Fallback to mock if Supabase not configured
+        onLogin(username);
+      }
+    } else if (username === "Contractor") {
+      // Switch to email login mode for Contractors
+      if (isSupabaseConfigured && signIn) {
+        setAuthUserType("contractor");
         setMode("email");
         setUsername("");
       } else {
@@ -42,7 +57,7 @@ export function Login({ onLogin, onContractorLogin, signIn, authLoading }: Login
     }
   };
 
-  // Email/password login (Contractor - real auth)
+  // Email/password login (Manager/Contractor - real auth)
   const handleEmailLogin = async () => {
     setError("");
 
@@ -66,9 +81,20 @@ export function Login({ onLogin, onContractorLogin, signIn, authLoading }: Login
     try {
       const result = await signIn(email, password);
 
-      if (result.success) {
+      if (result.success && result.role) {
+        // Verify the user has the expected role
+        const expectedRole = authUserType === "manager" ? "MANAGER" : "CONTRACTOR";
+        if (result.role !== expectedRole) {
+          setError(`This account is not a ${authUserType}. Please use the correct login.`);
+          return;
+        }
+
         // Auth state will be handled by useAuth hook
-        onContractorLogin?.();
+        onSupabaseLogin?.(result.role);
+      } else if (result.success && !result.role) {
+        // Logged in but no profile - assume the role based on selection
+        const assumedRole: UserRole = authUserType === "manager" ? "MANAGER" : "CONTRACTOR";
+        onSupabaseLogin?.(assumedRole);
       } else {
         setError(result.error || "Login failed. Please check your credentials.");
       }
@@ -96,6 +122,16 @@ export function Login({ onLogin, onContractorLogin, signIn, authLoading }: Login
     setError("");
   };
 
+  const getEmailLoginTitle = () => {
+    return authUserType === "manager" ? "Manager Login" : "Contractor Login";
+  };
+
+  const getEmailLoginHint = () => {
+    return authUserType === "manager"
+      ? "Sign in with your manager account credentials"
+      : "Sign in with your contractor account credentials";
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
@@ -117,7 +153,7 @@ export function Login({ onLogin, onContractorLogin, signIn, authLoading }: Login
             Invoicing Platform
           </h1>
           <p className="text-center text-sm text-gray-500 mb-6">
-            {mode === "role" ? "Select your role to continue" : "Contractor Login"}
+            {mode === "role" ? "Select your role to continue" : getEmailLoginTitle()}
           </p>
 
           {mode === "role" ? (
@@ -143,7 +179,7 @@ export function Login({ onLogin, onContractorLogin, signIn, authLoading }: Login
                 </div>
               </div>
 
-              {/* Password Field (visual only for mock) */}
+              {/* Password Field (visual only for Admin mock) */}
               <div>
                 <Label htmlFor="password-role" className="text-sm font-medium text-gray-900 mb-1.5 block">
                   Password
@@ -176,7 +212,7 @@ export function Login({ onLogin, onContractorLogin, signIn, authLoading }: Login
               )}
             </div>
           ) : (
-            /* Email/password login form for Contractors */
+            /* Email/password login form for Manager/Contractor */
             <div className="space-y-5">
               {/* Back button */}
               <button
@@ -226,7 +262,11 @@ export function Login({ onLogin, onContractorLogin, signIn, authLoading }: Login
               <Button
                 onClick={handleEmailLogin}
                 disabled={loading}
-                className="w-full h-11 bg-purple-600 hover:bg-purple-700 rounded-lg mt-2"
+                className={`w-full h-11 rounded-lg mt-2 ${
+                  authUserType === "manager"
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-purple-600 hover:bg-purple-700"
+                }`}
               >
                 {loading ? (
                   <>
@@ -253,15 +293,13 @@ export function Login({ onLogin, onContractorLogin, signIn, authLoading }: Login
         <div className="mt-6 text-center">
           {mode === "role" ? (
             <p className="text-xs text-gray-500">
-              Demo: <span className="font-medium text-gray-700">Admin</span> or{" "}
-              <span className="font-medium text-gray-700">Manager</span> (mock login)
+              <span className="font-medium text-gray-700">Admin</span> (mock login)
               <br />
+              <span className="font-medium text-gray-700">Manager</span> &{" "}
               <span className="font-medium text-gray-700">Contractor</span> (real authentication)
             </p>
           ) : (
-            <p className="text-xs text-gray-500">
-              Sign in with your contractor account credentials
-            </p>
+            <p className="text-xs text-gray-500">{getEmailLoginHint()}</p>
           )}
         </div>
       </div>

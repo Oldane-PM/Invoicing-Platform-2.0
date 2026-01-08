@@ -15,157 +15,169 @@ import {
 } from "../components/ui/table";
 import { ManagerSubmissionDrawer } from "./ManagerSubmissionDrawer";
 import { toast } from "sonner";
-import { Search, Users, Clock, FileText, DollarSign } from "lucide-react";
+import {
+  Search,
+  Users,
+  Clock,
+  FileText,
+  DollarSign,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 import { format } from "date-fns";
+import { useManagerDashboard } from "../lib/hooks/manager/useManagerDashboard";
+import { useManagerSubmissions } from "../lib/hooks/manager/useManagerSubmissions";
+import { useSubmissionActions } from "../lib/hooks/manager/useSubmissionActions";
+import { useTeam } from "../lib/hooks/manager/useTeam";
+import type { ManagerSubmission } from "../lib/supabase/repos/managerSubmissions.repo";
 
-interface SubmissionData {
-  id: string;
-  employeeName: string;
-  employeeEmail: string;
-  contractorType: string;
-  project: string;
-  dateSubmitted: Date;
-  regularHours: number;
-  overtimeHours: number;
-  totalHours: number;
-  invoiceAmount: number;
-  status: "Pending" | "Approved" | "Rejected";
-  rate: number;
-  notes?: string;
+// Map database status to display status
+type DisplayStatus = "Pending" | "Approved" | "Rejected" | "Paid";
+
+function mapStatusToDisplay(status: string): DisplayStatus {
+  switch (status) {
+    case "PAID":
+      return "Paid";
+    case "APPROVED":
+      return "Approved";
+    case "REJECTED":
+      return "Rejected";
+    case "PENDING":
+    case "NEEDS_CLARIFICATION":
+    default:
+      return "Pending";
+  }
 }
 
-const mockSubmissions: SubmissionData[] = [
-  {
-    id: "SUB-001",
-    employeeName: "Sarah Johnson",
-    employeeEmail: "sarah.johnson@company.com",
-    contractorType: "Hourly",
-    project: "Platform Migration",
-    dateSubmitted: new Date(2026, 0, 15),
-    regularHours: 160,
-    overtimeHours: 8,
-    totalHours: 168,
-    invoiceAmount: 8400,
-    status: "Pending",
-    rate: 50,
-    notes: "Worked extra hours during critical deployment phase.",
-  },
-  {
-    id: "SUB-002",
-    employeeName: "Michael Chen",
-    employeeEmail: "michael.chen@company.com",
-    contractorType: "Fixed",
-    project: "API Development",
-    dateSubmitted: new Date(2026, 0, 14),
-    regularHours: 160,
-    overtimeHours: 0,
-    totalHours: 160,
-    invoiceAmount: 12000,
-    status: "Approved",
-    rate: 75,
-  },
-  {
-    id: "SUB-003",
-    employeeName: "Emily Rodriguez",
-    employeeEmail: "emily.rodriguez@company.com",
-    contractorType: "Hourly",
-    project: "UI Redesign",
-    dateSubmitted: new Date(2026, 0, 16),
-    regularHours: 160,
-    overtimeHours: 5,
-    totalHours: 165,
-    invoiceAmount: 8250,
-    status: "Pending",
-    rate: 50,
-    notes: "Additional hours for client revisions.",
-  },
-  {
-    id: "SUB-004",
-    employeeName: "David Kim",
-    employeeEmail: "david.kim@company.com",
-    contractorType: "Hourly",
-    project: "Data Analytics",
-    dateSubmitted: new Date(2026, 0, 13),
-    regularHours: 160,
-    overtimeHours: 0,
-    totalHours: 160,
-    invoiceAmount: 9600,
-    status: "Approved",
-    rate: 60,
-  },
-  {
-    id: "SUB-005",
-    employeeName: "Jessica Martinez",
-    employeeEmail: "jessica.martinez@company.com",
-    contractorType: "Hourly",
-    project: "Mobile App",
-    dateSubmitted: new Date(2026, 0, 17),
-    regularHours: 152,
-    overtimeHours: 12,
-    totalHours: 164,
-    invoiceAmount: 9020,
-    status: "Pending",
-    rate: 55,
-    notes: "Weekend work for app store submission deadline.",
-  },
-];
-
-const statusStyles: Record<string, string> = {
+const statusStyles: Record<DisplayStatus, string> = {
   Pending: "bg-yellow-100 text-yellow-700 border-yellow-200",
   Approved: "bg-green-100 text-green-700 border-green-200",
   Rejected: "bg-red-100 text-red-700 border-red-200",
+  Paid: "bg-purple-100 text-purple-700 border-purple-200",
 };
 
 export function ManagerDashboard() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("");
   const [timeRangeFilter, setTimeRangeFilter] = React.useState("");
-  const [submissions, setSubmissions] = React.useState(mockSubmissions);
-  const [selectedSubmission, setSelectedSubmission] = React.useState<SubmissionData | null>(null);
+  const [selectedSubmission, setSelectedSubmission] =
+    React.useState<ManagerSubmission | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
-  const handleSubmissionClick = (submission: SubmissionData) => {
+  // Use live data hooks
+  const { metrics, loading: metricsLoading, refetch: refetchMetrics } = useManagerDashboard();
+  const { teamSize, loading: teamLoading } = useTeam();
+  const {
+    submissions,
+    loading: submissionsLoading,
+    error: submissionsError,
+    filters,
+    setFilters,
+    refetch: refetchSubmissions,
+  } = useManagerSubmissions({
+    status: statusFilter || undefined,
+  });
+  const { approve, reject, markPaid, approving, rejecting, markingPaid } =
+    useSubmissionActions();
+
+  // Update filters when UI changes
+  React.useEffect(() => {
+    setFilters({
+      status: statusFilter || undefined,
+    });
+  }, [statusFilter, setFilters]);
+
+  const handleSubmissionClick = (submission: ManagerSubmission) => {
     setSelectedSubmission(submission);
     setDrawerOpen(true);
   };
 
-  const handleStatusUpdate = (submissionId: string, newStatus: "Approved" | "Rejected", reason?: string) => {
-    setSubmissions(prev =>
-      prev.map(sub =>
-        sub.id === submissionId
-          ? { ...sub, status: newStatus }
-          : sub
-      )
-    );
+  const handleStatusUpdate = async (
+    submissionId: string,
+    newStatus: "Approved" | "Rejected",
+    reason?: string
+  ) => {
+    let success = false;
 
-    if (selectedSubmission?.id === submissionId) {
-      setSelectedSubmission({ ...selectedSubmission, status: newStatus });
+    if (newStatus === "Approved") {
+      success = await approve(submissionId);
+      if (success) {
+        toast.success("Submission approved successfully");
+      }
+    } else if (newStatus === "Rejected") {
+      success = await reject(submissionId, reason || "No reason provided");
+      if (success) {
+        toast.success("Submission rejected");
+      }
+    }
+
+    if (success) {
+      // Refetch data to update UI
+      refetchSubmissions();
+      refetchMetrics();
+      setDrawerOpen(false);
+    } else {
+      toast.error("Failed to update submission status");
     }
   };
 
+  const handleMarkPaid = async (submissionId: string) => {
+    const success = await markPaid(submissionId);
+    if (success) {
+      toast.success("Submission marked as paid");
+      refetchSubmissions();
+      refetchMetrics();
+      setDrawerOpen(false);
+    } else {
+      toast.error("Failed to mark submission as paid");
+    }
+  };
+
+  // Filter submissions by search query (client-side)
   const filteredSubmissions = React.useMemo(() => {
+    if (!searchQuery) return submissions;
+
     return submissions.filter((submission) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        submission.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        submission.employeeEmail.toLowerCase().includes(searchQuery.toLowerCase());
+      const contractorName = submission.contractorName?.toLowerCase() || "";
+      const contractorEmail = submission.contractorEmail?.toLowerCase() || "";
+      const query = searchQuery.toLowerCase();
 
-      const matchesStatus =
-        statusFilter === "" || submission.status === statusFilter;
-
-      // For now, timeRange is just a placeholder
-      return matchesSearch && matchesStatus;
+      return contractorName.includes(query) || contractorEmail.includes(query);
     });
-  }, [submissions, searchQuery, statusFilter]);
+  }, [submissions, searchQuery]);
 
-  const teamSize = submissions.length;
-  const pendingCount = submissions.filter(s => s.status === "Pending").length;
-  const totalHours = submissions.reduce((sum, s) => sum + s.totalHours, 0);
-  const totalInvoice = submissions.reduce((sum, s) => sum + s.invoiceAmount, 0);
+  const isLoading = metricsLoading || submissionsLoading || teamLoading;
+
+  // Calculate metrics from live data or use defaults
+  const pendingCount = metrics?.pendingCount ?? 0;
+  const totalHours = metrics?.totalHoursThisPeriod ?? 0;
+  const totalInvoice = metrics?.totalAmountThisPeriod ?? 0;
+
+  const handleRefresh = () => {
+    refetchSubmissions();
+    refetchMetrics();
+    toast.success("Data refreshed");
+  };
 
   return (
     <>
       <div className="space-y-6">
+        {/* Refresh Button */}
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="h-9"
+          >
+            <RefreshCw
+              className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </div>
+
         {/* Metrics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
@@ -215,9 +227,10 @@ export function ManagerDashboard() {
                 value={statusFilter}
                 onValueChange={setStatusFilter}
                 options={[
-                  { value: "Pending", label: "Pending" },
-                  { value: "Approved", label: "Approved" },
-                  { value: "Rejected", label: "Rejected" },
+                  { value: "PENDING", label: "Pending" },
+                  { value: "APPROVED", label: "Approved" },
+                  { value: "REJECTED", label: "Rejected" },
+                  { value: "PAID", label: "Paid" },
                 ]}
                 placeholder="All Statuses"
               />
@@ -251,75 +264,146 @@ export function ManagerDashboard() {
 
         {/* Team Submission Table */}
         <Card className="border border-gray-200 rounded-[14px] bg-white overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50 hover:bg-gray-50">
-                <TableHead className="font-semibold text-gray-700">Date of Submission</TableHead>
-                <TableHead className="font-semibold text-gray-700">Employee Name</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-right">Total Hours</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-right">Overtime Hours</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-right">Invoice Amount</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-center">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSubmissions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12">
-                    <div className="flex flex-col items-center gap-2">
-                      <FileText className="h-12 w-12 text-gray-300" />
-                      <p className="text-gray-600">No submissions found</p>
-                      <p className="text-sm text-gray-500">
-                        {searchQuery || statusFilter || timeRangeFilter
-                          ? "Try adjusting your filters"
-                          : "Submissions will appear here"}
-                      </p>
-                    </div>
-                  </TableCell>
+          {submissionsLoading && submissions.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+              <span className="ml-3 text-gray-600">Loading submissions...</span>
+            </div>
+          ) : submissionsError ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <p className="text-red-600 mb-2">Failed to load submissions</p>
+              <p className="text-sm text-gray-500 mb-4">
+                {submissionsError.message}
+              </p>
+              <Button
+                onClick={() => refetchSubmissions()}
+                variant="outline"
+                className="border-red-200 text-red-600 hover:bg-red-50"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50 hover:bg-gray-50">
+                  <TableHead className="font-semibold text-gray-700">
+                    Date of Submission
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-700">
+                    Employee Name
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-right">
+                    Total Hours
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-right">
+                    Overtime Hours
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-right">
+                    Invoice Amount
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-center">
+                    Status
+                  </TableHead>
                 </TableRow>
-              ) : (
-                filteredSubmissions.map((submission) => (
-                  <TableRow
-                    key={submission.id}
-                    onClick={() => handleSubmissionClick(submission)}
-                    className="hover:bg-gray-50 cursor-pointer"
-                  >
-                    <TableCell className="text-gray-700">
-                      {format(submission.dateSubmitted, "MMM d, yyyy")}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium text-gray-900">{submission.employeeName}</div>
-                        <div className="text-sm text-gray-500">{submission.employeeEmail}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-gray-900">
-                      {submission.totalHours}h
-                    </TableCell>
-                    <TableCell className="text-right text-gray-700">
-                      {submission.overtimeHours}h
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-gray-900">
-                      ${submission.invoiceAmount.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex justify-center">
-                        <Badge className={`${statusStyles[submission.status]} border`}>
-                          {submission.status}
-                        </Badge>
+              </TableHeader>
+              <TableBody>
+                {filteredSubmissions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-2">
+                        <FileText className="h-12 w-12 text-gray-300" />
+                        <p className="text-gray-600">No submissions found</p>
+                        <p className="text-sm text-gray-500">
+                          {searchQuery || statusFilter || timeRangeFilter
+                            ? "Try adjusting your filters"
+                            : "Submissions will appear here"}
+                        </p>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredSubmissions.map((submission) => {
+                    const displayStatus = mapStatusToDisplay(submission.status);
+                    const totalHours =
+                      submission.regularHours + submission.overtimeHours;
+
+                    return (
+                      <TableRow
+                        key={submission.id}
+                        onClick={() => handleSubmissionClick(submission)}
+                        className="hover:bg-gray-50 cursor-pointer"
+                      >
+                        <TableCell className="text-gray-700">
+                          {format(
+                            new Date(submission.submissionDate),
+                            "MMM d, yyyy"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {submission.contractorName || "Unknown"}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {submission.contractorEmail || ""}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-gray-900">
+                          {totalHours}h
+                        </TableCell>
+                        <TableCell className="text-right text-gray-700">
+                          {submission.overtimeHours}h
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-gray-900">
+                          ${submission.totalAmount.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Badge
+                              className={`${statusStyles[displayStatus]} border`}
+                            >
+                              {displayStatus}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          )}
         </Card>
       </div>
 
       {/* Submission Review Drawer */}
       <ManagerSubmissionDrawer
-        submission={selectedSubmission}
+        submission={
+          selectedSubmission
+            ? {
+                id: selectedSubmission.id,
+                employeeName: selectedSubmission.contractorName || "Unknown",
+                employeeEmail: selectedSubmission.contractorEmail || "",
+                contractorType: "Hourly",
+                project: selectedSubmission.projectName || "",
+                dateSubmitted: new Date(selectedSubmission.submissionDate),
+                regularHours: selectedSubmission.regularHours,
+                overtimeHours: selectedSubmission.overtimeHours,
+                totalHours:
+                  selectedSubmission.regularHours +
+                  selectedSubmission.overtimeHours,
+                invoiceAmount: selectedSubmission.totalAmount,
+                status: mapStatusToDisplay(
+                  selectedSubmission.status
+                ) as "Pending" | "Approved" | "Rejected",
+                rate: 0,
+                notes: selectedSubmission.description,
+              }
+            : null
+        }
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         onStatusUpdate={handleStatusUpdate}
