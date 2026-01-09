@@ -35,6 +35,11 @@ export function Login({ onSupabaseLogin, signIn, authLoading }: LoginProps) {
 
     setLoading(true);
 
+    // Store login intent in sessionStorage so App.tsx can validate it
+    if (loginIntent) {
+      sessionStorage.setItem('loginIntent', loginIntent);
+    }
+
     try {
       const result = await signIn(email, password);
 
@@ -46,9 +51,11 @@ export function Login({ onSupabaseLogin, signIn, authLoading }: LoginProps) {
         setError("Account found but no role assigned. Please contact an administrator.");
       } else {
         setError(result.error || "Login failed. Please check your credentials.");
+        sessionStorage.removeItem('loginIntent');
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
+      sessionStorage.removeItem('loginIntent');
     } finally {
       setLoading(false);
     }

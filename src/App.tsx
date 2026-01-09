@@ -32,6 +32,11 @@ import { AdminCalendar } from "./pages/AdminCalendar";
 import { NotificationsDrawer } from "./pages/NotificationsDrawer";
 import { ContractorDetailDrawer } from "./pages/ContractorDetailDrawer";
 import { ContractorSubmissions } from "./pages/ContractorSubmissions";
+import {
+  mockEmployees,
+  mockUsers,
+  mockNotifications,
+} from "./lib/data/mockData";
 import { useAuth } from "./lib/hooks/useAuth";
 import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
 import type { Employee, User, Submission, Notification, MetricData } from "./lib/types";
@@ -78,20 +83,55 @@ function App() {
   const unreadCount = notifications.filter((n) => !n.read).length;
   const currentUserId = user?.id || "";
 
-  // Sync Supabase auth state with currentUser (for Manager and Contractor)
+  // Sync Supabase auth state with currentUser and fetch role from database
   React.useEffect(() => {
-    if (isAuthenticated && user && role) {
-      // User is authenticated via Supabase - set role based on profile
-      if (role === "MANAGER") {
-        setCurrentUser("Manager");
-      } else if (role === "CONTRACTOR") {
-        setCurrentUser("Contractor");
+    async function fetchUserRole() {
+      if (isAuthenticated && user) {
+        // User is authenticated via Supabase - fetch their role from app_users table
+        const { getSupabaseClient } = await import('./lib/supabase/client');
+        const supabase = getSupabaseClient();
+        
+        const { data: appUser, error } = await supabase
+          .from('app_users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user role:', error);
+          // Sign out and show error
+          await signOut();
+          alert('Unable to fetch user role. Please try again.');
+        } else if (appUser) {
+          // Map database role to app role
+          const roleMap: Record<string, UserRole> = {
+            'admin': 'Admin',
+            'manager': 'Manager',
+            'contractor': 'Contractor',
+          };
+          const userRole = roleMap[appUser.role.toLowerCase()] || 'Contractor';
+          
+          // Validate that user is logging in through the correct option
+          // This prevents admins from logging in through "Contractor" and vice versa
+          const loginIntent = sessionStorage.getItem('loginIntent');
+          if (loginIntent && loginIntent !== userRole) {
+            // User tried to log in through wrong option
+            await signOut();
+            alert(`You cannot log in as ${loginIntent}. Please use the ${userRole} login option.`);
+            sessionStorage.removeItem('loginIntent');
+          } else {
+            setCurrentUser(userRole);
+            sessionStorage.removeItem('loginIntent');
+          }
+        }
+      } else if (!authLoading && currentUser && !isAuthenticated) {
+        // User was logged out from Supabase
+        setCurrentUser(null);
       }
-    } else if (!authLoading && (currentUser === "Contractor" || currentUser === "Manager") && !isAuthenticated) {
-      // User was logged out from Supabase
-      setCurrentUser(null);
     }
-  }, [isAuthenticated, user, role, authLoading, currentUser]);
+
+    fetchUserRole();
+  }, [isAuthenticated, user, authLoading, signOut]);
 
   // Handle Supabase login success (for all roles)
   const handleSupabaseLogin = (authRole: AuthUserRole) => {
@@ -565,13 +605,7 @@ function App() {
             onEmployeeClick={handleEmployeeClick}
           />
         )}
-        {currentScreen === "access" && (
-          <UserAccessManagement
-            users={users}
-            currentUserId={currentUserId}
-            onUserUpdate={handleUserUpdate}
-          />
-        )}
+        {currentScreen === "access" && <UserAccessManagement />}
         {currentScreen === "calendar" && <AdminCalendar />}
       </main>
 
