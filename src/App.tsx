@@ -39,7 +39,7 @@ import {
 } from "./lib/data/mockData";
 import { useAuth } from "./lib/hooks/useAuth";
 import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
-import type { Employee, User } from "./lib/types";
+import type { Employee, User, Submission, Notification, MetricData } from "./lib/types";
 
 type Screen = "dashboard" | "directory" | "access" | "calendar";
 type ManagerScreen = "dashboard" | "team";
@@ -64,11 +64,24 @@ function App() {
   const [contractorDrawerOpen, setContractorDrawerOpen] = React.useState(false);
   const [selectedEmployee, setSelectedEmployee] =
     React.useState<Employee | null>(null);
-  const [employees, setEmployees] = React.useState(mockEmployees);
-  const [users, setUsers] = React.useState(mockUsers);
+  const [employees, setEmployees] = React.useState<Employee[]>([]);
+  const [users, setUsers] = React.useState<User[]>([]);
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [submissions, setSubmissions] = React.useState<Submission[]>([]);
+  const [metrics, setMetrics] = React.useState<MetricData>({
+    totalEmployees: 0,
+    pendingPayments: 0,
+    totalPayout: 0,
+    payoutChange: 0,
+  });
 
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
-  const currentUserId = "USER-004"; // John Administrator
+  // Filter options - these could come from Supabase in the future
+  const projects: string[] = [];
+  const managers: string[] = [];
+  const months: string[] = [];
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const currentUserId = user?.id || "";
 
   // Sync Supabase auth state with currentUser and fetch role from database
   React.useEffect(() => {
@@ -120,17 +133,11 @@ function App() {
     fetchUserRole();
   }, [isAuthenticated, user, authLoading, signOut]);
 
-  // Handle mock login for Admin only
-  const handleLogin = (username: string) => {
-    if (username === "Admin") {
-      setCurrentUser("Admin");
-    }
-    // Manager and Contractor login is handled via Supabase auth
-  };
-
-  // Handle Supabase login success (for Manager or Contractor)
+  // Handle Supabase login success (for all roles)
   const handleSupabaseLogin = (authRole: AuthUserRole) => {
-    if (authRole === "MANAGER") {
+    if (authRole === "ADMIN") {
+      setCurrentUser("Admin");
+    } else if (authRole === "MANAGER") {
       setCurrentUser("Manager");
     } else if (authRole === "CONTRACTOR") {
       setCurrentUser("Contractor");
@@ -202,7 +209,6 @@ function App() {
   if (!currentUser) {
     return (
       <Login
-        onLogin={handleLogin}
         onSupabaseLogin={handleSupabaseLogin}
         signIn={signIn}
         authLoading={authLoading}
@@ -325,7 +331,7 @@ function App() {
         <NotificationsDrawer
           open={notificationsOpen}
           onOpenChange={setNotificationsOpen}
-          notifications={mockNotifications}
+          notifications={notifications}
         />
       </div>
     );
@@ -449,7 +455,7 @@ function App() {
         <NotificationsDrawer
           open={notificationsOpen}
           onOpenChange={setNotificationsOpen}
-          notifications={mockNotifications}
+          notifications={notifications}
         />
       </div>
     );
@@ -584,7 +590,15 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-        {currentScreen === "dashboard" && <AdminDashboard />}
+        {currentScreen === "dashboard" && (
+          <AdminDashboard
+            metrics={metrics}
+            submissions={submissions}
+            projects={projects}
+            managers={managers}
+            months={months}
+          />
+        )}
         {currentScreen === "directory" && (
           <EmployeeDirectory
             employees={employees}
@@ -599,13 +613,13 @@ function App() {
       <NotificationsDrawer
         open={notificationsOpen}
         onOpenChange={setNotificationsOpen}
-        notifications={mockNotifications}
+        notifications={notifications}
       />
       <ContractorDetailDrawer
         open={contractorDrawerOpen}
         onOpenChange={setContractorDrawerOpen}
         employee={selectedEmployee}
-        submissions={[]}
+        submissions={submissions}
         onSave={handleSaveEmployee}
       />
     </div>
