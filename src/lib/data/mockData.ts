@@ -280,6 +280,13 @@ export const mockUsers: User[] = [
     enabled: true,
   },
   {
+    id: "9e84be8a-20af-434d-ab16-86a43c016b75",
+    name: "John Smith",
+    email: "john.smith@email.com",
+    role: "Manager",
+    enabled: true,
+  },
+  {
     id: "USER-004",
     name: "John Administrator",
     email: "john.admin@company.com",

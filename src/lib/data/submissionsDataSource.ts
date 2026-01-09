@@ -12,7 +12,6 @@
 
 import type { ContractorSubmission, SubmissionDraft, SubmissionStatus } from "../types";
 import { supabase, isSupabaseConfigured } from "../supabase/client";
-import { mockContractorSubmissions } from "./mockData";
 import { format, parse, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from "date-fns";
 
 // Rate constants - will be fetched from contract/rates table in production
@@ -42,12 +41,7 @@ function calculateTotalAmount(
   return regularAmount + overtimeAmount;
 }
 
-/**
- * Generate a unique ID for mock submissions
- */
-function generateMockId(): string {
-  return `CSUB-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-}
+
 
 /**
  * Map database submission status to frontend SubmissionStatus type
@@ -405,75 +399,21 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
 }
 
 /**
- * Mock implementation of SubmissionsDataSource
- * Uses in-memory array for development/fallback when Supabase is not configured
- */
-class MockSubmissionsDataSource implements SubmissionsDataSource {
-  private submissions: ContractorSubmission[] = [...mockContractorSubmissions];
-
-  async listMySubmissions(): Promise<ContractorSubmission[]> {
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    console.log("[MockSubmissionsDataSource] Returning", this.submissions.length, "submissions");
-
-    // Return sorted by submission date (newest first)
-    return [...this.submissions].sort(
-      (a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()
-    );
-  }
-
-  async createSubmission(draft: SubmissionDraft): Promise<ContractorSubmission> {
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    console.log("[MockSubmissionsDataSource] Creating submission with draft:", draft);
-
-    const totalAmount = calculateTotalAmount(draft.hoursSubmitted, draft.overtimeHours);
-    const now = new Date().toISOString();
-
-    const newSubmission: ContractorSubmission = {
-      id: generateMockId(),
-      submissionDate: now,
-      projectName: draft.projectName || "General Work",
-      description: draft.description,
-      regularHours: draft.hoursSubmitted,
-      overtimeHours: draft.overtimeHours,
-      totalAmount,
-      status: "PENDING",
-      invoiceUrl: null,
-      workPeriod: draft.workPeriod,
-      excludedDates: draft.excludedDates,
-      overtimeDescription: draft.overtimeDescription,
-    };
-
-    // Add to beginning of array (newest first)
-    this.submissions.unshift(newSubmission);
-
-    console.log("[MockSubmissionsDataSource] Created submission:", newSubmission);
-    return newSubmission;
-  }
-}
-
-/**
  * Singleton instances
  */
 let dataSourceInstance: SubmissionsDataSource | null = null;
 
 /**
- * Get the appropriate data source based on environment configuration
- * - If Supabase is configured, use SupabaseSubmissionsDataSource
- * - Otherwise, fall back to MockSubmissionsDataSource
+ * Get the Supabase data source
+ * Throws an error if Supabase is not configured
  */
 export function getSubmissionsDataSource(): SubmissionsDataSource {
   if (!dataSourceInstance) {
-    if (isSupabaseConfigured) {
-      console.log("[SubmissionsDataSource] Using Supabase implementation");
-      dataSourceInstance = new SupabaseSubmissionsDataSource();
-    } else {
-      console.log("[SubmissionsDataSource] Using Mock implementation (Supabase not configured)");
-      dataSourceInstance = new MockSubmissionsDataSource();
+    if (!isSupabaseConfigured) {
+      throw new Error("Supabase is not configured. Please set up your environment variables.");
     }
+    console.log("[SubmissionsDataSource] Using Supabase implementation");
+    dataSourceInstance = new SupabaseSubmissionsDataSource();
   }
   return dataSourceInstance;
 }
