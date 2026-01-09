@@ -10,7 +10,7 @@ import {
   listTeamContractors,
   getTeamSize,
   getAvailableContractors,
-  searchAvailableContractors,
+  searchContractors,
   addContractorToTeam,
   removeContractorFromTeam,
   type TeamContractor,
@@ -51,7 +51,9 @@ export function useTeam(): UseTeamResult {
   const [error, setError] = useState<Error | null>(null);
 
   // Available contractors state
-  const [availableContractors, setAvailableContractors] = useState<AvailableContractor[]>([]);
+  const [availableContractors, setAvailableContractors] = useState<
+    AvailableContractor[]
+  >([]);
   const [availableLoading, setAvailableLoading] = useState(false);
   const [availableError, setAvailableError] = useState<Error | null>(null);
 
@@ -119,7 +121,7 @@ export function useTeam(): UseTeamResult {
       setAvailableError(null);
 
       try {
-        const data = await searchAvailableContractors(user.id, query);
+        const data = await searchContractors(user.id, query);
         setAvailableContractors(data);
       } catch (err) {
         console.error("[useTeam] Error searching contractors:", err);
