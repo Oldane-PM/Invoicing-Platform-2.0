@@ -559,13 +559,7 @@ function App() {
             onEmployeeClick={handleEmployeeClick}
           />
         )}
-        {currentScreen === "access" && (
-          <UserAccessManagement
-            users={users}
-            currentUserId={currentUserId}
-            onUserUpdate={handleUserUpdate}
-          />
-        )}
+        {currentScreen === "access" && <UserAccessManagement />}
         {currentScreen === "calendar" && <AdminCalendar />}
       </main>
 
