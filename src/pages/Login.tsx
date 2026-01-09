@@ -7,7 +7,7 @@ import { isSupabaseConfigured } from "../lib/supabase/client";
 import type { UserRole } from "../lib/supabase/repos/auth.repo";
 
 type LoginMode = "role" | "email";
-type AuthUserType = "contractor" | "manager";
+type LoginIntent = "Admin" | "Contractor" | null;
 
 interface LoginProps {
   onLogin: (username: string) => void;
@@ -18,19 +18,29 @@ interface LoginProps {
 
 export function Login({ onLogin, onSupabaseLogin, signIn, authLoading }: LoginProps) {
   const [mode, setMode] = React.useState<LoginMode>("role");
-  const [authUserType, setAuthUserType] = React.useState<AuthUserType>("contractor");
+  const [loginIntent, setLoginIntent] = React.useState<LoginIntent>(null);
   const [username, setUsername] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(false);
 
-  // Role-based login (Admin - mock) or switch to email mode for Manager/Contractor
+  // Role-based login (Admin/Manager - mock or real auth)
   const handleRoleLogin = () => {
     setError("");
 
     if (username === "Admin") {
-      // Admin still uses mock login
+      // Switch to email login mode for admin (real Supabase auth)
+      if (isSupabaseConfigured && signIn) {
+        setMode("email");
+        setLoginIntent("Admin");
+        setUsername("");
+      } else {
+        // Fallback to mock if Supabase not configured
+        onLogin(username);
+      }
+    } else if (username === "Manager") {
+      // Manager still uses mock login
       onLogin(username);
     } else if (username === "Manager") {
       // Switch to email login mode for Manager
@@ -47,6 +57,7 @@ export function Login({ onLogin, onSupabaseLogin, signIn, authLoading }: LoginPr
       if (isSupabaseConfigured && signIn) {
         setAuthUserType("contractor");
         setMode("email");
+        setLoginIntent("Contractor");
         setUsername("");
       } else {
         // Fallback to mock if Supabase not configured
@@ -78,6 +89,11 @@ export function Login({ onLogin, onSupabaseLogin, signIn, authLoading }: LoginPr
 
     setLoading(true);
 
+    // Store login intent in sessionStorage so App.tsx can validate it
+    if (loginIntent) {
+      sessionStorage.setItem('loginIntent', loginIntent);
+    }
+
     try {
       const result = await signIn(email, password);
 
@@ -97,9 +113,11 @@ export function Login({ onLogin, onSupabaseLogin, signIn, authLoading }: LoginPr
         onSupabaseLogin?.(assumedRole);
       } else {
         setError(result.error || "Login failed. Please check your credentials.");
+        sessionStorage.removeItem('loginIntent');
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
+      sessionStorage.removeItem('loginIntent');
     } finally {
       setLoading(false);
     }
@@ -117,9 +135,11 @@ export function Login({ onLogin, onSupabaseLogin, signIn, authLoading }: LoginPr
 
   const switchToRoleMode = () => {
     setMode("role");
+    setLoginIntent(null);
     setEmail("");
     setPassword("");
     setError("");
+    sessionStorage.removeItem('loginIntent');
   };
 
   const getEmailLoginTitle = () => {
@@ -153,7 +173,7 @@ export function Login({ onLogin, onSupabaseLogin, signIn, authLoading }: LoginPr
             Invoicing Platform
           </h1>
           <p className="text-center text-sm text-gray-500 mb-6">
-            {mode === "role" ? "Select your role to continue" : getEmailLoginTitle()}
+            {mode === "role" ? "Select your role to continue" : "Sign in to continue"}
           </p>
 
           {mode === "role" ? (
@@ -293,13 +313,15 @@ export function Login({ onLogin, onSupabaseLogin, signIn, authLoading }: LoginPr
         <div className="mt-6 text-center">
           {mode === "role" ? (
             <p className="text-xs text-gray-500">
-              <span className="font-medium text-gray-700">Admin</span> (mock login)
+              Demo: <span className="font-medium text-gray-700">Manager</span> (mock login)
               <br />
-              <span className="font-medium text-gray-700">Manager</span> &{" "}
+              <span className="font-medium text-gray-700">Admin</span> or{" "}
               <span className="font-medium text-gray-700">Contractor</span> (real authentication)
             </p>
           ) : (
-            <p className="text-xs text-gray-500">{getEmailLoginHint()}</p>
+            <p className="text-xs text-gray-500">
+              Sign in with your account credentials
+            </p>
           )}
         </div>
       </div>
