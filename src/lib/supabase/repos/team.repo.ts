@@ -90,14 +90,15 @@ export async function listTeamContractors(
     .in("contractor_id", contractorIds);
 
   if (contractorsError) {
-    logSupabaseError("listTeamContractors - contractors query", contractorsError);
+    logSupabaseError(
+      "listTeamContractors - contractors query",
+      contractorsError
+    );
     // Don't throw - contractors table may be empty, we can still show profiles
   }
 
   // Step 4: Merge results
-  const profilesMap = new Map(
-    (profilesData || []).map((p: any) => [p.id, p])
-  );
+  const profilesMap = new Map((profilesData || []).map((p: any) => [p.id, p]));
   const contractorsMap = new Map(
     (contractorsData || []).map((c: any) => [c.contractor_id, c])
   );
@@ -149,7 +150,10 @@ export async function getAvailableContractors(
 ): Promise<AvailableContractor[]> {
   const supabase = getSupabaseClient();
 
-  console.log("[team.repo] getAvailableContractors called for manager:", managerId);
+  console.log(
+    "[team.repo] getAvailableContractors called for manager:",
+    managerId
+  );
 
   // Step 1: Get IDs of contractors already in team
   const { data: teamData, error: teamError } = await supabase
@@ -158,14 +162,20 @@ export async function getAvailableContractors(
     .eq("manager_id", managerId);
 
   if (teamError) {
-    logSupabaseError("getAvailableContractors - manager_teams query", teamError);
+    logSupabaseError(
+      "getAvailableContractors - manager_teams query",
+      teamError
+    );
     throw new Error(`Failed to fetch team: ${teamError.message}`);
   }
 
   const existingContractorIds = new Set(
     (teamData || []).map((t: any) => t.contractor_id)
   );
-  console.log("[team.repo] Existing team contractor IDs:", Array.from(existingContractorIds));
+  console.log(
+    "[team.repo] Existing team contractor IDs:",
+    Array.from(existingContractorIds)
+  );
 
   // Step 2: Get all profiles with role='CONTRACTOR'
   const { data: profilesData, error: profilesError } = await supabase
@@ -179,7 +189,11 @@ export async function getAvailableContractors(
     throw new Error(`Failed to fetch contractors: ${profilesError.message}`);
   }
 
-  console.log("[team.repo] Found contractor profiles:", profilesData?.length || 0, profilesData);
+  console.log(
+    "[team.repo] Found contractor profiles:",
+    profilesData?.length || 0,
+    profilesData
+  );
 
   // Step 3: Filter out contractors already in team
   const available = (profilesData || [])
@@ -190,21 +204,24 @@ export async function getAvailableContractors(
       email: p.email || "",
     }));
 
-  console.log("[team.repo] Available contractors after filtering:", available.length);
+  console.log(
+    "[team.repo] Available contractors after filtering:",
+    available.length
+  );
   return available;
 }
 
 /**
- * Search available contractors (for add-to-team dialog)
+ * Search contractors (for add-to-team dialog)
  * Returns contractors not currently in manager's team, filtered by search query
  */
-export async function searchAvailableContractors(
+export async function searchContractors(
   managerId: string,
   query: string
 ): Promise<AvailableContractor[]> {
   const supabase = getSupabaseClient();
 
-  console.log("[team.repo] searchAvailableContractors called:", { managerId, query });
+  console.log("[team.repo] searchContractors called:", { managerId, query });
 
   // Step 1: Get IDs of contractors already in team
   const { data: teamData, error: teamError } = await supabase
@@ -213,7 +230,7 @@ export async function searchAvailableContractors(
     .eq("manager_id", managerId);
 
   if (teamError) {
-    logSupabaseError("searchAvailableContractors - manager_teams query", teamError);
+    logSupabaseError("searchContractors - manager_teams query", teamError);
     throw new Error(`Failed to fetch team: ${teamError.message}`);
   }
 
@@ -235,18 +252,49 @@ export async function searchAvailableContractors(
     );
   }
 
-  const { data: profilesData, error: profilesError } = await profilesQuery.limit(25);
+  const { data: profilesData, error: profilesError } =
+    await profilesQuery.limit(25);
 
   if (profilesError) {
-    logSupabaseError("searchAvailableContractors - profiles query", profilesError);
+    logSupabaseError("searchContractors - profiles query", profilesError);
     throw new Error(`Failed to search contractors: ${profilesError.message}`);
   }
 
-  console.log("[team.repo] Search results:", profilesData?.length || 0, profilesData);
+  console.log(
+    "[team.repo] Search results:",
+    profilesData?.length || 0,
+    profilesData
+  );
 
-  // Step 3: Filter out contractors already in team
+  // Step 3: Get contractor IDs from search results
+  const contractorIds = (profilesData || []).map((p: any) => p.id);
+
+  if (contractorIds.length === 0) {
+    return [];
+  }
+
+  // Step 4: Fetch contractor details from contractors table
+  const { data: contractorsData, error: contractorsError } = await supabase
+    .from("contractors")
+    .select("contractor_id")
+    .in("contractor_id", contractorIds);
+
+  if (contractorsError) {
+    logSupabaseError("searchContractors - contractors query", contractorsError);
+    // Don't throw - if contractors table is empty, we can still show profiles
+  }
+
+  // Step 5: Filter to only contractors with contractor rows
+  const validContractorIds = new Set(
+    (contractorsData || []).map((c: any) => c.contractor_id)
+  );
+
+  // Step 6: Filter out contractors already in team and ensure they have contractor rows
   const available = (profilesData || [])
-    .filter((p: any) => !existingContractorIds.has(p.id))
+    .filter(
+      (p: any) =>
+        validContractorIds.has(p.id) && !existingContractorIds.has(p.id)
+    )
     .map((p: any) => ({
       id: p.id,
       fullName: p.full_name || "Unknown",
