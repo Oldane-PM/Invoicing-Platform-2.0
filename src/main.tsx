@@ -4,12 +4,13 @@ import App from "./App";
 import { ErrorBoundary } from "./pages/ErrorBoundary";
 import "./styles/index.css";
 
-// Create a client for React Query
+// Create a React Query client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      staleTime: 30000,
     },
   },
 });
