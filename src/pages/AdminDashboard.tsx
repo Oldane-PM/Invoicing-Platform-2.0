@@ -14,175 +14,143 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { SubmissionReviewDrawer } from "./SubmissionReviewDrawer";
-import { Submission, MetricData } from "../lib/types";
-import { format } from "date-fns";
 import { toast } from "sonner";
-import { Search, FileX, Users, FileText, DollarSign, TrendingUp } from "lucide-react";
-
-interface AdminDashboardProps {
-  metrics: MetricData;
-  submissions: Submission[];
-  projects: string[];
-  managers: string[];
-  months: string[];
-}
+import { Search, FileX, Users, FileText, DollarSign, TrendingUp, Loader2, AlertCircle } from "lucide-react";
+import { format } from "date-fns";
+import {
+  useAdminMetrics,
+  useAdminSubmissions,
+  useProjects,
+  useManagers,
+} from "../lib/hooks/adminDashboard";
+import type { SubmissionFilters } from "../lib/data/adminDashboard";
 
 const statusStyles: Record<string, string> = {
-  Pending: "bg-blue-100 text-blue-700 border-blue-200",
-  Approved: "bg-green-100 text-green-700 border-green-200",
-  Rejected: "bg-red-100 text-red-700 border-red-200",
-  Paid: "bg-purple-100 text-purple-700 border-purple-200",
+  submitted: "bg-blue-100 text-blue-700 border-blue-200",
+  approved: "bg-green-100 text-green-700 border-green-200",
+  rejected: "bg-red-100 text-red-700 border-red-200",
+  needs_clarification: "bg-yellow-100 text-yellow-700 border-yellow-200",
 };
 
-export function AdminDashboard({
-  metrics,
-  submissions,
-  projects,
-  managers,
-  months,
-}: AdminDashboardProps) {
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [contractorType, setContractorType] = React.useState("");
-  const [invoiceStatus, setInvoiceStatus] = React.useState("");
-  const [project, setProject] = React.useState("");
-  const [manager, setManager] = React.useState("");
-  const [month, setMonth] = React.useState("");
-  const [selectedSubmission, setSelectedSubmission] = React.useState<any>(null);
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const [submissionsList, setSubmissionsList] = React.useState(submissions);
+const statusLabels: Record<string, string> = {
+  submitted: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  needs_clarification: "Needs Clarification",
+};
 
-  React.useEffect(() => {
-    setSubmissionsList(submissions);
-  }, [submissions]);
+export function AdminDashboard() {
+  // Filters state
+  const [filters, setFilters] = React.useState<SubmissionFilters>({});
+  const [selectedSubmissionId, setSelectedSubmissionId] = React.useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+
+  // Fetch data using hooks
+  const { data: metrics, isLoading: metricsLoading, error: metricsError } = useAdminMetrics();
+  const { data: submissions, isLoading: submissionsLoading, error: submissionsError } = useAdminSubmissions(filters);
+  const { data: projects } = useProjects();
+  const { data: managers } = useManagers();
+
+  // Generate month options (last 4 months)
+  const months = React.useMemo(() => {
+    const result: string[] = [];
+    const now = new Date();
+    for (let i = 0; i < 4; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      result.push(date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
+    }
+    return result;
+  }, []);
 
   const handleResetFilters = () => {
-    setSearchQuery("");
-    setContractorType("");
-    setInvoiceStatus("");
-    setProject("");
-    setManager("");
-    setMonth("");
+    setFilters({});
     toast.success("All filters cleared");
   };
 
   const handleMetricClick = (metric: string) => {
     if (metric === "pending") {
-      setInvoiceStatus("Pending");
-      toast.info("Filtered to pending payments");
+      setFilters({ ...filters, status: "submitted" });
+      toast.info("Filtered to pending submissions");
     }
   };
 
-  const handleSubmissionClick = (submission: Submission) => {
-    const drawerSubmission = {
-      id: submission.id,
-      contractor: submission.employeeName,
-      contractorType: submission.contractorType,
-      reportingManager: submission.manager,
-      project: submission.project,
-      period: format(submission.date, "MMMM yyyy"),
-      submittedOn: format(submission.date, "MMM d, yyyy"),
-      status: submission.status as "Submitted" | "Approved" | "Rejected" | "Needs Clarification",
-      regularHours: submission.totalHours - submission.overtimeHours,
-      overtimeHours: submission.overtimeHours,
-      totalAmount: `$${submission.totalAmount.toLocaleString()}`,
-      notes: "Standard bi-weekly submission with no issues reported.",
-      managerEmail: "manager@company.com",
-    };
-    setSelectedSubmission(drawerSubmission);
+  const handleSubmissionClick = (submissionId: string) => {
+    setSelectedSubmissionId(submissionId);
     setDrawerOpen(true);
   };
 
-  const handleStatusUpdate = (submissionId: string, status: any, note?: string) => {
-    setSubmissionsList(prev => 
-      prev.map(sub => 
-        sub.id === submissionId 
-          ? { ...sub, status: status }
-          : sub
-      )
-    );
-    
-    if (selectedSubmission) {
-      setSelectedSubmission({
-        ...selectedSubmission,
-        status: status
-      });
-    }
+  const handleDrawerClose = () => {
+    setDrawerOpen(false);
+    setSelectedSubmissionId(null);
   };
 
-  const filteredSubmissions = React.useMemo(() => {
-    return submissionsList.filter((submission) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        submission.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        submission.project.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        submission.manager.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesContractorType =
-        contractorType === "" || submission.contractorType === contractorType;
-
-      const matchesStatus =
-        invoiceStatus === "" || submission.status === invoiceStatus;
-
-      const matchesProject = project === "" || submission.project === project;
-
-      const matchesManager = manager === "" || submission.manager === manager;
-
-      return (
-        matchesSearch &&
-        matchesContractorType &&
-        matchesStatus &&
-        matchesProject &&
-        matchesManager
-      );
-    });
-  }, [
-    submissionsList,
-    searchQuery,
-    contractorType,
-    invoiceStatus,
-    project,
-    manager,
-  ]);
+  // Show error state if metrics fail to load
+  if (metricsError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <AlertCircle className="w-16 h-16 text-red-500" />
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to load dashboard</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            {metricsError instanceof Error ? metricsError.message : 'An error occurred'}
+          </p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Total Employees"
-          value={metrics.totalEmployees}
-          subtitle="Active contractors"
-          icon={Users}
-          accentColor="purple"
-          onClick={() => handleMetricClick("total")}
-        />
-        <MetricCard
-          title="Pending Payments"
-          value={metrics.pendingPayments}
-          subtitle="Needs attention"
-          icon={FileText}
-          accentColor="yellow"
-          onClick={() => handleMetricClick("pending")}
-        />
-        <MetricCard
-          title="Total Payout"
-          value={`$${metrics.totalPayout.toLocaleString()}`}
-          subtitle="Approved payouts this month"
-          icon={DollarSign}
-          accentColor="green"
-          onClick={() => handleMetricClick("payout")}
-        />
-        <MetricCard
-          title="% vs Last Month"
-          value={`${metrics.payoutChange > 0 ? "+" : ""}${metrics.payoutChange}%`}
-          trend={{
-            value: metrics.payoutChange,
-            isPositive: metrics.payoutChange > 0,
-          }}
-          icon={TrendingUp}
-          accentColor={metrics.payoutChange > 0 ? "green" : "red"}
-          onClick={() => handleMetricClick("change")}
-        />
+        {metricsLoading ? (
+          // Loading skeletons
+          <>
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="p-6 border border-gray-200 rounded-[14px] bg-white animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+              </Card>
+            ))}
+          </>
+        ) : (
+          <>
+            <MetricCard
+              title="Total Contractors"
+              value={metrics?.totalContractors || 0}
+              subtitle="Active contractors"
+              icon={Users}
+              accentColor="purple"
+              onClick={() => handleMetricClick("total")}
+            />
+            <MetricCard
+              title="Pending Submissions"
+              value={metrics?.pendingSubmissions || 0}
+              subtitle="Needs attention"
+              icon={FileText}
+              accentColor="yellow"
+              onClick={() => handleMetricClick("pending")}
+            />
+            <MetricCard
+              title="Total Invoice Value"
+              value={`$${(metrics?.totalInvoiceValue || 0).toLocaleString()}`}
+              subtitle="Approved this month"
+              icon={DollarSign}
+              accentColor="green"
+              onClick={() => handleMetricClick("payout")}
+            />
+            <MetricCard
+              title="Active Contracts"
+              value={metrics?.activeContracts || 0}
+              subtitle="Currently active"
+              icon={TrendingUp}
+              accentColor="blue"
+              onClick={() => handleMetricClick("contracts")}
+            />
+          </>
+        )}
       </div>
 
       {/* Filters & Search */}
@@ -192,15 +160,15 @@ export function AdminDashboard({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
               placeholder="Search by name, project, manager…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={filters.search || ""}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               className="pl-11 h-11 bg-gray-50 border-gray-200 rounded-lg"
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <Combobox
-              value={contractorType}
-              onValueChange={setContractorType}
+              value={filters.contractorType || ""}
+              onValueChange={(value) => setFilters({ ...filters, contractorType: value })}
               options={[
                 { value: "Hourly", label: "Hourly" },
                 { value: "Fixed", label: "Fixed" },
@@ -208,31 +176,31 @@ export function AdminDashboard({
               placeholder="Contractor Type"
             />
             <Combobox
-              value={invoiceStatus}
-              onValueChange={setInvoiceStatus}
+              value={filters.status || ""}
+              onValueChange={(value) => setFilters({ ...filters, status: value })}
               options={[
-                { value: "Pending", label: "Pending" },
-                { value: "Approved", label: "Approved" },
-                { value: "Rejected", label: "Rejected" },
-                { value: "Paid", label: "Paid" },
+                { value: "submitted", label: "Pending" },
+                { value: "approved", label: "Approved" },
+                { value: "rejected", label: "Rejected" },
+                { value: "needs_clarification", label: "Needs Clarification" },
               ]}
-              placeholder="Invoice Status"
+              placeholder="Status"
             />
             <Combobox
-              value={project}
-              onValueChange={setProject}
-              options={projects.map((p) => ({ value: p, label: p }))}
+              value={filters.project || ""}
+              onValueChange={(value) => setFilters({ ...filters, project: value })}
+              options={(projects || []).map((p) => ({ value: p, label: p }))}
               placeholder="Project"
             />
             <Combobox
-              value={manager}
-              onValueChange={setManager}
-              options={managers.map((m) => ({ value: m, label: m }))}
+              value={filters.manager || ""}
+              onValueChange={(value) => setFilters({ ...filters, manager: value })}
+              options={(managers || []).map((m) => ({ value: m, label: m }))}
               placeholder="Manager"
             />
             <Combobox
-              value={month}
-              onValueChange={setMonth}
+              value={filters.month || ""}
+              onValueChange={(value) => setFilters({ ...filters, month: value })}
               options={months.map((m) => ({ value: m, label: m }))}
               placeholder="Month"
             />
@@ -252,13 +220,13 @@ export function AdminDashboard({
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-gray-50">
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  Employee
+                  Contractor
                 </TableHead>
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  Contractor Type
+                  Type
                 </TableHead>
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  Total Hours
+                  Regular Hours
                 </TableHead>
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
                   Overtime Hours
@@ -272,7 +240,28 @@ export function AdminDashboard({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredSubmissions.length === 0 ? (
+              {submissionsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-64 text-center">
+                    <div className="flex flex-col items-center justify-center text-gray-400">
+                      <Loader2 className="w-8 h-8 mb-3 animate-spin" />
+                      <div className="text-gray-600 font-medium">Loading submissions...</div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : submissionsError ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-64 text-center">
+                    <div className="flex flex-col items-center justify-center text-gray-400">
+                      <AlertCircle className="w-16 h-16 mb-3 text-red-500" />
+                      <div className="text-gray-600 font-medium mb-2">Failed to load submissions</div>
+                      <div className="text-sm text-gray-500">
+                        {submissionsError instanceof Error ? submissionsError.message : 'An error occurred'}
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : !submissions || submissions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
@@ -283,31 +272,31 @@ export function AdminDashboard({
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredSubmissions.map((submission) => (
+                submissions.map((submission) => (
                   <TableRow
                     key={submission.id}
                     className="h-16 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
-                    onClick={() => handleSubmissionClick(submission)}
+                    onClick={() => handleSubmissionClick(submission.id)}
                   >
                     <TableCell>
                       <div>
-                        <div className="font-medium text-gray-900">{submission.employeeName}</div>
+                        <div className="font-medium text-gray-900">{submission.contractorName}</div>
                         <div className="text-sm text-gray-500">
-                          {format(submission.date, "MMM d, yyyy")}
+                          {format(new Date(submission.submittedAt), "MMM d, yyyy")}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-gray-700">{submission.contractorType}</TableCell>
-                    <TableCell className="text-gray-700">{submission.totalHours}</TableCell>
+                    <TableCell className="text-gray-700">{submission.regularHours}</TableCell>
                     <TableCell className="text-gray-700">{submission.overtimeHours}</TableCell>
                     <TableCell className="font-semibold text-gray-900">
                       ${submission.totalAmount.toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <Badge
-                        className={`${statusStyles[submission.status]} border rounded-full px-3 py-1 font-medium text-xs`}
+                        className={`${statusStyles[submission.status] || statusStyles.submitted} border rounded-full px-3 py-1 font-medium text-xs`}
                       >
-                        {submission.status}
+                        {statusLabels[submission.status] || submission.status}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -320,10 +309,9 @@ export function AdminDashboard({
 
       {/* Submission Review Drawer */}
       <SubmissionReviewDrawer
-        submission={selectedSubmission}
+        submissionId={selectedSubmissionId}
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        onStatusUpdate={handleStatusUpdate}
+        onOpenChange={handleDrawerClose}
       />
     </div>
   );
