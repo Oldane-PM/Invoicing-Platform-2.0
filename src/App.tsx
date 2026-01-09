@@ -33,11 +33,6 @@ import { NotificationsDrawer } from "./pages/NotificationsDrawer";
 import { ContractorDetailDrawer } from "./pages/ContractorDetailDrawer";
 import { ContractorSubmissions } from "./pages/ContractorSubmissions";
 import {
-  mockMetrics,
-  mockSubmissions,
-  projects,
-  managers,
-  months,
   mockEmployees,
   mockUsers,
   mockNotifications,
@@ -74,16 +69,55 @@ function App() {
   const unreadCount = mockNotifications.filter((n) => !n.read).length;
   const currentUserId = "USER-004"; // John Administrator
 
-  // Sync Supabase auth state with currentUser
+  // Sync Supabase auth state with currentUser and fetch role from database
   React.useEffect(() => {
-    if (isAuthenticated && user) {
-      // User is authenticated via Supabase - set as Contractor
-      setCurrentUser("Contractor");
-    } else if (!authLoading && currentUser === "Contractor" && !isAuthenticated) {
-      // User was logged out from Supabase
-      setCurrentUser(null);
+    async function fetchUserRole() {
+      if (isAuthenticated && user) {
+        // User is authenticated via Supabase - fetch their role from app_users table
+        const { getSupabaseClient } = await import('./lib/supabase/client');
+        const supabase = getSupabaseClient();
+        
+        const { data: appUser, error } = await supabase
+          .from('app_users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user role:', error);
+          // Sign out and show error
+          await signOut();
+          alert('Unable to fetch user role. Please try again.');
+        } else if (appUser) {
+          // Map database role to app role
+          const roleMap: Record<string, UserRole> = {
+            'admin': 'Admin',
+            'manager': 'Manager',
+            'contractor': 'Contractor',
+          };
+          const userRole = roleMap[appUser.role.toLowerCase()] || 'Contractor';
+          
+          // Validate that user is logging in through the correct option
+          // This prevents admins from logging in through "Contractor" and vice versa
+          const loginIntent = sessionStorage.getItem('loginIntent');
+          if (loginIntent && loginIntent !== userRole) {
+            // User tried to log in through wrong option
+            await signOut();
+            alert(`You cannot log in as ${loginIntent}. Please use the ${userRole} login option.`);
+            sessionStorage.removeItem('loginIntent');
+          } else {
+            setCurrentUser(userRole);
+            sessionStorage.removeItem('loginIntent');
+          }
+        }
+      } else if (!authLoading && currentUser && !isAuthenticated) {
+        // User was logged out from Supabase
+        setCurrentUser(null);
+      }
     }
-  }, [isAuthenticated, user, authLoading, currentUser]);
+
+    fetchUserRole();
+  }, [isAuthenticated, user, authLoading, signOut]);
 
   // Handle mock login for Admin/Manager
   const handleLogin = (username: string) => {
@@ -544,15 +578,7 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-        {currentScreen === "dashboard" && (
-          <AdminDashboard
-            metrics={mockMetrics}
-            submissions={mockSubmissions}
-            projects={projects}
-            managers={managers}
-            months={months}
-          />
-        )}
+        {currentScreen === "dashboard" && <AdminDashboard />}
         {currentScreen === "directory" && (
           <EmployeeDirectory
             employees={employees}
@@ -579,7 +605,7 @@ function App() {
         open={contractorDrawerOpen}
         onOpenChange={setContractorDrawerOpen}
         employee={selectedEmployee}
-        submissions={mockSubmissions}
+        submissions={[]}
         onSave={handleSaveEmployee}
       />
     </div>

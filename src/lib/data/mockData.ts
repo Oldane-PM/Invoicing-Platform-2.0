@@ -1,154 +1,14 @@
 // Mock data for the invoicing platform
 import {
-  Submission,
   Employee,
   User,
   Notification,
-  MetricData,
   ContractorSubmission,
 } from "../types";
+// Admin metrics are now fetched from Supabase via useAdminMetrics hook
 
-export const mockMetrics: MetricData = {
-  totalEmployees: 127,
-  pendingPayments: 23,
-  totalPayout: 487500,
-  payoutChange: 12.5,
-};
+// Admin submissions are now fetched from Supabase via useAdminSubmissions hook
 
-export const mockSubmissions: Submission[] = [
-  {
-    id: "SUB-001",
-    employeeName: "Sarah Johnson",
-    contractorType: "Hourly",
-    totalHours: 168,
-    overtimeHours: 8,
-    totalAmount: 12600,
-    status: "Pending",
-    project: "Web Platform Redesign",
-    manager: "Michael Chen",
-    date: new Date("2026-01-03"),
-  },
-  {
-    id: "SUB-002",
-    employeeName: "David Martinez",
-    contractorType: "Fixed",
-    totalHours: 160,
-    overtimeHours: 0,
-    totalAmount: 8500,
-    status: "Approved",
-    project: "Mobile App Development",
-    manager: "Emily Davis",
-    date: new Date("2026-01-02"),
-  },
-  {
-    id: "SUB-003",
-    employeeName: "Jessica Williams",
-    contractorType: "Hourly",
-    totalHours: 152,
-    overtimeHours: 12,
-    totalAmount: 11400,
-    status: "Paid",
-    project: "Data Analytics Dashboard",
-    manager: "Michael Chen",
-    date: new Date("2025-12-31"),
-  },
-  {
-    id: "SUB-004",
-    employeeName: "Robert Taylor",
-    contractorType: "Hourly",
-    totalHours: 176,
-    overtimeHours: 16,
-    totalAmount: 14080,
-    status: "Pending",
-    project: "Cloud Migration",
-    manager: "Sarah Thompson",
-    date: new Date("2026-01-03"),
-  },
-  {
-    id: "SUB-005",
-    employeeName: "Amanda Brown",
-    contractorType: "Fixed",
-    totalHours: 160,
-    overtimeHours: 0,
-    totalAmount: 9000,
-    status: "Approved",
-    project: "Customer Portal",
-    manager: "Emily Davis",
-    date: new Date("2026-01-01"),
-  },
-  {
-    id: "SUB-006",
-    employeeName: "Christopher Lee",
-    contractorType: "Hourly",
-    totalHours: 164,
-    overtimeHours: 4,
-    totalAmount: 13120,
-    status: "Rejected",
-    project: "API Integration",
-    manager: "Michael Chen",
-    date: new Date("2025-12-30"),
-  },
-  {
-    id: "SUB-007",
-    employeeName: "Michelle Garcia",
-    contractorType: "Fixed",
-    totalHours: 160,
-    overtimeHours: 0,
-    totalAmount: 7500,
-    status: "Paid",
-    project: "Marketing Website",
-    manager: "Sarah Thompson",
-    date: new Date("2025-12-28"),
-  },
-  {
-    id: "SUB-008",
-    employeeName: "Daniel Anderson",
-    contractorType: "Hourly",
-    totalHours: 172,
-    overtimeHours: 12,
-    totalAmount: 13760,
-    status: "Pending",
-    project: "Security Audit",
-    manager: "Emily Davis",
-    date: new Date("2026-01-03"),
-  },
-  {
-    id: "SUB-009",
-    employeeName: "Sarah Johnson",
-    contractorType: "Hourly",
-    totalHours: 160,
-    overtimeHours: 8,
-    totalAmount: 8600,
-    status: "Paid",
-    project: "E-Commerce Platform",
-    manager: "Michael Chen",
-    date: new Date("2024-11-29"),
-  },
-  {
-    id: "SUB-010",
-    employeeName: "Sarah Johnson",
-    contractorType: "Hourly",
-    totalHours: 80,
-    overtimeHours: 4,
-    totalAmount: 4300,
-    status: "Approved",
-    project: "E-Commerce Platform",
-    manager: "Michael Chen",
-    date: new Date("2024-11-14"),
-  },
-  {
-    id: "SUB-011",
-    employeeName: "Sarah Johnson",
-    contractorType: "Hourly",
-    totalHours: 160,
-    overtimeHours: 5,
-    totalAmount: 8375,
-    status: "Paid",
-    project: "E-Commerce Platform",
-    manager: "Michael Chen",
-    date: new Date("2024-10-30"),
-  },
-];
 
 export const mockEmployees: Employee[] = [
   {
@@ -359,29 +219,11 @@ export const mockNotifications: Notification[] = [
   },
 ];
 
-export const projects = [
-  "Web Platform Redesign",
-  "Mobile App Development",
-  "Data Analytics Dashboard",
-  "Cloud Migration",
-  "Customer Portal",
-  "API Integration",
-  "Marketing Website",
-  "Security Audit",
-];
+// Projects list is now fetched from Supabase via useProjects hook
 
-export const managers = [
-  "Michael Chen",
-  "Emily Davis",
-  "Sarah Thompson",
-];
+// Managers list is now fetched from Supabase via useManagers hook
 
-export const months = [
-  "January 2026",
-  "December 2025",
-  "November 2025",
-  "October 2025",
-];
+// Months list is now generated dynamically in AdminDashboard component
 
 // Contractor-specific submissions (for the new ContractorSubmissions page)
 // This is separate from mockSubmissions to avoid breaking Admin/Manager views
