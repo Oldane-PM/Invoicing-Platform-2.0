@@ -38,6 +38,7 @@ import {
   mockNotifications,
 } from "./lib/data/mockData";
 import { useAuth } from "./lib/hooks/useAuth";
+import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
 import type { Employee, User } from "./lib/types";
 
 type Screen = "dashboard" | "directory" | "access" | "calendar";
@@ -50,8 +51,8 @@ type ContractorScreen =
 type UserRole = "Admin" | "Manager" | "Contractor" | null;
 
 function App() {
-  // Supabase auth for Contractor
-  const { isAuthenticated, user, signIn, signOut, loading: authLoading } = useAuth();
+  // Supabase auth for Contractor and Manager
+  const { isAuthenticated, user, profile, role, signIn, signOut, loading: authLoading } = useAuth();
 
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
   const [currentScreen, setCurrentScreen] = React.useState<Screen>("dashboard");
@@ -119,27 +120,32 @@ function App() {
     fetchUserRole();
   }, [isAuthenticated, user, authLoading, signOut]);
 
-  // Handle mock login for Admin/Manager
+  // Handle mock login for Admin only
   const handleLogin = (username: string) => {
-    if (username === "Admin" || username === "Manager") {
-      setCurrentUser(username as UserRole);
+    if (username === "Admin") {
+      setCurrentUser("Admin");
     }
-    // Contractor login is handled via Supabase auth
+    // Manager and Contractor login is handled via Supabase auth
   };
 
-  // Handle contractor login success (after Supabase signIn)
-  const handleContractorLogin = () => {
-    setCurrentUser("Contractor");
+  // Handle Supabase login success (for Manager or Contractor)
+  const handleSupabaseLogin = (authRole: AuthUserRole) => {
+    if (authRole === "MANAGER") {
+      setCurrentUser("Manager");
+    } else if (authRole === "CONTRACTOR") {
+      setCurrentUser("Contractor");
+    }
   };
 
   // Handle logout for all user types
   const handleLogout = async () => {
-    if (currentUser === "Contractor") {
-      // Sign out from Supabase for contractors
+    if (currentUser === "Contractor" || currentUser === "Manager") {
+      // Sign out from Supabase for Contractors and Managers
       await signOut();
     }
     setCurrentUser(null);
     setCurrentScreen("dashboard");
+    setManagerScreen("dashboard");
     setContractorScreen("dashboard");
   };
 
@@ -197,7 +203,7 @@ function App() {
     return (
       <Login
         onLogin={handleLogin}
-        onContractorLogin={handleContractorLogin}
+        onSupabaseLogin={handleSupabaseLogin}
         signIn={signIn}
         authLoading={authLoading}
       />
