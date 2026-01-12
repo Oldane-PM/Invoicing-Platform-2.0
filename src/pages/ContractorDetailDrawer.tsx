@@ -4,7 +4,7 @@ import {
   SheetContent,
   SheetHeader,
 } from "../components/ui/sheet";
-import { Employee, Submission } from "../lib/types";
+import { EmployeeDirectoryRow } from "../lib/types";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -15,13 +15,13 @@ import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { X, Pencil, Calendar, DollarSign, Clock } from "lucide-react";
+import { useContractorSubmissions } from "../lib/hooks/admin/useContractorSubmissions";
 
 interface ContractorDetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  employee: Employee | null;
-  submissions: Submission[];
-  onSave: (employee: Employee) => void;
+  employee: EmployeeDirectoryRow | null;
+  onSave: (employee: EmployeeDirectoryRow) => void;
 }
 
 const statusStyles: Record<string, string> = {
@@ -37,12 +37,16 @@ export function ContractorDetailDrawer({
   open,
   onOpenChange,
   employee,
-  submissions,
   onSave,
 }: ContractorDetailDrawerProps) {
   const [activeTab, setActiveTab] = React.useState<TabType>("submissions");
   const [isEditing, setIsEditing] = React.useState(false);
-  const [formData, setFormData] = React.useState<Employee | null>(null);
+  const [formData, setFormData] = React.useState<EmployeeDirectoryRow | null>(null);
+
+  // Fetch submissions directly
+  const { data: realSubmissions, isLoading: isLoadingSubmissions } = useContractorSubmissions(
+    employee?.contractor_id // Use the correct ID field from EmployeeDirectoryRow
+  );
 
   React.useEffect(() => {
     if (employee) {
@@ -56,17 +60,17 @@ export function ContractorDetailDrawer({
     if (!formData) return;
 
     // Validation
-    if (!formData.contractStartDate || !formData.contractEndDate) {
+    if (!formData.contract_start || !formData.contract_end) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    if (formData.rateType === "Hourly" && !formData.hourlyRate) {
+    if (formData.rate_type === "Hourly" && !formData.hourly_rate) {
       toast.error("Hourly rate is required for hourly contractors");
       return;
     }
 
-    if (formData.rateType === "Fixed" && !formData.fixedRate) {
+    if (formData.rate_type === "Fixed" && !formData.fixed_rate) {
       toast.error("Fixed rate is required for fixed contractors");
       return;
     }
@@ -82,10 +86,6 @@ export function ContractorDetailDrawer({
   };
 
   if (!formData || !employee) return null;
-
-  const employeeSubmissions = submissions.filter(
-    (s) => s.employeeName === employee.name
-  );
 
   const getInitials = (name: string) => {
     return name
@@ -103,8 +103,21 @@ export function ContractorDetailDrawer({
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-gray-200 sticky top-0 bg-white z-10">
           <div className="flex items-center justify-between mb-3">
             <Badge className="bg-purple-100 text-purple-700 border-purple-200 px-3 py-1">
-              {employee.contractorType}
+              {employee.contract_type || "Contractor"}
             </Badge>
+          </div>
+          <div>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16 bg-purple-100 text-purple-700">
+                <AvatarFallback className="bg-purple-100 text-purple-700 text-xl font-medium">
+                  {getInitials(employee.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{employee.full_name}</h2>
+                <div className="text-sm text-gray-500">{employee.email}</div>
+              </div>
+            </div>
           </div>
         </SheetHeader>
 
@@ -142,12 +155,17 @@ export function ContractorDetailDrawer({
                 Recent Submissions
               </h3>
               <div className="space-y-3">
-                {employeeSubmissions.length === 0 ? (
+                {isLoadingSubmissions ? (
+                   <div className="text-center py-12">
+                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mx-auto"></div>
+                     <div className="text-sm text-gray-500 mt-2">Loading history...</div>
+                   </div>
+                ) : !realSubmissions || realSubmissions.length === 0 ? (
                   <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
                     <div className="text-sm text-gray-500">No submissions found</div>
                   </div>
                 ) : (
-                  employeeSubmissions.map((submission) => (
+                  realSubmissions.map((submission) => (
                     <div
                       key={submission.id}
                       className="p-4 border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer transition-all bg-white"
@@ -156,14 +174,14 @@ export function ContractorDetailDrawer({
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <div className="font-semibold text-sm text-gray-900">
-                            {format(submission.date, "MMM d, yyyy")}
+                            {format(new Date(submission.submissionDate), "MMM d, yyyy")}
                           </div>
                           <div className="text-xs text-gray-500 mt-0.5">
-                            {submission.project}
+                            {submission.projectName}
                           </div>
                         </div>
                         <Badge
-                          className={`${statusStyles[submission.status]} border rounded-full px-3 py-1 font-medium text-xs`}
+                          className={`${statusStyles[submission.status] || "bg-gray-100 text-gray-700"} border rounded-full px-3 py-1 font-medium text-xs`}
                         >
                           {submission.status}
                         </Badge>
@@ -173,7 +191,7 @@ export function ContractorDetailDrawer({
                         <div>
                           <div className="text-[11px] text-gray-500 mb-1">Regular Hours</div>
                           <div className="font-semibold text-sm text-gray-900">
-                            {submission.totalHours}h
+                            {submission.regularHours}h
                           </div>
                         </div>
                         <div>
@@ -246,7 +264,9 @@ export function ContractorDetailDrawer({
                           <span>Start Date</span>
                         </div>
                         <div className="font-medium text-sm text-gray-900">
-                          {format(formData.contractStartDate, "MMM d, yyyy")}
+                          {formData.contract_start
+                            ? format(new Date(formData.contract_start), "MMM d, yyyy")
+                            : "-"}
                         </div>
                       </div>
                       <div>
@@ -304,7 +324,7 @@ export function ContractorDetailDrawer({
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Reporting Manager</div>
                       <div className="font-medium text-sm text-gray-900">
-                        {formData.reportingManager}
+                        {formData.reporting_manager_name}
                       </div>
                     </div>
                   </div>
@@ -319,11 +339,11 @@ export function ContractorDetailDrawer({
                       <Input
                         id="startDate"
                         type="date"
-                        value={format(formData.contractStartDate, "yyyy-MM-dd")}
+                        value={formData.contract_start ? format(new Date(formData.contract_start), "yyyy-MM-dd") : ""}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            contractStartDate: new Date(e.target.value),
+                            contract_start: e.target.value,
                           })
                         }
                         className="bg-gray-50 border-gray-200 rounded-lg h-10 text-sm"
@@ -336,11 +356,11 @@ export function ContractorDetailDrawer({
                       <Input
                         id="endDate"
                         type="date"
-                        value={format(formData.contractEndDate, "yyyy-MM-dd")}
+                        value={formData.contract_end ? format(new Date(formData.contract_end), "yyyy-MM-dd") : ""}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            contractEndDate: new Date(e.target.value),
+                            contract_end: e.target.value,
                           })
                         }
                         className="bg-gray-50 border-gray-200 rounded-lg h-10 text-sm"
@@ -352,11 +372,11 @@ export function ContractorDetailDrawer({
                       Rate Type
                     </Label>
                     <Combobox
-                      value={formData.rateType}
+                      value={formData.rate_type || ""}
                       onValueChange={(value) =>
                         setFormData({
                           ...formData,
-                          rateType: value as "Hourly" | "Fixed",
+                          rate_type: value as "Hourly" | "Fixed",
                         })
                       }
                       options={[
@@ -366,7 +386,7 @@ export function ContractorDetailDrawer({
                       placeholder="Select rate type"
                     />
                   </div>
-                  {formData.rateType === "Hourly" && (
+                  {formData.rate_type === "Hourly" && (
                     <div>
                       <Label htmlFor="hourlyRate" className="text-xs text-gray-700 mb-1.5 block">
                         Hourly Rate
@@ -374,11 +394,11 @@ export function ContractorDetailDrawer({
                       <Input
                         id="hourlyRate"
                         type="number"
-                        value={formData.hourlyRate || ""}
+                        value={formData.hourly_rate || ""}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            hourlyRate: parseFloat(e.target.value),
+                            hourly_rate: parseFloat(e.target.value),
                           })
                         }
                         placeholder="Enter hourly rate"
@@ -386,7 +406,7 @@ export function ContractorDetailDrawer({
                       />
                     </div>
                   )}
-                  {formData.rateType === "Fixed" && (
+                  {formData.rate_type === "Fixed" && (
                     <div>
                       <Label htmlFor="fixedRate" className="text-xs text-gray-700 mb-1.5 block">
                         Fixed Rate
@@ -394,11 +414,11 @@ export function ContractorDetailDrawer({
                       <Input
                         id="fixedRate"
                         type="number"
-                        value={formData.fixedRate || ""}
+                        value={formData.fixed_rate || ""}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            fixedRate: parseFloat(e.target.value),
+                            fixed_rate: parseFloat(e.target.value),
                           })
                         }
                         placeholder="Enter fixed rate"
