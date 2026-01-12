@@ -2,12 +2,12 @@
  * useSubmissions Hook
  *
  * Provides state management for loading and displaying contractor submissions.
- * Uses the data source abstraction for flexibility.
+ * Uses the submissions repository for data access.
  */
 
 import { useState, useEffect, useCallback } from "react";
 import type { ContractorSubmission } from "../types";
-import { getSubmissionsDataSource } from "../data/submissionsDataSource";
+import { listContractorSubmissions } from "../supabase/repos/submissions.repo";
 import { useAuth } from "./useAuth";
 
 interface UseSubmissionsResult {
@@ -35,9 +35,10 @@ export function useSubmissions(): UseSubmissionsResult {
     setLoading(true);
     setError(null);
 
+    console.log("[useSubmissions] Fetching for user:", user.id);
+
     try {
-      const dataSource = getSubmissionsDataSource();
-      const data = await dataSource.listMySubmissions();
+      const data = await listContractorSubmissions(user.id);
       setSubmissions(data);
     } catch (err) {
       console.error("[useSubmissions] Error fetching submissions:", err);

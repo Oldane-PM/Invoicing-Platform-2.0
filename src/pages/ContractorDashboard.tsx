@@ -7,6 +7,7 @@ import { Plus, Clock, FileText, Loader2, RefreshCw } from "lucide-react";
 import { format, parse } from "date-fns";
 import { toast } from "sonner";
 import { useSubmissions } from "../lib/hooks/useSubmissions";
+import { useAuth } from "../lib/hooks/useAuth";
 import type { ContractorSubmission, SubmissionStatus } from "../lib/types";
 
 // Map SubmissionStatus to display status
@@ -45,6 +46,7 @@ export function ContractorDashboard({
 }: ContractorDashboardProps) {
   // Use the Supabase-backed submissions hook
   const { submissions, loading, error, refetch } = useSubmissions();
+  const { profile } = useAuth(); // Get live profile data
 
   // Get the 3 most recent submissions for the dashboard
   const recentSubmissions = React.useMemo(() => {
@@ -110,24 +112,23 @@ export function ContractorDashboard({
       overtimeDescription: submission.overtimeDescription || undefined,
 
       // Contractor Personal Info (live from profile)
-      contractorName: "Sarah Johnson",
-      contractorAddress: "123 Main Street, Apartment 4B, California 90210",
+      contractorName: profile?.fullName || "Contractor Name",
+      contractorAddress: "Address Not on File", // Placeholder until DB update
       contractorCountry: "United States",
-      contractorEmail: "sarah.johnson@email.com",
+      contractorEmail: profile?.email || "email@example.com",
 
       // Contract Info
-      hourlyRate: 75,
+      hourlyRate: 75, // Ideally from DB, but keeping simple for now
       overtimeRate: 112.5,
-      position: "Senior Developer",
+      position: profile?.role === "CONTRACTOR" ? "Contractor" : "Staff",
 
-      // Banking Details (live from profile)
-      bankName: "First National Bank",
-      bankAddress:
-        "456 Banking Boulevard, Financial District, New York, NY 10004",
-      swiftCode: "FNBAUS33",
-      routingNumber: "021000021",
-      accountType: "Checking",
-      accountNumber: "9876543210",
+      // Banking Details (Placeholder until schema supports bank details)
+      bankName: "Bank details on file", 
+      bankAddress: "---",
+      swiftCode: "---",
+      routingNumber: "---",
+      accountType: "---",
+      accountNumber: "****",
       currency: "USD",
 
       // Company/Client Info

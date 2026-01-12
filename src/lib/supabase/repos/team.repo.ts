@@ -271,35 +271,11 @@ export async function searchContractors(
     profilesData
   );
 
-  // Step 3: Get contractor IDs from search results
-  const contractorIds = (profilesData || []).map((p: any) => p.id);
-
-  if (contractorIds.length === 0) {
-    return [];
-  }
-
-  // Step 4: Fetch contractor details from contractors table
-  const { data: contractorsData, error: contractorsError } = await supabase
-    .from("contractors")
-    .select("contractor_id")
-    .in("contractor_id", contractorIds);
-
-  if (contractorsError) {
-    logSupabaseError("searchContractors - contractors query", contractorsError);
-    // Don't throw - if contractors table is empty, we can still show profiles
-  }
-
-  // Step 5: Filter to only contractors with contractor rows
-  const validContractorIds = new Set(
-    (contractorsData || []).map((c: any) => c.contractor_id)
-  );
-
-  // Step 6: Filter out contractors already in team and ensure they have contractor rows
+  // Step 3: Filter out contractors already in team
+  // We do NOT strictly check the 'contractors' table here.
+  // If a user has a profile with role='CONTRACTOR', they can be added.
   const available = (profilesData || [])
-    .filter(
-      (p: any) =>
-        validContractorIds.has(p.id) && !existingContractorIds.has(p.id)
-    )
+    .filter((p: any) => !existingContractorIds.has(p.id))
     .map((p: any) => ({
       id: p.id,
       fullName: p.full_name || "Unknown",
