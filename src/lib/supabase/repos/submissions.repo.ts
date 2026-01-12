@@ -62,9 +62,9 @@ export async function listContractorSubmissions(contractorId: string): Promise<C
       status,
       submitted_at,
       created_at,
-      contractor_id
+      contractor_user_id
     `)
-    .eq("contractor_id", contractorId)
+    .eq("contractor_user_id", contractorId)
     .order("created_at", { ascending: false });
 
   if (error) {

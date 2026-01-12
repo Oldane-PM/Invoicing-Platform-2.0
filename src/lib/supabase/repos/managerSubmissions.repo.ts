@@ -95,10 +95,6 @@ export async function listTeamSubmissions(
       profiles: contractor_user_id (
         full_name,
         email
-      ),
-      contractors (
-        hourly_rate,
-        overtime_rate
       )
     `
     )
@@ -145,7 +141,6 @@ export async function listTeamSubmissions(
   let submissions = (data || []).map((s: any) => {
     // Handle potential array or object return from joins
     const profile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
-    const contractor = Array.isArray(s.contractors) ? s.contractors[0] : s.contractors;
 
     return {
     id: s.id,
@@ -165,8 +160,6 @@ export async function listTeamSubmissions(
     submittedAt: s.submitted_at,
     approvedAt: s.approved_at,
     paidAt: s.paid_at,
-    hourlyRate: contractor?.hourly_rate,
-    overtimeRate: contractor?.overtime_rate,
   }});
 
   // Apply search filter client-side
@@ -223,10 +216,6 @@ export async function getSubmissionDetails(
       profiles!submissions_contractor_user_id_fkey (
         full_name,
         email
-      ),
-      contractors (
-        hourly_rate,
-        overtime_rate
       )
     `
     )
@@ -258,7 +247,6 @@ export async function getSubmissionDetails(
 
   // Safe access to joined data
   const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
-  const contractor = Array.isArray(data.contractors) ? data.contractors[0] : data.contractors;
 
   return {
     id: data.id,
@@ -278,8 +266,6 @@ export async function getSubmissionDetails(
     submittedAt: data.submitted_at,
     approvedAt: data.approved_at,
     paidAt: data.paid_at,
-    hourlyRate: contractor?.hourly_rate,
-    overtimeRate: contractor?.overtime_rate,
   };
 }
 
