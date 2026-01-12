@@ -39,7 +39,7 @@ import {
 } from "./lib/data/mockData";
 import { useAuth } from "./lib/hooks/useAuth";
 import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
-import type { Employee, User, Submission, Notification, MetricData } from "./lib/types";
+import type { Employee, User, Submission, Notification, MetricData, EmployeeDirectoryRow } from "./lib/types";
 
 type Screen = "dashboard" | "directory" | "access" | "calendar";
 type ManagerScreen = "dashboard" | "team";
@@ -63,8 +63,8 @@ function App() {
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const [contractorDrawerOpen, setContractorDrawerOpen] = React.useState(false);
   const [selectedEmployee, setSelectedEmployee] =
-    React.useState<Employee | null>(null);
-  const [employees, setEmployees] = React.useState<Employee[]>([]);
+    React.useState<EmployeeDirectoryRow | null>(null);
+  const [employees, setEmployees] = React.useState<EmployeeDirectoryRow[]>([]);
   const [users, setUsers] = React.useState<User[]>([]);
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const [submissions, setSubmissions] = React.useState<Submission[]>([]);
@@ -157,15 +157,15 @@ function App() {
     setContractorScreen("dashboard");
   };
 
-  const handleEmployeeClick = (employee: Employee) => {
+  const handleEmployeeClick = (employee: EmployeeDirectoryRow) => {
     setSelectedEmployee(employee);
     setContractorDrawerOpen(true);
   };
 
-  const handleSaveEmployee = (updatedEmployee: Employee) => {
+  const handleSaveEmployee = (updatedEmployee: EmployeeDirectoryRow) => {
     setEmployees(
       employees.map((emp) =>
-        emp.id === updatedEmployee.id ? updatedEmployee : emp
+        emp.contractor_id === updatedEmployee.contractor_id ? updatedEmployee : emp
       )
     );
   };
@@ -601,10 +601,7 @@ function App() {
           />
         )}
         {currentScreen === "directory" && (
-          <EmployeeDirectory
-            employees={employees}
-            onEmployeeClick={handleEmployeeClick}
-          />
+          <EmployeeDirectory onEmployeeClick={handleEmployeeClick} />
         )}
         {currentScreen === "access" && <UserAccessManagement />}
         {currentScreen === "calendar" && <AdminCalendar />}
@@ -620,7 +617,7 @@ function App() {
         open={contractorDrawerOpen}
         onOpenChange={setContractorDrawerOpen}
         employee={selectedEmployee}
-        submissions={submissions}
+        submissions={[]} // Pass empty array as it's now ignored/optional in the drawer until prop is removed from interface
         onSave={handleSaveEmployee}
       />
     </div>

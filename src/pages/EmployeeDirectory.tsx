@@ -10,32 +10,41 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { Employee } from "../lib/types";
+import { useEmployeeDirectory } from "../lib/hooks/admin/useEmployeeDirectory";
 import { format } from "date-fns";
-import { Search, Users } from "lucide-react";
+import { Search, Users, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { Button } from "../components/ui/button";
+
+import { EmployeeDirectoryRow } from "../lib/types";
 
 interface EmployeeDirectoryProps {
-  employees: Employee[];
-  onEmployeeClick: (employee: Employee) => void;
+  onEmployeeClick: (employee: EmployeeDirectoryRow) => void;
 }
 
-type SortField = keyof Employee;
+type SortField = "full_name" | "contract_start" | "contract_end" | "hourly_rate" | "fixed_rate" | "manager_name";
 type SortDirection = "asc" | "desc";
 
-export function EmployeeDirectory({
-  employees,
-  onEmployeeClick,
-}: EmployeeDirectoryProps) {
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [sortField, setSortField] = React.useState<SortField | null>(null);
-  const [sortDirection, setSortDirection] = React.useState<SortDirection>("asc");
+export function EmployeeDirectory({ onEmployeeClick }: EmployeeDirectoryProps) {
+  const {
+    data: employees,
+    isLoading,
+    error,
+    search,
+    setSearch,
+    sortBy,
+    setSortBy,
+    sortDir,
+    setSortDir,
+    refetch,
+  } = useEmployeeDirectory();
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    if (sortBy === field) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
     } else {
-      setSortField(field);
-      setSortDirection("asc");
+      setSortBy(field);
+      setSortDir("asc");
     }
   };
 
@@ -49,28 +58,37 @@ export function EmployeeDirectory({
   };
 
   const filteredAndSortedEmployees = React.useMemo(() => {
-    let result = employees.filter((employee) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        employee.reportingManager.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!employees) return [];
 
-      return matchesSearch;
-    });
-
-    if (sortField) {
-      result.sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
-
-        if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+    // Client-side sorting for manager_name if needed
+    if (sortBy === "manager_name") {
+      return [...employees].sort((a, b) => {
+        const aValue = a.reporting_manager_name || "";
+        const bValue = b.reporting_manager_name || "";
+        if (aValue < bValue) return sortDir === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortDir === "asc" ? 1 : -1;
         return 0;
       });
     }
 
-    return result;
-  }, [employees, searchQuery, sortField, sortDirection]);
+    return employees;
+  }, [employees, sortBy, sortDir]);
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load employee directory. {error.message}
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => refetch()} variant="outline">
+          Try Again
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -79,9 +97,9 @@ export function EmployeeDirectory({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <Input
-            placeholder="Search by name or manager..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by contractor name or manager..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="pl-11 h-11 bg-gray-50 border-gray-200 rounded-lg"
           />
         </div>
@@ -95,29 +113,35 @@ export function EmployeeDirectory({
               <TableRow className="border-b border-gray-200 bg-gray-50">
                 <TableHead
                   className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort("name")}
+                  onClick={() => handleSort("full_name")}
                 >
-                  Name
-                  {sortField === "name" && (
-                    <span className="ml-2">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                  Name + Role
+                  {sortBy === "full_name" && (
+                    <span className="ml-2">
+                      {sortDir === "asc" ? "↑" : "↓"}
+                    </span>
                   )}
                 </TableHead>
                 <TableHead
                   className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort("contractStartDate")}
+                  onClick={() => handleSort("contract_start")}
                 >
-                  Contract Start Date
-                  {sortField === "contractStartDate" && (
-                    <span className="ml-2">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                  Contract Start
+                  {sortBy === "contract_start" && (
+                    <span className="ml-2">
+                      {sortDir === "asc" ? "↑" : "↓"}
+                    </span>
                   )}
                 </TableHead>
                 <TableHead
                   className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort("contractEndDate")}
+                  onClick={() => handleSort("contract_end")}
                 >
-                  Contract End Date
-                  {sortField === "contractEndDate" && (
-                    <span className="ml-2">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                  Contract End
+                  {sortBy === "contract_end" && (
+                    <span className="ml-2">
+                      {sortDir === "asc" ? "↑" : "↓"}
+                    </span>
                   )}
                 </TableHead>
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
@@ -134,30 +158,47 @@ export function EmployeeDirectory({
                 </TableHead>
                 <TableHead
                   className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort("reportingManager")}
+                  onClick={() => handleSort("manager_name")}
                 >
                   Reporting Manager
-                  {sortField === "reportingManager" && (
-                    <span className="ml-2">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                  {sortBy === "manager_name" && (
+                    <span className="ml-2">
+                      {sortDir === "asc" ? "↑" : "↓"}
+                    </span>
                   )}
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAndSortedEmployees.length === 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-64 text-center">
+                    <div className="flex flex-col items-center justify-center text-gray-400">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+                      <div className="text-gray-600 font-medium mt-3">
+                        Loading employees...
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredAndSortedEmployees.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <Users className="w-16 h-16 mb-3" strokeWidth={1.5} />
-                      <div className="text-gray-600 font-medium">No employees found</div>
-                      <div className="text-sm text-gray-500 mt-1">Try adjusting your search</div>
+                      <div className="text-gray-600 font-medium">
+                        No employees found
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        Try adjusting your search
+                      </div>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredAndSortedEmployees.map((employee) => (
                   <TableRow
-                    key={employee.id}
+                    key={employee.contractor_id}
                     className="h-16 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
                     onClick={() => onEmployeeClick(employee)}
                   >
@@ -165,32 +206,51 @@ export function EmployeeDirectory({
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9 bg-purple-100 text-purple-700">
                           <AvatarFallback className="bg-purple-100 text-purple-700 font-medium">
-                            {getInitials(employee.name)}
+                            {getInitials(employee.full_name)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <div className="font-medium text-gray-900">{employee.name}</div>
-                          <div className="text-sm text-gray-500">{employee.position}</div>
+                          <div className="font-medium text-gray-900">
+                            {employee.full_name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {employee.role}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-gray-700">
-                      {format(employee.contractStartDate, "MMM d, yyyy")}
-                    </TableCell>
-                    <TableCell className="text-gray-700">
-                      {format(employee.contractEndDate, "MMM d, yyyy")}
-                    </TableCell>
-                    <TableCell className="text-gray-700">{employee.rateType}</TableCell>
-                    <TableCell className="text-right text-gray-700">
-                      {employee.hourlyRate ? `$${employee.hourlyRate}/hr` : "-"}
-                    </TableCell>
-                    <TableCell className="text-right text-gray-700">
-                      {employee.fixedRate
-                        ? `$${employee.fixedRate.toLocaleString()}`
+                      {employee.contract_start
+                        ? format(
+                            new Date(employee.contract_start),
+                            "MMM d, yyyy"
+                          )
                         : "-"}
                     </TableCell>
-                    <TableCell className="text-gray-700">{employee.contractType}</TableCell>
-                    <TableCell className="text-gray-500">{employee.reportingManager}</TableCell>
+                    <TableCell className="text-gray-700">
+                      {employee.contract_end
+                        ? format(new Date(employee.contract_end), "MMM d, yyyy")
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="text-gray-700">
+                      {employee.rate_type || "-"}
+                    </TableCell>
+                    <TableCell className="text-right text-gray-700">
+                      {employee.hourly_rate
+                        ? `$${employee.hourly_rate}/hr`
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="text-right text-gray-700">
+                      {employee.fixed_rate
+                        ? `$${employee.fixed_rate.toLocaleString()}`
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="text-gray-700">
+                      {employee.contract_type || "-"}
+                    </TableCell>
+                    <TableCell className="text-gray-500">
+                      {employee.reporting_manager_name || "-"}
+                    </TableCell>
                   </TableRow>
                 ))
               )}

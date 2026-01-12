@@ -93,3 +93,22 @@ export interface SubmissionDraft {
   overtimeDescription?: string | null;
   projectName?: string; // optional for now if app doesn't have project selection
 }
+
+export interface EmployeeDirectoryRow {
+  contractor_id: string; // Used as key in table
+  full_name: string;
+  email: string;
+  role: string;
+  status: "Active" | "Inactive";
+  joined_at: string;
+  reporting_manager_name?: string; // matched to reporting_manager_name
+  contract_start?: string;
+  contract_end?: string;
+  hourly_rate?: number;
+  fixed_rate?: number;
+  rate_type?: string;
+  rate_type?: string;
+  contract_type?: string;
+  position?: string;
+  department?: string;
+}
