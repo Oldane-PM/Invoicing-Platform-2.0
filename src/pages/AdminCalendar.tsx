@@ -10,7 +10,7 @@ import {
   SheetHeader,
 } from "../components/ui/sheet";
 import { toast } from "sonner";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, isAfter, isBefore, addDays } from "date-fns";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, addDays } from "date-fns";
 import { ChevronLeft, ChevronRight, CalendarPlus, X, Info, Trash2, CalendarCheck, Calendar as CalendarIcon } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 
@@ -181,7 +181,7 @@ export function AdminCalendar() {
     );
   };
 
-  const calculateAffectedCount = (countries: string[], teams: string[], appliesTo: string) => {
+  const calculateAffectedCount = (countries: string[], teams: string[], appliesTo: string): number => {
     // Mock calculation - in real app, this would call an API
     if (countries.includes("all") && teams.includes("all")) {
       return appliesTo === "All" ? 127 : appliesTo === "Contractors" ? 85 : 42;
