@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ContractorSubmission } from "../types";
 import { getSubmissionsDataSource } from "../data/submissionsDataSource";
+import { useAuth } from "./useAuth";
 
 interface UseSubmissionsResult {
   submissions: ContractorSubmission[];
@@ -21,7 +22,16 @@ export function useSubmissions(): UseSubmissionsResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  // Get auth state to ensure we only fetch when logged in
+  const { user } = useAuth();
+  
   const fetchSubmissions = useCallback(async () => {
+    // specific check: don't fetch if no user
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -35,12 +45,16 @@ export function useSubmissions(): UseSubmissionsResult {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
-  // Fetch on mount
+  // Fetch when user changes (and exists)
   useEffect(() => {
-    fetchSubmissions();
-  }, [fetchSubmissions]);
+    if (user) {
+      fetchSubmissions();
+    } else {
+      setLoading(false); 
+    }
+  }, [user, fetchSubmissions]);
 
   return {
     submissions,

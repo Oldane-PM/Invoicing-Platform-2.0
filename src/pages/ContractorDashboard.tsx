@@ -175,13 +175,13 @@ export function ContractorDashboard({
                 />
                 Refresh
               </Button>
-              {submissions.length > 0 && onNavigateToSubmissions && (
+              {onNavigateToSubmissions && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   onClick={onNavigateToSubmissions}
-                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                  className="bg-white text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300"
                 >
-                  View All
+                  View All Invoices
                 </Button>
               )}
             </div>

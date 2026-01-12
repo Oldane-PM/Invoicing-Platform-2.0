@@ -12,7 +12,7 @@
 
 import type { ContractorSubmission, SubmissionDraft, SubmissionStatus } from "../types";
 import { supabase, isSupabaseConfigured } from "../supabase/client";
-import { format, parse, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from "date-fns";
+import { format, parse, startOfMonth, endOfMonth } from "date-fns";
 
 // Rate constants - will be fetched from contract/rates table in production
 const DEFAULT_HOURLY_RATE = 75;
@@ -25,20 +25,6 @@ const DEFAULT_OT_MULTIPLIER = 1.5;
 export interface SubmissionsDataSource {
   listMySubmissions(): Promise<ContractorSubmission[]>;
   createSubmission(draft: SubmissionDraft): Promise<ContractorSubmission>;
-}
-
-/**
- * Calculate total amount based on hours and rates
- */
-function calculateTotalAmount(
-  regularHours: number,
-  overtimeHours: number,
-  hourlyRate: number = DEFAULT_HOURLY_RATE,
-  otMultiplier: number = DEFAULT_OT_MULTIPLIER
-): number {
-  const regularAmount = regularHours * hourlyRate;
-  const overtimeAmount = overtimeHours * hourlyRate * otMultiplier;
-  return regularAmount + overtimeAmount;
 }
 
 
@@ -68,6 +54,10 @@ function mapDbStatusToFrontend(dbStatus: string, hasPaidInvoice: boolean): Submi
  * Supabase implementation of SubmissionsDataSource
  * Works with the normalized schema (submissions, submission_line_items, overtime_entries)
  */
+/**
+ * Supabase implementation of SubmissionsDataSource
+ * Works with the actual schema (flat submissions table, contractors table)
+ */
 class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
   private async getContractorUserId(): Promise<string> {
     if (!supabase) {
@@ -86,64 +76,31 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
   }
 
   /**
-   * Get the active contract for a contractor (for project name, rates, and organization_id)
+   * Get the active contractor details (project name, rates)
    */
-  private async getActiveContract(contractorUserId: string): Promise<{
-    id: string;
-    organizationId: string;
-    projectName: string;
+  private async getContractorDetails(contractorUserId: string): Promise<{
     hourlyRate: number;
-    otMultiplier: number;
+    overtimeRate: number;
+    projectName: string;
   } | null> {
     if (!supabase) return null;
 
-    // Get active contract with rates
-    const { data: contract, error } = await supabase
-      .from("contracts")
-      .select(
-        `
-        id,
-        organization_id,
-        project_name,
-        rates (
-          hourly_rate,
-          overtime_multiplier,
-          effective_from,
-          effective_to
-        )
-      `
-      )
-      .eq("contractor_user_id", contractorUserId)
+    const { data, error } = await supabase
+      .from("contractors")
+      .select("hourly_rate, overtime_rate, default_project_name")
+      .eq("contractor_id", contractorUserId)
       .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(1)
       .single();
 
-    if (error || !contract) {
-      console.log("[SupabaseSubmissionsDataSource] No active contract found, using defaults");
+    if (error || !data) {
+      console.log("[SupabaseSubmissionsDataSource] No active contractor details found, using defaults");
       return null;
     }
 
-    // Safely extract rates array - Supabase may return object, array, or null
-    const ratesRaw = contract.rates;
-    const rates: Array<{
-      hourly_rate: number;
-      overtime_multiplier: number;
-      effective_from: string;
-      effective_to: string | null;
-    }> = Array.isArray(ratesRaw) ? ratesRaw : [];
-
-    const today = new Date().toISOString().split("T")[0];
-    const currentRate = rates.find(
-      (r) => r.effective_from <= today && (!r.effective_to || r.effective_to >= today)
-    );
-
     return {
-      id: contract.id,
-      organizationId: contract.organization_id,
-      projectName: contract.project_name || "General Work",
-      hourlyRate: currentRate?.hourly_rate || DEFAULT_HOURLY_RATE,
-      otMultiplier: currentRate?.overtime_multiplier || DEFAULT_OT_MULTIPLIER,
+      hourlyRate: data.hourly_rate || DEFAULT_HOURLY_RATE,
+      overtimeRate: data.overtime_rate || (DEFAULT_HOURLY_RATE * DEFAULT_OT_MULTIPLIER),
+      projectName: data.default_project_name || "General Work",
     };
   }
 
@@ -161,29 +118,18 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       .select(
         `
         id,
+        project_name,
+        description,
         period_start,
         period_end,
+        work_period,
+        regular_hours,
+        overtime_hours,
+        overtime_description,
+        total_amount,
         status,
         submitted_at,
-        created_at,
-        contract_id,
-        contracts (
-          project_name
-        ),
-        submission_line_items (
-          work_date,
-          hours,
-          is_non_working_day,
-          note
-        ),
-        overtime_entries (
-          overtime_hours,
-          description
-        ),
-        invoices (
-          pdf_url,
-          status
-        )
+        created_at
       `
       )
       .eq("contractor_user_id", contractorUserId)
@@ -194,93 +140,27 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       throw error;
     }
 
-    // Get contract rates for amount calculation
-    const contract = await this.getActiveContract(contractorUserId);
-
     // Transform to ContractorSubmission format
     return (submissions || []).map((sub) => {
-      // Safely extract arrays - Supabase may return object, array, or null
-      const lineItemsRaw = sub.submission_line_items;
-      const lineItems: Array<{
-        work_date: string;
-        hours: number;
-        is_non_working_day: boolean;
-        note: string | null;
-      }> = Array.isArray(lineItemsRaw) ? lineItemsRaw : [];
-
-      const overtimeEntriesRaw = sub.overtime_entries;
-      const overtimeEntries: Array<{
-        overtime_hours: number;
-        description: string | null;
-      }> = Array.isArray(overtimeEntriesRaw) ? overtimeEntriesRaw : [];
-
-      // Safely extract invoices - CRITICAL: must be array before calling .find()
-      const invoicesRaw = sub.invoices;
-      const invoices: Array<{
-        pdf_url: string | null;
-        status: string;
-      }> = Array.isArray(invoicesRaw) ? invoicesRaw : [];
-
-      // contracts is a single object (not array) due to the foreign key relationship
-      const contractData = sub.contracts as { project_name: string } | { project_name: string }[] | null;
-      const contracts = Array.isArray(contractData) ? contractData[0] : contractData;
-
-      // Calculate totals from line items
-      const regularHours = lineItems.reduce((sum, li) => sum + (li.hours || 0), 0);
-      const overtimeHours = overtimeEntries.reduce((sum, ot) => sum + (ot.overtime_hours || 0), 0);
-
-      // Get excluded dates (non-working days)
-      const excludedDates = lineItems
-        .filter((li) => li.is_non_working_day)
-        .map((li) => li.work_date);
-
-      // Get overtime description (combine if multiple)
-      const overtimeDescription =
-        overtimeEntries
-          .filter((ot) => ot.description)
-          .map((ot) => ot.description)
-          .join("; ") || null;
-
-      // Get work description from line item notes
-      const description =
-        lineItems
-          .filter((li) => li.note)
-          .map((li) => li.note)
-          .join(" ") || "Work completed for this period";
-
-      // Calculate total amount
-      const totalAmount = calculateTotalAmount(
-        regularHours,
-        overtimeHours,
-        contract?.hourlyRate || DEFAULT_HOURLY_RATE,
-        contract?.otMultiplier || DEFAULT_OT_MULTIPLIER
-      );
-
-      // Check if any invoice is paid
-      const hasPaidInvoice = invoices.some((inv) => inv.status === "paid");
-
       // Determine status
-      const status = mapDbStatusToFrontend(sub.status, hasPaidInvoice);
+      const status = mapDbStatusToFrontend(sub.status, false); // No invoices table, so passed false
 
-      // Get invoice URL from the first invoice if available
-      const invoiceUrl = invoices.length > 0 ? (invoices[0].pdf_url || null) : null;
-
-      // Format work period as "YYYY-MM"
-      const workPeriod = format(new Date(sub.period_start), "yyyy-MM");
+      // Format work period as "YYYY-MM" if not present
+      const workPeriod = sub.work_period || format(new Date(sub.period_start), "yyyy-MM");
 
       return {
         id: sub.id,
         submissionDate: sub.submitted_at || sub.created_at,
-        projectName: contracts?.project_name || contract?.projectName || "General Work",
-        description,
-        regularHours,
-        overtimeHours,
-        totalAmount,
+        projectName: sub.project_name || "General Work",
+        description: sub.description || "",
+        regularHours: sub.regular_hours || 0,
+        overtimeHours: sub.overtime_hours || 0,
+        totalAmount: sub.total_amount || 0,
         status,
-        invoiceUrl,
+        invoiceUrl: null, // Invoices table does not exist
         workPeriod,
-        excludedDates,
-        overtimeDescription,
+        excludedDates: [], // Not stored in flat schema
+        overtimeDescription: sub.overtime_description,
       };
     });
   }
@@ -293,28 +173,33 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     const contractorUserId = await this.getContractorUserId();
     console.log("[SupabaseSubmissionsDataSource] Creating submission for:", contractorUserId);
 
-    // Get active contract
-    const contract = await this.getActiveContract(contractorUserId);
+    // Get contractor details
+    const details = await this.getContractorDetails(contractorUserId);
+    const hourlyRate = details?.hourlyRate || DEFAULT_HOURLY_RATE;
+    const overtimeRate = details?.overtimeRate || (hourlyRate * DEFAULT_OT_MULTIPLIER);
+    const projectName = details?.projectName || "General Work";
 
     // Parse work period to get period_start and period_end
     const periodDate = parse(draft.workPeriod, "yyyy-MM", new Date());
     const periodStart = format(startOfMonth(periodDate), "yyyy-MM-dd");
     const periodEnd = format(endOfMonth(periodDate), "yyyy-MM-dd");
 
-    // Create submission header
-    // Note: organization_id is required by the schema
-    if (!contract) {
-      throw new Error("No active contract found. Please contact your administrator.");
-    }
+    // Calculate total amount
+    const totalAmount = (draft.hoursSubmitted * hourlyRate) + (draft.overtimeHours * overtimeRate);
 
     const { data: submission, error: submissionError } = await supabase
       .from("submissions")
       .insert({
-        organization_id: contract.organizationId,
         contractor_user_id: contractorUserId,
-        contract_id: contract.id,
+        project_name: projectName,
+        description: draft.description,
         period_start: periodStart,
         period_end: periodEnd,
+        work_period: draft.workPeriod,
+        regular_hours: draft.hoursSubmitted,
+        overtime_hours: draft.overtimeHours,
+        overtime_description: draft.overtimeDescription || null,
+        total_amount: totalAmount,
         status: "submitted",
         submitted_at: new Date().toISOString(),
       })
@@ -326,74 +211,21 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       throw submissionError;
     }
 
-    // Create line items for each working day
-    const allDays = eachDayOfInterval({
-      start: new Date(periodStart),
-      end: new Date(periodEnd),
-    });
-
-    const excludedDatesSet = new Set(draft.excludedDates);
-    const hoursPerDay = draft.hoursSubmitted / allDays.filter((d) => !isWeekend(d) && !excludedDatesSet.has(format(d, "yyyy-MM-dd"))).length || 8;
-
-    const lineItems = allDays.map((day) => {
-      const dateStr = format(day, "yyyy-MM-dd");
-      const isNonWorking = isWeekend(day) || excludedDatesSet.has(dateStr);
-
-      return {
-        submission_id: submission.id,
-        work_date: dateStr,
-        hours: isNonWorking ? 0 : hoursPerDay,
-        is_non_working_day: isNonWorking,
-        note: isNonWorking ? null : draft.description,
-      };
-    });
-
-    const { error: lineItemsError } = await supabase
-      .from("submission_line_items")
-      .insert(lineItems);
-
-    if (lineItemsError) {
-      console.error("[SupabaseSubmissionsDataSource] Error creating line items:", lineItemsError);
-      // Don't throw - submission was created, line items can be added later
-    }
-
-    // Create overtime entry if overtime hours > 0
-    if (draft.overtimeHours > 0) {
-      const { error: overtimeError } = await supabase.from("overtime_entries").insert({
-        submission_id: submission.id,
-        work_date: periodEnd, // Associate with end of period
-        overtime_hours: draft.overtimeHours,
-        description: draft.overtimeDescription || "Overtime work",
-      });
-
-      if (overtimeError) {
-        console.error("[SupabaseSubmissionsDataSource] Error creating overtime entry:", overtimeError);
-      }
-    }
-
-    // Calculate total amount
-    const totalAmount = calculateTotalAmount(
-      draft.hoursSubmitted,
-      draft.overtimeHours,
-      contract.hourlyRate,
-      contract.otMultiplier
-    );
-
     console.log("[SupabaseSubmissionsDataSource] Created submission:", submission.id);
 
     return {
       id: submission.id,
       submissionDate: submission.submitted_at || submission.created_at,
-      projectName: contract.projectName,
-      description: draft.description,
-      regularHours: draft.hoursSubmitted,
-      overtimeHours: draft.overtimeHours,
-      totalAmount,
+      projectName: submission.project_name,
+      description: submission.description,
+      regularHours: submission.regular_hours,
+      overtimeHours: submission.overtime_hours,
+      totalAmount: submission.total_amount,
       status: "PENDING",
       invoiceUrl: null,
-      workPeriod: draft.workPeriod,
-      excludedDates: draft.excludedDates,
-      overtimeDescription: draft.overtimeDescription,
+      workPeriod: submission.work_period,
+      excludedDates: draft.excludedDates, // Returned from input, but not persisted deeply
+      overtimeDescription: submission.overtime_description,
     };
   }
 }

@@ -92,7 +92,7 @@ function App() {
         const supabase = getSupabaseClient();
         
         const { data: appUser, error } = await supabase
-          .from('app_users')
+          .from('profiles')
           .select('role')
           .eq('id', user.id)
           .single();
@@ -109,6 +109,7 @@ function App() {
             'manager': 'Manager',
             'contractor': 'Contractor',
           };
+          // Handle both uppercase (DB) and lowercase
           const userRole = roleMap[appUser.role.toLowerCase()] || 'Contractor';
           
           // Validate that user is logging in through the correct option

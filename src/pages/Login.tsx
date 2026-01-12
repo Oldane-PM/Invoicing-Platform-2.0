@@ -36,8 +36,8 @@ export function Login({ onSupabaseLogin, signIn, authLoading }: LoginProps) {
     setLoading(true);
 
     // Store login intent in sessionStorage so App.tsx can validate it
-    if (loginIntent) {
-      sessionStorage.setItem('loginIntent', loginIntent);
+    if (selectedRole) {
+      sessionStorage.setItem('loginIntent', selectedRole);
     }
 
     try {

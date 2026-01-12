@@ -103,23 +103,28 @@ export async function listTeamContractors(
     (contractorsData || []).map((c: any) => [c.contractor_id, c])
   );
 
-  return contractorIds.map((contractorId: string) => {
-    const profile = profilesMap.get(contractorId);
-    const contractor = contractorsMap.get(contractorId);
+  return contractorIds
+    .map((contractorId: string) => {
+      const profile = profilesMap.get(contractorId);
+      const contractor = contractorsMap.get(contractorId);
 
-    return {
-      id: contractorId,
-      fullName: profile?.full_name || "Unknown",
-      email: profile?.email || "",
-      hourlyRate: contractor?.hourly_rate || 0,
-      overtimeRate: contractor?.overtime_rate || 0,
-      projectName: contractor?.default_project_name || null,
-      contractType: "Hourly", // Default
-      contractStart: contractor?.contract_start || null,
-      contractEnd: contractor?.contract_end || null,
-      isActive: contractor?.is_active ?? true,
-    };
-  });
+      // If no profile found (shouldn't happen due to FKs but possible with bad RLS), skip
+      if (!profile) return null;
+
+      return {
+        id: contractorId,
+        fullName: profile?.full_name || "Unknown",
+        email: profile?.email || "",
+        hourlyRate: contractor?.hourly_rate || 0,
+        overtimeRate: contractor?.overtime_rate || 0,
+        projectName: contractor?.default_project_name || null,
+        contractType: "Hourly", // Default
+        contractStart: contractor?.contract_start || null,
+        contractEnd: contractor?.contract_end || null,
+        isActive: contractor?.is_active ?? true,
+      };
+    })
+    .filter((c: TeamContractor | null): c is TeamContractor => c !== null);
 }
 
 /**

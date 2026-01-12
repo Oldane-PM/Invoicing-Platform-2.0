@@ -71,6 +71,8 @@ export async function listTeamSubmissions(
   }
 
   // Build submissions query
+  // Using simplified join syntax to avoid "Could not find relationship" errors if FK names are strict
+  // We manually join or carefuly select related data
   let query = supabase
     .from("submissions")
     .select(
@@ -89,7 +91,8 @@ export async function listTeamSubmissions(
       submitted_at,
       approved_at,
       paid_at,
-      profiles!submissions_contractor_user_id_fkey (
+      created_at,
+      profiles: contractor_user_id (
         full_name,
         email
       ),
@@ -139,11 +142,16 @@ export async function listTeamSubmissions(
     return statusMap[dbStatus] || "PENDING";
   };
 
-  let submissions = (data || []).map((s: any) => ({
+  let submissions = (data || []).map((s: any) => {
+    // Handle potential array or object return from joins
+    const profile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
+    const contractor = Array.isArray(s.contractors) ? s.contractors[0] : s.contractors;
+
+    return {
     id: s.id,
     contractorId: s.contractor_user_id,
-    contractorName: s.profiles?.full_name || "Unknown",
-    contractorEmail: s.profiles?.email || "",
+    contractorName: profile?.full_name || "Unknown",
+    contractorEmail: profile?.email || "",
     projectName: s.project_name || "",
     description: s.description || "",
     workPeriod: s.work_period || "",
@@ -157,9 +165,9 @@ export async function listTeamSubmissions(
     submittedAt: s.submitted_at,
     approvedAt: s.approved_at,
     paidAt: s.paid_at,
-    hourlyRate: s.contractors?.hourly_rate,
-    overtimeRate: s.contractors?.overtime_rate,
-  }));
+    hourlyRate: contractor?.hourly_rate,
+    overtimeRate: contractor?.overtime_rate,
+  }});
 
   // Apply search filter client-side
   if (filters?.search) {
@@ -211,6 +219,7 @@ export async function getSubmissionDetails(
       submitted_at,
       approved_at,
       paid_at,
+      created_at,
       profiles!submissions_contractor_user_id_fkey (
         full_name,
         email
@@ -247,11 +256,15 @@ export async function getSubmissionDetails(
     return statusMap[dbStatus] || "PENDING";
   };
 
+  // Safe access to joined data
+  const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
+  const contractor = Array.isArray(data.contractors) ? data.contractors[0] : data.contractors;
+
   return {
     id: data.id,
     contractorId: data.contractor_user_id,
-    contractorName: data.profiles?.full_name || "Unknown",
-    contractorEmail: data.profiles?.email || "",
+    contractorName: profile?.full_name || "Unknown",
+    contractorEmail: profile?.email || "",
     projectName: data.project_name || "",
     description: data.description || "",
     workPeriod: data.work_period || "",
@@ -265,8 +278,8 @@ export async function getSubmissionDetails(
     submittedAt: data.submitted_at,
     approvedAt: data.approved_at,
     paidAt: data.paid_at,
-    hourlyRate: data.contractors?.hourly_rate,
-    overtimeRate: data.contractors?.overtime_rate,
+    hourlyRate: contractor?.hourly_rate,
+    overtimeRate: contractor?.overtime_rate,
   };
 }
 
