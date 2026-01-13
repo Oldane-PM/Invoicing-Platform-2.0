@@ -114,6 +114,7 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
       status,
       submitted_at,
       created_at,
+      total_amount,
       contractor_user_id,
       contract_id,
       submission_line_items (
@@ -143,14 +144,14 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
   }
 
   // Fetch contractors data
-  const contractorIds = [...new Set(data.map(s => s.contractor_user_id))];
+  const contractorIds = [...new Set(data.map(s => s.contractor_user_id).filter(Boolean))];
   const { data: contractors } = await supabase
     .from('app_users')
     .select('id, full_name, email')
     .in('id', contractorIds);
 
   // Fetch contracts data
-  const contractIds = [...new Set(data.map(s => s.contract_id))];
+  const contractIds = [...new Set(data.map(s => s.contract_id).filter(Boolean))];
   const { data: contracts } = await supabase
     .from('contracts')
     .select('id, project_name, contract_type, manager_user_id')
@@ -200,7 +201,7 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
       r.effective_from <= today && (!r.effective_to || r.effective_to >= today)
     );
 
-    const totalAmount = calculateTotalAmount(
+    const totalAmount = sub.total_amount || calculateTotalAmount(
       regularHours,
       overtimeHours,
       currentRate?.hourly_rate,
@@ -273,6 +274,7 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
       status,
       submitted_at,
       created_at,
+      total_amount,
       contractor_user_id,
       contract_id,
       submission_line_items (
@@ -336,7 +338,7 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
     r.effective_from <= today && (!r.effective_to || r.effective_to >= today)
   );
 
-  const totalAmount = calculateTotalAmount(
+  const totalAmount = data.total_amount || calculateTotalAmount(
     regularHours,
     overtimeHours,
     currentRate?.hourly_rate,

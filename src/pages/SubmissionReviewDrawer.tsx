@@ -23,6 +23,7 @@ import {
   useRejectSubmission,
   useRequestClarification,
 } from "../lib/hooks/adminDashboard";
+import { useAuth } from "../lib/hooks/useAuth";
 
 interface SubmissionReviewDrawerProps {
   submissionId: string | null;
@@ -40,6 +41,10 @@ export function SubmissionReviewDrawer({
   const [rejectReason, setRejectReason] = React.useState("");
   const [clarificationMessage, setClarificationMessage] = React.useState("");
 
+  // Get current user ID from auth
+  const { user } = useAuth();
+  const adminUserId = user?.id || "";
+
   // Fetch submission details
   const { data: submission, isLoading, error } = useSubmissionDetails(submissionId);
 
@@ -47,10 +52,6 @@ export function SubmissionReviewDrawer({
   const approveMutation = useApproveSubmission();
   const rejectMutation = useRejectSubmission();
   const clarifyMutation = useRequestClarification();
-
-  // Get admin user ID (in production, this would come from auth context)
-  // For now, we'll use a placeholder - you'll need to integrate with your auth system
-  const adminUserId = "admin-user-id"; // TODO: Get from auth context
 
   const getStatusColor = (status: string) => {
     switch (status) {

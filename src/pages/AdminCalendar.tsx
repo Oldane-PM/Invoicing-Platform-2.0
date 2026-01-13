@@ -8,24 +8,21 @@ import {
   Sheet,
   SheetContent,
   SheetHeader,
+  SheetTitle,
+  SheetDescription,
 } from "../components/ui/sheet";
 import { toast } from "sonner";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, isAfter, isBefore, addDays } from "date-fns";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, addDays } from "date-fns";
 import { ChevronLeft, ChevronRight, CalendarPlus, X, Info, Trash2, CalendarCheck, Calendar as CalendarIcon } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 
-interface TimeOffEntry {
-  id: string;
-  name: string;
-  type: "Holiday" | "Special Time Off";
-  description?: string;
-  startDate: Date;
-  endDate: Date;
-  country: string[];
-  team: string[];
-  appliesTo: "Contractors" | "Employees" | "All";
-  affectedCount: number;
-}
+import { 
+  useCalendarEntries, 
+  useCreateCalendarEntry, 
+  useUpdateCalendarEntry, 
+  useDeleteCalendarEntry 
+} from "../lib/hooks/adminCalendar";
+import { TimeOffEntry, CalendarEntryType, CalendarAppliesTo } from "../lib/data/adminCalendar";
 
 const mockCountries = [
   { value: "all", label: "All Countries" },
@@ -44,77 +41,13 @@ const mockTeams = [
   { value: "operations", label: "Operations" },
 ];
 
-const mockTimeOffEntries: TimeOffEntry[] = [
-  {
-    id: "1",
-    name: "New Year's Day",
-    type: "Holiday",
-    description: "Public holiday",
-    startDate: new Date(2026, 0, 1),
-    endDate: new Date(2026, 0, 1),
-    country: ["all"],
-    team: ["all"],
-    appliesTo: "All",
-    affectedCount: 127,
-  },
-  {
-    id: "2",
-    name: "Martin Luther King Jr. Day",
-    type: "Holiday",
-    description: "Federal holiday",
-    startDate: new Date(2026, 0, 19),
-    endDate: new Date(2026, 0, 19),
-    country: ["us"],
-    team: ["all"],
-    appliesTo: "All",
-    affectedCount: 87,
-  },
-  {
-    id: "3",
-    name: "Presidents' Day",
-    type: "Holiday",
-    description: "Federal holiday",
-    startDate: new Date(2026, 1, 16),
-    endDate: new Date(2026, 1, 16),
-    country: ["us"],
-    team: ["all"],
-    appliesTo: "All",
-    affectedCount: 87,
-  },
-  {
-    id: "4",
-    name: "Memorial Day",
-    type: "Holiday",
-    description: "Federal holiday",
-    startDate: new Date(2026, 4, 25),
-    endDate: new Date(2026, 4, 25),
-    country: ["us"],
-    team: ["all"],
-    appliesTo: "All",
-    affectedCount: 87,
-  },
-  {
-    id: "5",
-    name: "Labour Day",
-    type: "Holiday",
-    description: "Public holiday",
-    startDate: new Date(2026, 4, 23),
-    endDate: new Date(2026, 4, 23),
-    country: ["jm"],
-    team: ["all"],
-    appliesTo: "All",
-    affectedCount: 24,
-  },
-];
-
 type ViewMode = "month" | "year";
 type DateRangeMode = "single" | "range";
 
 export function AdminCalendar() {
-  const [currentDate, setCurrentDate] = React.useState(new Date(2026, 0, 1));
+  const [currentDate, setCurrentDate] = React.useState(new Date());
   const [viewMode, setViewMode] = React.useState<ViewMode>("month");
   const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const [timeOffEntries, setTimeOffEntries] = React.useState<TimeOffEntry[]>(mockTimeOffEntries);
   const [editingEntry, setEditingEntry] = React.useState<TimeOffEntry | null>(null);
   const [isReadMode, setIsReadMode] = React.useState(false);
 
@@ -127,15 +60,29 @@ export function AdminCalendar() {
   const [dateRangeMode, setDateRangeMode] = React.useState<DateRangeMode>("single");
   const [formData, setFormData] = React.useState({
     name: "",
-    type: "Holiday" as "Holiday" | "Special Time Off",
+    type: "Holiday" as CalendarEntryType,
     description: "",
     startDate: format(new Date(), "yyyy-MM-dd"),
     endDate: format(new Date(), "yyyy-MM-dd"),
     country: ["all"],
     team: ["all"],
-    appliesTo: "All" as "Contractors" | "Employees" | "All",
+    appliesTo: "All" as CalendarAppliesTo,
   });
 
+  // Hooks
+  // We fetch a wide range to cover both the calendar view and the upcoming list
+  // Ideally these would be two separate queries but for simplicity we'll fetch a larger chunk
+  // Or utilize query caching.
+  // Let's fetch specifically for the current view + 3 months
+  const queryStart = React.useMemo(() => subMonths(startOfMonth(currentDate), 1), [currentDate]);
+  const queryEnd = React.useMemo(() => addMonths(endOfMonth(currentDate), 3), [currentDate]);
+  
+  const { data: timeOffEntries = [] } = useCalendarEntries(queryStart, queryEnd);
+  
+  const createMutation = useCreateCalendarEntry();
+  const updateMutation = useUpdateCalendarEntry();
+  const deleteMutation = useDeleteCalendarEntry();
+  
   // Keyboard event listener for Shift key
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -175,13 +122,14 @@ export function AdminCalendar() {
     });
   };
 
+
   const isDateSelected = (date: Date) => {
     return selectedDates.some(selectedDate => 
       isSameDay(new Date(selectedDate), date)
     );
   };
 
-  const calculateAffectedCount = (countries: string[], teams: string[], appliesTo: string) => {
+  const calculateAffectedCount = (countries: string[], teams: string[], appliesTo: string): number => {
     // Mock calculation - in real app, this would call an API
     if (countries.includes("all") && teams.includes("all")) {
       return appliesTo === "All" ? 127 : appliesTo === "Contractors" ? 85 : 42;
@@ -338,13 +286,12 @@ export function AdminCalendar() {
       return;
     }
 
-    const newEntry: TimeOffEntry = {
-      id: editingEntry?.id || `${Date.now()}`,
+    const entryData = {
       name: formData.name,
       type: formData.type,
       description: formData.description,
-      startDate: new Date(formData.startDate),
-      endDate: dateRangeMode === "single" ? new Date(formData.startDate) : new Date(formData.endDate),
+      startDate: formData.startDate,
+      endDate: dateRangeMode === "single" ? formData.startDate : formData.endDate,
       country: formData.country,
       team: formData.team,
       appliesTo: formData.appliesTo,
@@ -352,24 +299,34 @@ export function AdminCalendar() {
     };
 
     if (editingEntry) {
-      setTimeOffEntries(prev => prev.map(e => e.id === editingEntry.id ? newEntry : e));
-      toast.success(`Time off updated. ${count} contractors affected.`);
+      updateMutation.mutate({
+        ...entryData,
+        id: editingEntry.id,
+      }, {
+        onSuccess: () => {
+           setDrawerOpen(false);
+        }
+      });
     } else {
-      setTimeOffEntries(prev => [...prev, newEntry]);
-      toast.success(`Time off added. ${count} contractors affected.`);
+      createMutation.mutate(entryData, {
+        onSuccess: () => {
+          setDrawerOpen(false);
+        }
+      });
     }
 
     setSelectedDates([]);
     setRangeStart(null);
-    setDrawerOpen(false);
   };
 
   const handleDelete = () => {
     if (!editingEntry) return;
 
-    setTimeOffEntries(prev => prev.filter(e => e.id !== editingEntry.id));
-    toast.success(`Time off removed. ${editingEntry.affectedCount} contractors no longer affected.`);
-    setDrawerOpen(false);
+    deleteMutation.mutate(editingEntry.id, {
+      onSuccess: () => {
+        setDrawerOpen(false);
+      }
+    });
   };
 
   const getEntryColor = (type: string) => {
@@ -683,9 +640,14 @@ export function AdminCalendar() {
           {/* Drawer Header */}
           <SheetHeader className="px-6 pt-6 pb-5 border-b border-gray-200">
             <div className="flex items-start justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {isReadMode ? "Time Off Details" : editingEntry ? "Edit Time Off" : "Add Time Off"}
-              </h2>
+              <div>
+                <SheetTitle className="text-lg font-semibold text-gray-900">
+                  {isReadMode ? "Time Off Details" : editingEntry ? "Edit Time Off" : "Add Time Off"}
+                </SheetTitle>
+                <SheetDescription className="text-sm text-gray-500 mt-1">
+                  {isReadMode ? "View details of this time off entry" : "Enter details for the time off entry"}
+                </SheetDescription>
+              </div>
               <Button
                 variant="ghost"
                 size="icon"

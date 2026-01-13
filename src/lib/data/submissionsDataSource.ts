@@ -173,11 +173,39 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     const contractorUserId = await this.getContractorUserId();
     console.log("[SupabaseSubmissionsDataSource] Creating submission for:", contractorUserId);
 
-    // Get contractor details
+    // Get contractor's active contract (most recent if multiple)
+    const { data: contractData, error: contractError } = await supabase
+      .from("contracts")
+      .select("id, project_name")
+      .eq("contractor_user_id", contractorUserId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (contractError) {
+      console.error("[SupabaseSubmissionsDataSource] Error fetching contract:", {
+        error: contractError,
+        message: contractError.message,
+        details: contractError.details,
+        hint: contractError.hint,
+        code: contractError.code
+      });
+      throw new Error(`Error fetching contract: ${contractError.message || 'Unknown error'}`);
+    }
+
+    if (!contractData) {
+      console.error("[SupabaseSubmissionsDataSource] No active contract found for contractor");
+      throw new Error("No active contract found. Please contact your manager to set up a contract.");
+    }
+
+    const contractId = contractData.id;
+    const projectName = contractData.project_name || "General Work";
+
+    // Get contractor details (for rates)
     const details = await this.getContractorDetails(contractorUserId);
     const hourlyRate = details?.hourlyRate || DEFAULT_HOURLY_RATE;
     const overtimeRate = details?.overtimeRate || (hourlyRate * DEFAULT_OT_MULTIPLIER);
-    const projectName = details?.projectName || "General Work";
 
     // Parse work period to get period_start and period_end
     const periodDate = parse(draft.workPeriod, "yyyy-MM", new Date());
@@ -191,6 +219,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       .from("submissions")
       .insert({
         contractor_user_id: contractorUserId,
+        contract_id: contractId, // ✅ Now includes contract_id
         project_name: projectName,
         description: draft.description,
         period_start: periodStart,

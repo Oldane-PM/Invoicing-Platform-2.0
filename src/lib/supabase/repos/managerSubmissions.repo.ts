@@ -95,10 +95,6 @@ export async function listTeamSubmissions(
       profiles: contractor_user_id (
         full_name,
         email
-      ),
-      contractors (
-        hourly_rate,
-        overtime_rate
       )
     `
     )
@@ -220,13 +216,9 @@ export async function getSubmissionDetails(
       approved_at,
       paid_at,
       created_at,
-      profiles!submissions_contractor_user_id_fkey (
+      profiles: contractor_user_id (
         full_name,
         email
-      ),
-      contractors (
-        hourly_rate,
-        overtime_rate
       )
     `
     )
@@ -258,7 +250,6 @@ export async function getSubmissionDetails(
 
   // Safe access to joined data
   const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
-  const contractor = Array.isArray(data.contractors) ? data.contractors[0] : data.contractors;
 
   return {
     id: data.id,
@@ -278,8 +269,6 @@ export async function getSubmissionDetails(
     submittedAt: data.submitted_at,
     approvedAt: data.approved_at,
     paidAt: data.paid_at,
-    hourlyRate: contractor?.hourly_rate,
-    overtimeRate: contractor?.overtime_rate,
   };
 }
 

@@ -138,7 +138,7 @@ export async function getRecentSubmissions(
       total_amount,
       status,
       submitted_at,
-      profiles!submissions_contractor_user_id_fkey (
+      profiles: contractor_user_id (
         full_name
       )
     `
