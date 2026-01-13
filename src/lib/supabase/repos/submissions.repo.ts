@@ -59,9 +59,16 @@ export async function listContractorSubmissions(contractorId: string): Promise<C
       status,
       submitted_at,
       created_at,
+  const { data: submissions, error } = await supabase
+    .from("submissions")
+    .select(`
+      id,
+      status,
+      submitted_at,
+      created_at,
+      contractor_user_id,
       period_start,
       period_end,
-      contractor_user_id,
       contracts (
         project_name
       ),
@@ -76,6 +83,10 @@ export async function listContractorSubmissions(contractorId: string): Promise<C
         total,
         pdf_url
       )
+    `)
+    .eq("contractor_user_id", contractorId)
+    .order("created_at", { ascending: false });
+
     `)
     .eq("contractor_user_id", contractorId)
     .order("created_at", { ascending: false });
