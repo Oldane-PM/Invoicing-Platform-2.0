@@ -85,11 +85,28 @@ export async function listEmployees({
   // Step 3: Fetch manager assignments
   const { data: managerTeams, error: managersError } = await supabase
     .from("manager_teams")
-    .select("contractor_id, manager_id, profiles!manager_teams_manager_id_fkey(full_name)")
+    .select("contractor_id, manager_id")
     .in("contractor_id", profileIds);
 
   if (managersError) {
     console.error("[employeeDirectory.repo] fetch managers error:", managersError);
+  }
+
+  // Manually fetch manager profiles to avoid FK naming issues
+  const managerIds = Array.from(new Set((managerTeams || []).map(t => t.manager_id)));
+  
+  let managerProfilesMap = new Map();
+  if (managerIds.length > 0) {
+    const { data: managerProfiles, error: managerProfilesError } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", managerIds);
+
+    if (!managerProfilesError && managerProfiles) {
+      managerProfilesMap = new Map(managerProfiles.map(p => [p.id, p.full_name]));
+    } else if (managerProfilesError) {
+      console.error("[employeeDirectory.repo] fetch manager profiles error:", managerProfilesError);
+    }
   }
 
   // Map for quick lookup
@@ -97,10 +114,12 @@ export async function listEmployees({
     (contractors || []).map((c) => [c.contractor_id, c])
   );
   
+  // Map contractor_id -> manager_name
   const managerMap = new Map();
   (managerTeams || []).forEach((item: any) => {
-    if (item.profiles?.full_name) {
-      managerMap.set(item.contractor_id, item.profiles.full_name);
+    const managerName = managerProfilesMap.get(item.manager_id);
+    if (managerName) {
+      managerMap.set(item.contractor_id, managerName);
     }
   });
 

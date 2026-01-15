@@ -41,9 +41,6 @@ function logSupabaseError(context: string, error: any): void {
 /**
  * List all submissions for a specific contractor
  */
-/**
- * List all submissions for a specific contractor
- */
 export async function listContractorSubmissions(contractorId: string): Promise<ContractorSubmission[]> {
   const supabase = getSupabaseClient();
 
@@ -52,13 +49,6 @@ export async function listContractorSubmissions(contractorId: string): Promise<C
   // Query submissions with related data
   // Note: 'total_amount', 'regular_hours' etc are not on the submissions table,
   // we must calculate them or fetch from related tables.
-  const { data: submissions, error } = await supabase
-    .from("submissions")
-    .select(`
-      id,
-      status,
-      submitted_at,
-      created_at,
   const { data: submissions, error } = await supabase
     .from("submissions")
     .select(`
@@ -83,10 +73,6 @@ export async function listContractorSubmissions(contractorId: string): Promise<C
         total,
         pdf_url
       )
-    `)
-    .eq("contractor_user_id", contractorId)
-    .order("created_at", { ascending: false });
-
     `)
     .eq("contractor_user_id", contractorId)
     .order("created_at", { ascending: false });
