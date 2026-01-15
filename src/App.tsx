@@ -33,7 +33,7 @@ import { ContractorDetailDrawer } from "./pages/ContractorDetailDrawer";
 import { ContractorSubmissions } from "./pages/ContractorSubmissions";
 import { useAuth } from "./lib/hooks/useAuth";
 import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
-import type { Employee, User, Submission, MetricData } from "./lib/types";
+import type { Employee, User, Submission, Notification, MetricData, EmployeeDirectoryRow } from "./lib/types";
 
 type Screen = "dashboard" | "directory" | "access" | "calendar";
 type ManagerScreen = "dashboard" | "team";
@@ -57,16 +57,17 @@ function App() {
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const [contractorDrawerOpen, setContractorDrawerOpen] = React.useState(false);
   const [selectedEmployee, setSelectedEmployee] =
-    React.useState<Employee | null>(null);
-  const [employees, setEmployees] = React.useState<Employee[]>([]);
-  // const [users, setUsers] = React.useState<User[]>([]); // Unused - kept for future use
-  const [submissions] = React.useState<Submission[]>([]);
-  // const [metrics] = React.useState<MetricData>({ // Unused - kept for future use
-  //   totalEmployees: 0,
-  //   pendingPayments: 0,
-  //   totalPayout: 0,
-  //   payoutChange: 0,
-  // });
+    React.useState<EmployeeDirectoryRow | null>(null);
+  const [employees, setEmployees] = React.useState<EmployeeDirectoryRow[]>([]);
+  const [users, setUsers] = React.useState<User[]>([]);
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [submissions, setSubmissions] = React.useState<Submission[]>([]);
+  const [metrics, setMetrics] = React.useState<MetricData>({
+    totalEmployees: 0,
+    pendingPayments: 0,
+    totalPayout: 0,
+    payoutChange: 0,
+  });
 
   // Filter options - these could come from Supabase in the future
   // const projects: string[] = []; // Unused - kept for future use
@@ -149,15 +150,15 @@ function App() {
     setContractorScreen("dashboard");
   };
 
-  const handleEmployeeClick = (employee: Employee) => {
+  const handleEmployeeClick = (employee: EmployeeDirectoryRow) => {
     setSelectedEmployee(employee);
     setContractorDrawerOpen(true);
   };
 
-  const handleSaveEmployee = (updatedEmployee: Employee) => {
+  const handleSaveEmployee = (updatedEmployee: EmployeeDirectoryRow) => {
     setEmployees(
       employees.map((emp) =>
-        emp.id === updatedEmployee.id ? updatedEmployee : emp
+        emp.contractor_id === updatedEmployee.contractor_id ? updatedEmployee : emp
       )
     );
   };
@@ -549,10 +550,7 @@ function App() {
           <AdminDashboard />
         )}
         {currentScreen === "directory" && (
-          <EmployeeDirectory
-            employees={employees}
-            onEmployeeClick={handleEmployeeClick}
-          />
+          <EmployeeDirectory onEmployeeClick={handleEmployeeClick} />
         )}
         {currentScreen === "access" && <UserAccessManagement />}
         {currentScreen === "calendar" && <AdminCalendar />}
@@ -572,7 +570,7 @@ function App() {
         open={contractorDrawerOpen}
         onOpenChange={setContractorDrawerOpen}
         employee={selectedEmployee}
-        submissions={submissions}
+        submissions={[]} // Pass empty array as it's now ignored/optional in the drawer until prop is removed from interface
         onSave={handleSaveEmployee}
       />
     </div>
