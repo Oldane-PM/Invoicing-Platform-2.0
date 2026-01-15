@@ -10,26 +10,44 @@ import {
   SheetDescription,
 } from "../components/ui/sheet";
 import { toast } from "sonner";
-import { format, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, parseISO } from "date-fns";
-import { ChevronLeft, ChevronRight, CalendarPlus, X, Info, Trash2, Calendar as CalendarIcon, Loader2 } from "lucide-react";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { ChevronLeft, ChevronRight, CalendarPlus, X, Info, Trash2, CalendarCheck, Calendar as CalendarIcon } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 
-// Import hooks - NO direct Supabase imports
-import {
-  useAdminCalendarState,
-  useCalendarEntries,
-  useUpcomingDaysOff,
-  useCreateCalendarEntry,
-  useUpdateCalendarEntry,
-  useDeleteCalendarEntry,
+import { 
+  useCalendarEntries, 
+  useCreateCalendarEntry, 
+  useUpdateCalendarEntry, 
+  useDeleteCalendarEntry 
 } from "../lib/hooks/adminCalendar";
-import type { CalendarEntry, CreateCalendarEntryInput } from "../lib/data/adminCalendar";
+import { TimeOffEntry, CalendarEntryType, CalendarAppliesTo } from "../lib/data/adminCalendar";
 
+const mockCountries = [
+  { value: "all", label: "All Countries" },
+  { value: "us", label: "United States" },
+  { value: "uk", label: "United Kingdom" },
+  { value: "ca", label: "Canada" },
+  { value: "au", label: "Australia" },
+  { value: "jm", label: "Jamaica" },
+];
+
+const mockTeams = [
+  { value: "all", label: "All Teams" },
+  { value: "engineering", label: "Engineering" },
+  { value: "design", label: "Design" },
+  { value: "marketing", label: "Marketing" },
+  { value: "operations", label: "Operations" },
+];
+
+type ViewMode = "month" | "year";
 type DateRangeMode = "single" | "range";
 
 export function AdminCalendar() {
-  // Calendar state management
-  const calendarState = useAdminCalendarState();
-  const { currentDate, viewMode, setViewMode, monthStart, monthEnd, monthStartISO, monthEndISO, goPrevMonth, goNextMonth } = calendarState;
+  const [currentDate, setCurrentDate] = React.useState(new Date());
+  const [viewMode, setViewMode] = React.useState<ViewMode>("month");
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [editingEntry, setEditingEntry] = React.useState<TimeOffEntry | null>(null);
+  const [isReadMode, setIsReadMode] = React.useState(false);
 
   // Data fetching
   const entriesQuery = useCalendarEntries(monthStartISO, monthEndISO);
@@ -47,28 +65,125 @@ export function AdminCalendar() {
   const [dateRangeMode, setDateRangeMode] = React.useState<DateRangeMode>("single");
   const [formData, setFormData] = React.useState({
     name: "",
-    date: format(new Date(), "yyyy-MM-dd"),
+    type: "Holiday" as CalendarEntryType,
+    description: "",
     startDate: format(new Date(), "yyyy-MM-dd"),
     endDate: format(new Date(), "yyyy-MM-dd"),
-    country: "",
-    teamId: "",
-    appliesToAllTeams: true,
+    country: ["all"],
+    team: ["all"],
+    appliesTo: "All" as CalendarAppliesTo,
   });
 
-  // Calendar grid calculation
+  // Hooks
+  // We fetch a wide range to cover both the calendar view and the upcoming list
+  // Ideally these would be two separate queries but for simplicity we'll fetch a larger chunk
+  // Or utilize query caching.
+  // Let's fetch specifically for the current view + 3 months
+  const queryStart = React.useMemo(() => subMonths(startOfMonth(currentDate), 1), [currentDate]);
+  const queryEnd = React.useMemo(() => addMonths(endOfMonth(currentDate), 3), [currentDate]);
+  
+  const { data: timeOffEntries = [] } = useCalendarEntries(queryStart, queryEnd);
+  
+  const createMutation = useCreateCalendarEntry();
+  const updateMutation = useUpdateCalendarEntry();
+  const deleteMutation = useDeleteCalendarEntry();
+  
+  // Keyboard event listener for Shift key
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Shift") setIsShiftPressed(true);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift") setIsShiftPressed(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  const previousMonth = () => setCurrentDate(subMonths(currentDate, 1));
+  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
+
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
   const calendarStart = startOfWeek(monthStart);
   const calendarEnd = endOfWeek(monthEnd);
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   // Get entries for a specific date
   const getEntriesForDate = (date: Date) => {
-    if (!entriesQuery.data) return [];
-    
-    return entriesQuery.data.filter(entry => {
-      // Handle single-date entries
-      if (entry.date) {
-        const entryDate = parseISO(entry.date);
-        return isSameDay(entryDate, date);
+    return timeOffEntries.filter(entry => {
+      const entryStart = new Date(entry.startDate);
+      const entryEnd = new Date(entry.endDate);
+      entryStart.setHours(0, 0, 0, 0);
+      entryEnd.setHours(0, 0, 0, 0);
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0);
+      return checkDate >= entryStart && checkDate <= entryEnd;
+    });
+  };
+
+
+  const isDateSelected = (date: Date) => {
+    return selectedDates.some(selectedDate => 
+      isSameDay(new Date(selectedDate), date)
+    );
+  };
+
+  const calculateAffectedCount = (countries: string[], teams: string[], appliesTo: string): number => {
+    // Mock calculation - in real app, this would call an API
+    if (countries.includes("all") && teams.includes("all")) {
+      return appliesTo === "All" ? 127 : appliesTo === "Contractors" ? 85 : 42;
+    }
+    if (countries.includes("all")) {
+      return appliesTo === "All" ? 87 : appliesTo === "Contractors" ? 58 : 29;
+    }
+    if (countries.includes("jm")) {
+      return appliesTo === "All" ? 24 : appliesTo === "Contractors" ? 16 : 8;
+    }
+    return appliesTo === "All" ? 24 : appliesTo === "Contractors" ? 16 : 8;
+  };
+
+  const affectedCount = React.useMemo(() => {
+    return calculateAffectedCount(formData.country, formData.team, formData.appliesTo);
+  }, [formData.country, formData.team, formData.appliesTo]);
+
+  const handleDateClick = (date: Date, entries: TimeOffEntry[]) => {
+    // If there's an entry, open it in read mode
+    if (entries.length > 0) {
+      handleEditEntry(entries[0], true);
+      return;
+    }
+
+    // Otherwise, handle date selection for inline editing
+    const normalizedDate = new Date(date);
+    normalizedDate.setHours(0, 0, 0, 0);
+
+    if (isShiftPressed && rangeStart) {
+      // Range selection
+      const start = new Date(rangeStart);
+      const end = new Date(normalizedDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+
+      const rangeDates: Date[] = [];
+      const current = new Date(start);
+      
+      if (start <= end) {
+        while (current <= end) {
+          rangeDates.push(new Date(current));
+          current.setDate(current.getDate() + 1);
+        }
+      } else {
+        while (current >= end) {
+          rangeDates.push(new Date(current));
+          current.setDate(current.getDate() - 1);
+        }
       }
       
       // Handle date-range entries
@@ -136,32 +251,53 @@ export function AdminCalendar() {
         input.endDate = formData.endDate;
       }
 
-      if (editingEntry) {
-        await updateMutation.mutateAsync({ id: editingEntry.id, ...input });
-        toast.success("Time off updated successfully");
-      } else {
-        await createMutation.mutateAsync(input);
-        toast.success("Time off added successfully");
-      }
+    const entryData = {
+      name: formData.name,
+      type: formData.type,
+      description: formData.description,
+      startDate: formData.startDate,
+      endDate: dateRangeMode === "single" ? formData.startDate : formData.endDate,
+      country: formData.country,
+      team: formData.team,
+      appliesTo: formData.appliesTo,
+      affectedCount: count,
+    };
 
-      setDrawerOpen(false);
-    } catch (error) {
-      console.error("Error saving entry:", error);
-      toast.error("Failed to save time off");
+    if (editingEntry) {
+      updateMutation.mutate({
+        ...entryData,
+        id: editingEntry.id,
+      }, {
+        onSuccess: () => {
+           setDrawerOpen(false);
+        }
+      });
+    } else {
+      createMutation.mutate(entryData, {
+        onSuccess: () => {
+          setDrawerOpen(false);
+        }
+      });
     }
+
+    setSelectedDates([]);
+    setRangeStart(null);
   };
 
   const handleDelete = async () => {
     if (!editingEntry) return;
 
-    try {
-      await deleteMutation.mutateAsync(editingEntry.id);
-      toast.success("Time off removed successfully");
-      setDrawerOpen(false);
-    } catch (error) {
-      console.error("Error deleting entry:", error);
-      toast.error("Failed to delete time off");
-    }
+    deleteMutation.mutate(editingEntry.id, {
+      onSuccess: () => {
+        setDrawerOpen(false);
+      }
+    });
+  };
+
+  const getEntryColor = (type: string) => {
+    if (type === "Holiday") return "bg-green-50 border-l-4 border-l-green-500";
+    if (type === "Special Time Off") return "bg-blue-50 border-l-4 border-l-blue-500";
+    return "bg-yellow-50 border-l-4 border-l-yellow-500";
   };
 
   const handleDateClick = (_date: Date, entries: CalendarEntry[]) => {
@@ -454,12 +590,24 @@ export function AdminCalendar() {
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
         <SheetContent className="w-[440px] p-0 bg-white border-l border-gray-200 overflow-y-auto">
           <SheetHeader className="px-6 pt-6 pb-5 border-b border-gray-200">
-            <SheetTitle>
-              {isReadMode ? "Time Off Details" : editingEntry ? "Edit Time Off" : "Add Time Off"}
-            </SheetTitle>
-            <SheetDescription>
-              {isReadMode ? "View time off details" : "Manage holidays and special time off"}
-            </SheetDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <SheetTitle className="text-lg font-semibold text-gray-900">
+                  {isReadMode ? "Time Off Details" : editingEntry ? "Edit Time Off" : "Add Time Off"}
+                </SheetTitle>
+                <SheetDescription className="text-sm text-gray-500 mt-1">
+                  {isReadMode ? "View details of this time off entry" : "Enter details for the time off entry"}
+                </SheetDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setDrawerOpen(false)}
+                className="h-8 w-8 rounded-lg hover:bg-gray-100"
+              >
+                <X className="h-4 w-4 text-gray-600" />
+              </Button>
+            </div>
           </SheetHeader>
 
           <div className="px-6 py-6 space-y-6">

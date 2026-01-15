@@ -1,43 +1,31 @@
-/**
- * Admin Calendar Types
- * 
- * Type definitions for calendar entries and related data.
- */
+export type CalendarEntryType = 'Holiday' | 'Special Time Off';
+export type CalendarAppliesTo = 'All' | 'Contractors' | 'Employees';
 
-export type CalendarViewMode = 'month' | 'year';
-
-export interface CalendarEntry {
+export interface TimeOffEntry {
   id: string;
   name: string;
-  date?: string;              // ISO date for single-day entries
-  startDate?: string;         // ISO date for range start
-  endDate?: string;           // ISO date for range end
-  country?: string | null;
-  teamId?: string | null;
-  teamName?: string | null;
-  appliesToAllTeams?: boolean;
-  affectedContractorCount?: number | null;
-  createdAt?: string;
-  updatedAt?: string;
+  type: CalendarEntryType;
+  description?: string;
+  startDate: Date;
+  endDate: Date;
+  country: string[];
+  team: string[];
+  appliesTo: CalendarAppliesTo;
+  affectedCount: number;
 }
 
-export interface CreateCalendarEntryInput {
+export interface CreateTimeOffEntryParams {
   name: string;
-  date?: string;              // For single-day entries
-  startDate?: string;         // For range entries
-  endDate?: string;
-  country?: string | null;
-  teamId?: string | null;
-  appliesToAllTeams?: boolean;
+  type: CalendarEntryType;
+  description?: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  country: string[];
+  team: string[];
+  appliesTo: CalendarAppliesTo;
+  affectedCount: number;
 }
 
-export interface UpdateCalendarEntryInput {
+export interface UpdateTimeOffEntryParams extends Partial<CreateTimeOffEntryParams> {
   id: string;
-  name?: string;
-  date?: string;
-  startDate?: string;
-  endDate?: string;
-  country?: string | null;
-  teamId?: string | null;
-  appliesToAllTeams?: boolean;
 }

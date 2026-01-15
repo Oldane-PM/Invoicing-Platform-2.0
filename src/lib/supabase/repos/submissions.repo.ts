@@ -56,23 +56,7 @@ export async function listContractorSubmissions(contractorId: string): Promise<C
       status,
       submitted_at,
       created_at,
-      contractor_user_id,
-      period_start,
-      period_end,
-      contracts (
-        project_name
-      ),
-      submission_line_items (
-        hours
-      ),
-      overtime_entries (
-        overtime_hours,
-        description
-      ),
-      invoices (
-        total,
-        pdf_url
-      )
+      contractor_user_id
     `)
     .eq("contractor_user_id", contractorId)
     .order("created_at", { ascending: false });

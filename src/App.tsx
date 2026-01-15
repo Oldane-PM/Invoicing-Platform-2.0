@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Button } from "./components/ui/button";
 import { Avatar, AvatarFallback } from "./components/ui/avatar";
-import { Badge } from "./components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +9,6 @@ import {
 } from "./components/ui/dropdown-menu";
 import { Toaster } from "sonner";
 import {
-  Bell,
   Settings,
   LayoutDashboard,
   Users,
@@ -29,14 +27,10 @@ import { SubmitHoursPage } from "./pages/SubmitHoursPage";
 import { EmployeeDirectory } from "./pages/EmployeeDirectory";
 import { UserAccessManagement } from "./pages/UserAccessManagement";
 import { AdminCalendar } from "./pages/AdminCalendar";
-import { NotificationsDrawer } from "./pages/NotificationsDrawer";
+import { NotificationBell } from "./components/shared/NotificationBell";
+import { NotificationDrawer } from "./components/shared/NotificationDrawer";
 import { ContractorDetailDrawer } from "./pages/ContractorDetailDrawer";
 import { ContractorSubmissions } from "./pages/ContractorSubmissions";
-import {
-  mockEmployees,
-  mockUsers,
-  mockNotifications,
-} from "./lib/data/mockData";
 import { useAuth } from "./lib/hooks/useAuth";
 import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
 import type { Employee, User, Submission, Notification, MetricData, EmployeeDirectoryRow } from "./lib/types";
@@ -52,7 +46,7 @@ type UserRole = "Admin" | "Manager" | "Contractor" | null;
 
 function App() {
   // Supabase auth for Contractor and Manager
-  const { isAuthenticated, user, profile, role, signIn, signOut, loading: authLoading } = useAuth();
+  const { isAuthenticated, user, signIn, signOut, loading: authLoading } = useAuth();
 
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
   const [currentScreen, setCurrentScreen] = React.useState<Screen>("dashboard");
@@ -76,12 +70,11 @@ function App() {
   });
 
   // Filter options - these could come from Supabase in the future
-  const projects: string[] = [];
-  const managers: string[] = [];
-  const months: string[] = [];
+  // const projects: string[] = []; // Unused - kept for future use
+  // const managers: string[] = []; // Unused - kept for future use
+  // const months: string[] = []; // Unused - kept for future use
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
-  const currentUserId = user?.id || "";
+
 
   // Sync Supabase auth state with currentUser and fetch role from database
   React.useEffect(() => {
@@ -170,11 +163,7 @@ function App() {
     );
   };
 
-  const handleUserUpdate = (updatedUser: User) => {
-    setUsers(
-      users.map((user) => (user.id === updatedUser.id ? updatedUser : user))
-    );
-  };
+  // handleUserUpdate removed - not currently used
 
   const getPageInfo = () => {
     switch (currentScreen) {
@@ -236,22 +225,7 @@ function App() {
                 </p>
               </div>
               <div className="flex items-center gap-2 md:gap-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
-                  onClick={() => setNotificationsOpen(true)}
-                >
-                  <Bell
-                    className="w-4 h-4 md:w-5 md:h-5 text-gray-600"
-                    strokeWidth={2}
-                  />
-                  {unreadCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs border-2 border-white">
-                      {unreadCount}
-                    </Badge>
-                  )}
-                </Button>
+                <NotificationBell onClick={() => setNotificationsOpen(true)} />
                 <Button
                   variant="ghost"
                   size="icon"
@@ -329,10 +303,14 @@ function App() {
         </main>
 
         {/* Drawers */}
-        <NotificationsDrawer
+        <NotificationDrawer
           open={notificationsOpen}
           onOpenChange={setNotificationsOpen}
-          notifications={notifications}
+          onNavigateToSubmission={(submissionId) => {
+            // Admin: Navigate to dashboard (submission details handled by AdminDashboard component)
+            setCurrentScreen('dashboard');
+            console.log('[Admin] Navigate to submission:', submissionId);
+          }}
         />
       </div>
     );
@@ -380,19 +358,7 @@ function App() {
               </Button>
 
               {/* Notifications */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
-                onClick={() => setNotificationsOpen(true)}
-              >
-                <Bell className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
-                {unreadCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs border-2 border-white">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </Button>
+              <NotificationBell onClick={() => setNotificationsOpen(true)} />
 
               {/* Avatar Dropdown */}
               <DropdownMenu>
@@ -453,10 +419,14 @@ function App() {
         </main>
 
         {/* Drawers */}
-        <NotificationsDrawer
+        <NotificationDrawer
           open={notificationsOpen}
           onOpenChange={setNotificationsOpen}
-          notifications={notifications}
+          onNavigateToSubmission={(submissionId) => {
+            // Manager: Navigate to dashboard
+            setManagerScreen('dashboard');
+            console.log('[Manager] Navigate to submission:', submissionId);
+          }}
         />
       </div>
     );
@@ -480,22 +450,7 @@ function App() {
               </p>
             </div>
             <div className="flex items-center gap-2 md:gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
-                onClick={() => setNotificationsOpen(true)}
-              >
-                <Bell
-                  className="w-4 h-4 md:w-5 md:h-5 text-gray-600"
-                  strokeWidth={2}
-                />
-                {unreadCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs border-2 border-white">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </Button>
+              <NotificationBell onClick={() => setNotificationsOpen(true)} />
               <Button
                 variant="ghost"
                 size="icon"
@@ -592,13 +547,7 @@ function App() {
       {/* Main Content */}
       <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
         {currentScreen === "dashboard" && (
-          <AdminDashboard
-            metrics={metrics}
-            submissions={submissions}
-            projects={projects}
-            managers={managers}
-            months={months}
-          />
+          <AdminDashboard />
         )}
         {currentScreen === "directory" && (
           <EmployeeDirectory onEmployeeClick={handleEmployeeClick} />
@@ -608,10 +557,14 @@ function App() {
       </main>
 
       {/* Drawers */}
-      <NotificationsDrawer
+      <NotificationDrawer
         open={notificationsOpen}
         onOpenChange={setNotificationsOpen}
-        notifications={notifications}
+        onNavigateToSubmission={(submissionId) => {
+          // Contractor: Navigate to dashboard
+          setContractorScreen('dashboard');
+          console.log('[Contractor] Navigate to submission:', submissionId);
+        }}
       />
       <ContractorDetailDrawer
         open={contractorDrawerOpen}
