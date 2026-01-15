@@ -2,8 +2,6 @@ import * as React from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Textarea } from "../components/ui/textarea";
-import { Combobox } from "./Combobox";
 import {
   Sheet,
   SheetContent,
@@ -51,12 +49,19 @@ export function AdminCalendar() {
   const [editingEntry, setEditingEntry] = React.useState<TimeOffEntry | null>(null);
   const [isReadMode, setIsReadMode] = React.useState(false);
 
-  // Date selection state for inline editing
-  const [selectedDates, setSelectedDates] = React.useState<Date[]>([]);
-  const [rangeStart, setRangeStart] = React.useState<Date | null>(null);
-  const [isShiftPressed, setIsShiftPressed] = React.useState(false);
+  // Data fetching
+  const entriesQuery = useCalendarEntries(monthStartISO, monthEndISO);
+  const upcomingQuery = useUpcomingDaysOff(90);
 
-  // Form state
+  // Mutations
+  const createMutation = useCreateCalendarEntry();
+  const updateMutation = useUpdateCalendarEntry();
+  const deleteMutation = useDeleteCalendarEntry();
+
+  // UI state
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [editingEntry, setEditingEntry] = React.useState<CalendarEntry | null>(null);
+  const [isReadMode, setIsReadMode] = React.useState(false);
   const [dateRangeMode, setDateRangeMode] = React.useState<DateRangeMode>("single");
   const [formData, setFormData] = React.useState({
     name: "",
@@ -110,6 +115,7 @@ export function AdminCalendar() {
   const calendarEnd = endOfWeek(monthEnd);
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
+  // Get entries for a specific date
   const getEntriesForDate = (date: Date) => {
     return timeOffEntries.filter(entry => {
       const entryStart = new Date(entry.startDate);
@@ -179,112 +185,71 @@ export function AdminCalendar() {
           current.setDate(current.getDate() - 1);
         }
       }
-
-      setSelectedDates(rangeDates);
-      setRangeStart(null);
       
-      const count = rangeDates.length;
-      toast.info(`${count} date${count !== 1 ? 's' : ''} selected`);
-    } else {
-      // Single or multiple discrete date selection
-      const isSelected = isDateSelected(date);
-      
-      if (isSelected) {
-        // Deselect
-        setSelectedDates(prev => prev.filter(d => !isSameDay(d, date)));
-        setRangeStart(null);
-      } else {
-        // Select (add to existing selection for multi-select)
-        setSelectedDates(prev => [...prev, normalizedDate]);
-        setRangeStart(normalizedDate);
-        
-        toast.info(`Date selected`);
+      // Handle date-range entries
+      if (entry.startDate && entry.endDate) {
+        const start = parseISO(entry.startDate);
+        const end = parseISO(entry.endDate);
+        return date >= start && date <= end;
       }
-    }
-  };
-
-  const handleAddTimeOffFromSelection = () => {
-    if (selectedDates.length === 0) return;
-
-    // Sort dates
-    const sortedDates = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
-    const startDate = sortedDates[0];
-    const endDate = sortedDates[sortedDates.length - 1];
-
-    setEditingEntry(null);
-    setIsReadMode(false);
-    setFormData({
-      name: "",
-      type: "Holiday",
-      description: "",
-      startDate: format(startDate, "yyyy-MM-dd"),
-      endDate: format(endDate, "yyyy-MM-dd"),
-      country: ["all"],
-      team: ["all"],
-      appliesTo: "All",
+      
+      return false;
     });
-    setDateRangeMode(selectedDates.length === 1 ? "single" : "range");
-    setDrawerOpen(true);
   };
 
-  const handleClearSelection = () => {
-    setSelectedDates([]);
-    setRangeStart(null);
-    toast.info("Selection cleared");
-  };
-
+  // Handlers
   const handleAddTimeOff = () => {
-    setSelectedDates([]);
-    setRangeStart(null);
     setEditingEntry(null);
     setIsReadMode(false);
     setFormData({
       name: "",
-      type: "Holiday",
-      description: "",
+      date: format(new Date(), "yyyy-MM-dd"),
       startDate: format(new Date(), "yyyy-MM-dd"),
       endDate: format(new Date(), "yyyy-MM-dd"),
-      country: ["all"],
-      team: ["all"],
-      appliesTo: "All",
+      country: "",
+      teamId: "",
+      appliesToAllTeams: true,
     });
     setDateRangeMode("single");
     setDrawerOpen(true);
   };
 
-  const handleEditEntry = (entry: TimeOffEntry, readOnly = false) => {
-    setSelectedDates([]);
-    setRangeStart(null);
+  const handleEditEntry = (entry: CalendarEntry, readOnly = false) => {
     setEditingEntry(entry);
     setIsReadMode(readOnly);
     setFormData({
       name: entry.name,
-      type: entry.type,
-      description: entry.description || "",
-      startDate: format(entry.startDate, "yyyy-MM-dd"),
-      endDate: format(entry.endDate, "yyyy-MM-dd"),
-      country: entry.country,
-      team: entry.team,
-      appliesTo: entry.appliesTo,
+      date: entry.date || format(new Date(), "yyyy-MM-dd"),
+      startDate: entry.startDate || format(new Date(), "yyyy-MM-dd"),
+      endDate: entry.endDate || format(new Date(), "yyyy-MM-dd"),
+      country: entry.country || "",
+      teamId: entry.teamId || "",
+      appliesToAllTeams: entry.appliesToAllTeams ?? true,
     });
-    setDateRangeMode(
-      isSameDay(entry.startDate, entry.endDate) ? "single" : "range"
-    );
+    setDateRangeMode(entry.startDate && entry.endDate ? "range" : "single");
     setDrawerOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name.trim()) {
       toast.error("Please enter a name for this time off");
       return;
     }
 
-    const count = calculateAffectedCount(formData.country, formData.team, formData.appliesTo);
+    try {
+      const input: CreateCalendarEntryInput = {
+        name: formData.name,
+        country: formData.country || null,
+        teamId: formData.teamId || null,
+        appliesToAllTeams: formData.appliesToAllTeams,
+      };
 
-    if (count === 0) {
-      toast.error("No contractors match this scope.");
-      return;
-    }
+      if (dateRangeMode === "single") {
+        input.date = formData.date;
+      } else {
+        input.startDate = formData.startDate;
+        input.endDate = formData.endDate;
+      }
 
     const entryData = {
       name: formData.name,
@@ -319,7 +284,7 @@ export function AdminCalendar() {
     setRangeStart(null);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!editingEntry) return;
 
     deleteMutation.mutate(editingEntry.id, {
@@ -335,47 +300,64 @@ export function AdminCalendar() {
     return "bg-yellow-50 border-l-4 border-l-yellow-500";
   };
 
-  const getEntryDotColor = (type: string) => {
-    if (type === "Holiday") return "bg-green-500";
-    if (type === "Special Time Off") return "bg-blue-500";
-    return "bg-yellow-500";
+  const handleDateClick = (_date: Date, entries: CalendarEntry[]) => {
+    if (entries.length > 0) {
+      handleEditEntry(entries[0], true);
+    }
   };
 
-  // Get upcoming days off (next 90 days)
-  const upcomingDaysOff = React.useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const ninetyDaysFromNow = addDays(today, 90);
-
-    return timeOffEntries
-      .filter(entry => {
-        const entryDate = new Date(entry.startDate);
-        entryDate.setHours(0, 0, 0, 0);
-        return entryDate >= today && entryDate <= ninetyDaysFromNow;
-      })
-      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-  }, [timeOffEntries]);
-
-  const handleUpcomingItemClick = (entry: TimeOffEntry) => {
-    // Scroll to the month containing this entry
-    setCurrentDate(new Date(entry.startDate));
+  const handleUpcomingItemClick = (entry: CalendarEntry) => {
     // Open the entry details
+    // Note: Could navigate to the month containing this entry by adding
+    // a setCurrentDate method to useAdminCalendarState hook
     setTimeout(() => {
       handleEditEntry(entry, true);
     }, 100);
   };
 
-  const getCountryLabel = (countries: string[]) => {
-    if (countries.includes("all")) return "All Countries";
-    const country = mockCountries.find(c => c.value === countries[0]);
-    return country?.label || countries[0];
-  };
+  // Loading state
+  if (entriesQuery.isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
+          <p className="text-gray-600">Loading calendar...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const getTeamLabel = (teams: string[]) => {
-    if (teams.includes("all")) return "All Teams";
-    const team = mockTeams.find(t => t.value === teams[0]);
-    return team?.label || teams[0];
-  };
+  // Error state
+  if (entriesQuery.error) {
+    const error = entriesQuery.error as any;
+    const isAccessDenied = error?.code === 'PGRST301' || error?.message?.includes('permission');
+    
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
+            <X className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            {isAccessDenied ? "Access Denied" : "Error Loading Calendar"}
+          </h2>
+          <p className="text-gray-600 mb-4">
+            {isAccessDenied 
+              ? "You don't have permission to access the calendar. Admin access required."
+              : "Failed to load calendar data. Please try again."}
+          </p>
+          {!isAccessDenied && (
+            <Button onClick={() => entriesQuery.refetch()} className="bg-purple-600 hover:bg-purple-700">
+              Retry
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const entries = entriesQuery.data || [];
+  const upcomingEntries = upcomingQuery.data || [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -401,49 +383,13 @@ export function AdminCalendar() {
           {/* Calendar Card */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              {/* Selection Banner */}
-              {selectedDates.length > 0 && (
-                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CalendarCheck className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <div className="font-medium text-blue-900 text-sm">
-                          {selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''} selected – changes not saved
-                        </div>
-                        <div className="text-xs text-blue-700 mt-0.5">
-                          Click dates to select • Shift+Click for range • {affectedCount} contractors affected
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        onClick={handleAddTimeOffFromSelection}
-                        className="bg-blue-600 hover:bg-blue-700 h-8"
-                      >
-                        Add Time Off
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleClearSelection}
-                        className="h-8 text-blue-700 hover:text-blue-900 hover:bg-blue-100"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Calendar Header */}
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={previousMonth}
+                    onClick={goPrevMonth}
                     className="h-9 w-9 rounded-lg border-gray-200 hover:bg-gray-50"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -454,7 +400,7 @@ export function AdminCalendar() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={nextMonth}
+                    onClick={goNextMonth}
                     className="h-9 w-9 rounded-lg border-gray-200 hover:bg-gray-50"
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -495,46 +441,36 @@ export function AdminCalendar() {
                   {/* Calendar Days */}
                   <div className="grid grid-cols-7 gap-2">
                     {calendarDays.map(day => {
-                      const entries = getEntriesForDate(day);
+                      const dayEntries = getEntriesForDate(day);
                       const isCurrentMonth = isSameMonth(day, currentDate);
                       const isToday = isSameDay(day, new Date());
-                      const isSelected = isDateSelected(day);
 
                       return (
                         <div
                           key={day.toISOString()}
-                          onClick={() => handleDateClick(day, entries)}
+                          onClick={() => handleDateClick(day, dayEntries)}
                           className={`
                             min-h-[120px] rounded-lg border p-2 transition-all cursor-pointer
                             ${!isCurrentMonth ? "bg-gray-50 border-gray-100" : "bg-white border-gray-200"}
-                            ${isToday && !isSelected ? "ring-2 ring-purple-500 ring-offset-2" : ""}
-                            ${isSelected ? "ring-2 ring-blue-500 bg-blue-50 border-blue-300" : ""}
-                            ${entries.length === 0 && !isSelected ? "hover:bg-gray-50" : ""}
+                            ${isToday ? "ring-2 ring-purple-500 ring-offset-2" : ""}
+                            ${dayEntries.length === 0 ? "hover:bg-gray-50" : ""}
                           `}
                         >
                           <div className="flex justify-between items-start mb-2">
                             <span className={`text-sm font-medium ${
                               isCurrentMonth ? "text-gray-900" : "text-gray-400"
-                            } ${isSelected ? "text-blue-700" : ""}`}>
+                            }`}>
                               {format(day, "d")}
                             </span>
-                            {isSelected && (
-                              <div className="w-2 h-2 rounded-full bg-blue-500" />
-                            )}
                           </div>
                           <div className="space-y-1">
-                            {entries.map(entry => (
+                            {dayEntries.map(entry => (
                               <div
                                 key={entry.id}
-                                className={`
-                                  ${getEntryColor(entry.type)}
-                                  px-2 py-1 rounded text-xs
-                                  hover:opacity-80 transition-opacity
-                                  group relative
-                                `}
+                                className="bg-green-50 border-l-4 border-l-green-500 px-2 py-1 rounded text-xs hover:opacity-80 transition-opacity group relative"
                               >
                                 <div className="flex items-center gap-1">
-                                  <div className={`w-1.5 h-1.5 rounded-full ${getEntryDotColor(entry.type)}`} />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
                                   <span className="font-medium text-gray-900 truncate">
                                     {entry.name}
                                   </span>
@@ -543,10 +479,11 @@ export function AdminCalendar() {
                                 {/* Tooltip */}
                                 <div className="absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg min-w-[200px]">
                                   <div className="font-semibold mb-1">{entry.name}</div>
-                                  <div className="text-gray-300 mb-1">{entry.type}</div>
-                                  <div className="text-gray-400">
-                                    Affects {entry.affectedCount} contractors
-                                  </div>
+                                  {entry.affectedContractorCount !== null && (
+                                    <div className="text-gray-400">
+                                      Affects {entry.affectedContractorCount} contractors
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             ))}
@@ -557,7 +494,7 @@ export function AdminCalendar() {
                   </div>
 
                   {/* Empty State */}
-                  {timeOffEntries.length === 0 && (
+                  {entries.length === 0 && (
                     <div className="text-center py-16">
                       <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
                         <CalendarPlus className="w-8 h-8 text-gray-400" />
@@ -589,7 +526,11 @@ export function AdminCalendar() {
               </div>
               <p className="text-xs text-gray-500 mb-4">Next 90 days</p>
 
-              {upcomingDaysOff.length === 0 ? (
+              {upcomingQuery.isLoading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+                </div>
+              ) : upcomingEntries.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
                     <CalendarIcon className="w-6 h-6 text-gray-400" />
@@ -598,35 +539,46 @@ export function AdminCalendar() {
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                  {upcomingDaysOff.map(entry => (
-                    <div
-                      key={entry.id}
-                      onClick={() => handleUpcomingItemClick(entry)}
-                      className="border border-gray-200 rounded-lg p-3 hover:border-purple-300 hover:bg-purple-50 transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="font-medium text-sm text-gray-900 mb-1 group-hover:text-purple-700">
-                            {entry.name}
+                  {upcomingEntries.map(entry => {
+                    const displayDate = entry.date 
+                      ? format(parseISO(entry.date), "MMM d, yyyy")
+                      : entry.startDate && entry.endDate
+                        ? `${format(parseISO(entry.startDate), "MMM d")} - ${format(parseISO(entry.endDate), "MMM d, yyyy")}`
+                        : "Date TBD";
+
+                    const scopeLabel = entry.appliesToAllTeams 
+                      ? "All Teams"
+                      : entry.teamName || "Specific Team";
+
+                    return (
+                      <div
+                        key={entry.id}
+                        onClick={() => handleUpcomingItemClick(entry)}
+                        className="border border-gray-200 rounded-lg p-3 hover:border-purple-300 hover:bg-purple-50 transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="font-medium text-sm text-gray-900 mb-1 group-hover:text-purple-700">
+                              {entry.name}
+                            </div>
+                            <div className="text-xs text-gray-600 mb-1">
+                              {displayDate}
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-600 mb-1">
-                            {isSameDay(entry.startDate, entry.endDate)
-                              ? format(entry.startDate, "MMM d, yyyy")
-                              : `${format(entry.startDate, "MMM d")} - ${format(entry.endDate, "MMM d, yyyy")}`
-                            }
-                          </div>
+                          <div className="w-2 h-2 rounded-full mt-1.5 bg-green-500" />
                         </div>
-                        <div className={`w-2 h-2 rounded-full mt-1.5 ${getEntryDotColor(entry.type)}`} />
+                        <div className="text-xs text-gray-500 mb-2">
+                          {scopeLabel}{entry.country && ` · ${entry.country}`}
+                        </div>
+                        {entry.affectedContractorCount !== null && (
+                          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                            <Info className="w-3 h-3" />
+                            <span>Affects {entry.affectedContractorCount} contractors</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-500 mb-2">
-                        {getCountryLabel(entry.country)} · {getTeamLabel(entry.team)}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                        <Info className="w-3 h-3" />
-                        <span>Affects {entry.affectedCount} contractors</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -637,7 +589,6 @@ export function AdminCalendar() {
       {/* Time Off Drawer */}
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
         <SheetContent className="w-[440px] p-0 bg-white border-l border-gray-200 overflow-y-auto">
-          {/* Drawer Header */}
           <SheetHeader className="px-6 pt-6 pb-5 border-b border-gray-200">
             <div className="flex items-start justify-between">
               <div>
@@ -668,42 +619,32 @@ export function AdminCalendar() {
                   <div className="font-medium text-gray-900">{editingEntry.name}</div>
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-500 mb-1 block">Type</Label>
-                  <div className="font-medium text-gray-900">{editingEntry.type}</div>
-                </div>
-                {editingEntry.description && (
-                  <div>
-                    <Label className="text-xs text-gray-500 mb-1 block">Description</Label>
-                    <div className="text-sm text-gray-700">{editingEntry.description}</div>
-                  </div>
-                )}
-                <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Date</Label>
                   <div className="font-medium text-gray-900">
-                    {isSameDay(editingEntry.startDate, editingEntry.endDate)
-                      ? format(editingEntry.startDate, "MMM d, yyyy")
-                      : `${format(editingEntry.startDate, "MMM d, yyyy")} - ${format(editingEntry.endDate, "MMM d, yyyy")}`
-                    }
+                    {editingEntry.date 
+                      ? format(parseISO(editingEntry.date), "MMM d, yyyy")
+                      : editingEntry.startDate && editingEntry.endDate
+                        ? `${format(parseISO(editingEntry.startDate), "MMM d, yyyy")} - ${format(parseISO(editingEntry.endDate), "MMM d, yyyy")}`
+                        : "Date TBD"}
                   </div>
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Scope</Label>
                   <div className="text-sm text-gray-700">
-                    {getCountryLabel(editingEntry.country)} • {getTeamLabel(editingEntry.team)}
+                    {editingEntry.appliesToAllTeams ? "All Teams" : editingEntry.teamName || "Specific Team"}
+                    {editingEntry.country && ` • ${editingEntry.country}`}
                   </div>
                 </div>
-                <div>
-                  <Label className="text-xs text-gray-500 mb-1 block">Applies To</Label>
-                  <div className="font-medium text-gray-900">{editingEntry.appliesTo}</div>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                  <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-medium text-blue-900 text-sm">
-                      Affects {editingEntry.affectedCount} contractors
+                {editingEntry.affectedContractorCount !== null && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                    <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-medium text-blue-900 text-sm">
+                        Affects {editingEntry.affectedContractorCount} contractors
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
                 <div className="pt-4 flex gap-3">
                   <Button
                     onClick={() => setIsReadMode(false)}
@@ -725,6 +666,20 @@ export function AdminCalendar() {
             {/* Edit Mode */}
             {!isReadMode && (
               <>
+                {/* Name */}
+                <div>
+                  <Label htmlFor="name" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    Name
+                  </Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., New Year's Day"
+                    className="border-gray-200"
+                  />
+                </div>
+
                 {/* Date Selection */}
                 <div className="space-y-4">
                   <Label className="text-sm font-medium text-gray-900">Date Selection</Label>
@@ -758,9 +713,9 @@ export function AdminCalendar() {
                       <Input
                         id="date"
                         type="date"
-                        value={formData.startDate}
-                        onChange={e => setFormData({ ...formData, startDate: e.target.value, endDate: e.target.value })}
-                        className="bg-gray-50 border-gray-200 rounded-lg h-10"
+                        value={formData.date}
+                        onChange={e => setFormData({ ...formData, date: e.target.value })}
+                        className="border-gray-200"
                       />
                     </div>
                   ) : (
@@ -772,7 +727,7 @@ export function AdminCalendar() {
                           type="date"
                           value={formData.startDate}
                           onChange={e => setFormData({ ...formData, startDate: e.target.value })}
-                          className="bg-gray-50 border-gray-200 rounded-lg h-10"
+                          className="border-gray-200"
                         />
                       </div>
                       <div>
@@ -782,116 +737,49 @@ export function AdminCalendar() {
                           type="date"
                           value={formData.endDate}
                           onChange={e => setFormData({ ...formData, endDate: e.target.value })}
-                          className="bg-gray-50 border-gray-200 rounded-lg h-10"
+                          className="border-gray-200"
                         />
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Time Off Details */}
-                <div className="space-y-4">
-                  <Label className="text-sm font-medium text-gray-900">Time Off Details</Label>
-                  
-                  <div>
-                    <Label htmlFor="type" className="text-xs text-gray-700 mb-1.5 block">Type</Label>
-                    <Combobox
-                      value={formData.type}
-                      onValueChange={(value) => setFormData({ ...formData, type: value as "Holiday" | "Special Time Off" })}
-                      options={[
-                        { value: "Holiday", label: "Holiday" },
-                        { value: "Special Time Off", label: "Special Time Off" },
-                      ]}
-                      placeholder="Select type"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="name" className="text-xs text-gray-700 mb-1.5 block">Name</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={e => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g. National Holiday"
-                      className="bg-gray-50 border-gray-200 rounded-lg h-10"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="description" className="text-xs text-gray-700 mb-1.5 block">
-                      Description <span className="text-gray-400">(Optional)</span>
-                    </Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={e => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Add additional details..."
-                      rows={3}
-                      className="bg-gray-50 border-gray-200 rounded-lg resize-none"
-                    />
-                  </div>
+                {/* Country */}
+                <div>
+                  <Label htmlFor="country" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    Country (Optional)
+                  </Label>
+                  <Input
+                    id="country"
+                    value={formData.country}
+                    onChange={e => setFormData({ ...formData, country: e.target.value })}
+                    placeholder="e.g., United States"
+                    className="border-gray-200"
+                  />
                 </div>
 
-                {/* Scope & Applicability */}
-                <div className="space-y-4 pt-2 border-t border-gray-200">
-                  <Label className="text-sm font-medium text-gray-900">Scope & Applicability</Label>
-                  
-                  <div>
-                    <Label htmlFor="country" className="text-xs text-gray-700 mb-1.5 block">Country</Label>
-                    <Combobox
-                      value={formData.country[0]}
-                      onValueChange={(value) => setFormData({ ...formData, country: [value] })}
-                      options={mockCountries}
-                      placeholder="Select country"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="team" className="text-xs text-gray-700 mb-1.5 block">Team</Label>
-                    <Combobox
-                      value={formData.team[0]}
-                      onValueChange={(value) => setFormData({ ...formData, team: [value] })}
-                      options={mockTeams}
-                      placeholder="Select team"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-xs text-gray-700 mb-2 block">Applies To</Label>
-                    <RadioGroup
-                      value={formData.appliesTo}
-                      onValueChange={(value) => setFormData({ ...formData, appliesTo: value as "Contractors" | "Employees" | "All" })}
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="All" id="all" />
-                          <Label htmlFor="all" className="font-normal cursor-pointer">All</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Contractors" id="contractors" />
-                          <Label htmlFor="contractors" className="font-normal cursor-pointer">Contractors</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Employees" id="employees" />
-                          <Label htmlFor="employees" className="font-normal cursor-pointer">Employees</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                </div>
-
-                {/* Affected Contractors Indicator */}
-                <div className={`${
-                  affectedCount === 0 ? "bg-yellow-50 border-yellow-200" : "bg-blue-50 border-blue-200"
-                } border rounded-lg p-4 flex items-start gap-3`}>
-                  <Info className={`w-5 h-5 ${affectedCount === 0 ? "text-yellow-600" : "text-blue-600"} flex-shrink-0 mt-0.5`} />
-                  <div>
-                    <div className={`font-medium text-sm ${affectedCount === 0 ? "text-yellow-900" : "text-blue-900"}`}>
-                      {affectedCount === 0
-                        ? "No contractors match the selected scope"
-                        : `This time off will affect ${affectedCount} contractors`
-                      }
-                    </div>
+                {/* Scope */}
+                <div>
+                  <Label className="text-sm font-medium text-gray-900 mb-3 block">Applies To</Label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={formData.appliesToAllTeams}
+                        onChange={() => setFormData({ ...formData, appliesToAllTeams: true, teamId: "" })}
+                        className="w-4 h-4 text-purple-600"
+                      />
+                      <span className="text-sm text-gray-700">All Teams</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={!formData.appliesToAllTeams}
+                        onChange={() => setFormData({ ...formData, appliesToAllTeams: false })}
+                        className="w-4 h-4 text-purple-600"
+                      />
+                      <span className="text-sm text-gray-700">Specific Team</span>
+                    </label>
                   </div>
                 </div>
 
@@ -900,9 +788,12 @@ export function AdminCalendar() {
                   <div className="flex gap-3">
                     <Button
                       onClick={handleSave}
+                      disabled={createMutation.isPending || updateMutation.isPending}
                       className="flex-1 bg-purple-600 hover:bg-purple-700"
-                      disabled={affectedCount === 0}
                     >
+                      {(createMutation.isPending || updateMutation.isPending) && (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      )}
                       Save
                     </Button>
                     <Button
@@ -915,10 +806,14 @@ export function AdminCalendar() {
                   </div>
                   {editingEntry && (
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       onClick={handleDelete}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      disabled={deleteMutation.isPending}
+                      className="w-full border-red-200 text-red-600 hover:bg-red-50"
                     >
+                      {deleteMutation.isPending && (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      )}
                       <Trash2 className="w-4 h-4 mr-2" />
                       Delete Time Off
                     </Button>

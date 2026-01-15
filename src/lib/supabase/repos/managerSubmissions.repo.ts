@@ -141,7 +141,6 @@ export async function listTeamSubmissions(
   let submissions = (data || []).map((s: any) => {
     // Handle potential array or object return from joins
     const profile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
-    const contractor = Array.isArray(s.contractors) ? s.contractors[0] : s.contractors;
 
     return {
     id: s.id,
@@ -161,8 +160,6 @@ export async function listTeamSubmissions(
     submittedAt: s.submitted_at,
     approvedAt: s.approved_at,
     paidAt: s.paid_at,
-    hourlyRate: contractor?.hourly_rate,
-    overtimeRate: contractor?.overtime_rate,
   }});
 
   // Apply search filter client-side
