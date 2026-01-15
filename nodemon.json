@@ -1,8 +1,8 @@
 {
-  "watch": ["src/server.ts", "src/lib/auth.ts"],
+  "watch": ["Server/server.ts", "src/lib/auth.ts"],
   "ext": "ts,js,json",
   "ignore": ["**/*.test.ts", "**/*.spec.ts"],
-  "exec": "tsx src/server.ts",
+  "exec": "tsx Server/server.ts",
   "env": {
     "NODE_ENV": "development"
   }

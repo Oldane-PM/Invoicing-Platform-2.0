@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
-import { auth } from "./lib/auth";
+import { auth } from "../src/lib/auth";
 
 const app = express();
 const port = Number(process.env.PORT ?? 8000);
