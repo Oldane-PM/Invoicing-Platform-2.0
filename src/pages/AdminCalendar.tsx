@@ -10,9 +10,8 @@ import {
   SheetDescription,
 } from "../components/ui/sheet";
 import { toast } from "sonner";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, addDays } from "date-fns";
-import { ChevronLeft, ChevronRight, CalendarPlus, X, Info, Trash2, CalendarCheck, Calendar as CalendarIcon } from "lucide-react";
-import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek } from "date-fns";
+import { ChevronLeft, ChevronRight, CalendarPlus, X, Info, Trash2, Loader2, Calendar as CalendarIcon } from "lucide-react";
 
 import { 
   useCalendarEntries, 
@@ -22,23 +21,6 @@ import {
 } from "../lib/hooks/adminCalendar";
 import { TimeOffEntry, CalendarEntryType, CalendarAppliesTo } from "../lib/data/adminCalendar";
 
-const mockCountries = [
-  { value: "all", label: "All Countries" },
-  { value: "us", label: "United States" },
-  { value: "uk", label: "United Kingdom" },
-  { value: "ca", label: "Canada" },
-  { value: "au", label: "Australia" },
-  { value: "jm", label: "Jamaica" },
-];
-
-const mockTeams = [
-  { value: "all", label: "All Teams" },
-  { value: "engineering", label: "Engineering" },
-  { value: "design", label: "Design" },
-  { value: "marketing", label: "Marketing" },
-  { value: "operations", label: "Operations" },
-];
-
 type ViewMode = "month" | "year";
 type DateRangeMode = "single" | "range";
 
@@ -47,20 +29,6 @@ export function AdminCalendar() {
   const [viewMode, setViewMode] = React.useState<ViewMode>("month");
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [editingEntry, setEditingEntry] = React.useState<TimeOffEntry | null>(null);
-  const [isReadMode, setIsReadMode] = React.useState(false);
-
-  // Data fetching
-  const entriesQuery = useCalendarEntries(monthStartISO, monthEndISO);
-  const upcomingQuery = useUpcomingDaysOff(90);
-
-  // Mutations
-  const createMutation = useCreateCalendarEntry();
-  const updateMutation = useUpdateCalendarEntry();
-  const deleteMutation = useDeleteCalendarEntry();
-
-  // UI state
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const [editingEntry, setEditingEntry] = React.useState<CalendarEntry | null>(null);
   const [isReadMode, setIsReadMode] = React.useState(false);
   const [dateRangeMode, setDateRangeMode] = React.useState<DateRangeMode>("single");
   const [formData, setFormData] = React.useState({
@@ -74,41 +42,23 @@ export function AdminCalendar() {
     appliesTo: "All" as CalendarAppliesTo,
   });
 
-  // Hooks
-  // We fetch a wide range to cover both the calendar view and the upcoming list
-  // Ideally these would be two separate queries but for simplicity we'll fetch a larger chunk
-  // Or utilize query caching.
-  // Let's fetch specifically for the current view + 3 months
+  // Data fetching - fetch current month + 3 months ahead for upcoming list
   const queryStart = React.useMemo(() => subMonths(startOfMonth(currentDate), 1), [currentDate]);
   const queryEnd = React.useMemo(() => addMonths(endOfMonth(currentDate), 3), [currentDate]);
   
-  const { data: timeOffEntries = [] } = useCalendarEntries(queryStart, queryEnd);
+  const entriesQuery = useCalendarEntries(queryStart, queryEnd);
+  const timeOffEntries = entriesQuery.data || [];
   
+  // Mutations
   const createMutation = useCreateCalendarEntry();
   const updateMutation = useUpdateCalendarEntry();
   const deleteMutation = useDeleteCalendarEntry();
-  
-  // Keyboard event listener for Shift key
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Shift") setIsShiftPressed(true);
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === "Shift") setIsShiftPressed(false);
-    };
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+  // Navigation
+  const goPrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
+  const goNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-    };
-  }, []);
-
-  const previousMonth = () => setCurrentDate(subMonths(currentDate, 1));
-  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
-
+  // Calendar calculations
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const calendarStart = startOfWeek(monthStart);
@@ -128,13 +78,7 @@ export function AdminCalendar() {
     });
   };
 
-
-  const isDateSelected = (date: Date) => {
-    return selectedDates.some(selectedDate => 
-      isSameDay(new Date(selectedDate), date)
-    );
-  };
-
+  // Calculate affected count
   const calculateAffectedCount = (countries: string[], teams: string[], appliesTo: string): number => {
     // Mock calculation - in real app, this would call an API
     if (countries.includes("all") && teams.includes("all")) {
@@ -143,9 +87,6 @@ export function AdminCalendar() {
     if (countries.includes("all")) {
       return appliesTo === "All" ? 87 : appliesTo === "Contractors" ? 58 : 29;
     }
-    if (countries.includes("jm")) {
-      return appliesTo === "All" ? 24 : appliesTo === "Contractors" ? 16 : 8;
-    }
     return appliesTo === "All" ? 24 : appliesTo === "Contractors" ? 16 : 8;
   };
 
@@ -153,81 +94,66 @@ export function AdminCalendar() {
     return calculateAffectedCount(formData.country, formData.team, formData.appliesTo);
   }, [formData.country, formData.team, formData.appliesTo]);
 
-  const handleDateClick = (date: Date, entries: TimeOffEntry[]) => {
+  // Get upcoming entries (next 90 days)
+  const upcomingEntries = React.useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const futureLimit = addMonths(now, 3);
+    
+    return timeOffEntries
+      .filter(entry => {
+        const entryStart = new Date(entry.startDate);
+        entryStart.setHours(0, 0, 0, 0);
+        return entryStart >= now && entryStart <= futureLimit;
+      })
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+      .slice(0, 10); // Limit to 10 entries
+  }, [timeOffEntries]);
+
+  // Handlers
+  const handleDateClick = (_date: Date, entries: TimeOffEntry[]) => {
     // If there's an entry, open it in read mode
     if (entries.length > 0) {
       handleEditEntry(entries[0], true);
-      return;
     }
-
-    // Otherwise, handle date selection for inline editing
-    const normalizedDate = new Date(date);
-    normalizedDate.setHours(0, 0, 0, 0);
-
-    if (isShiftPressed && rangeStart) {
-      // Range selection
-      const start = new Date(rangeStart);
-      const end = new Date(normalizedDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
-
-      const rangeDates: Date[] = [];
-      const current = new Date(start);
-      
-      if (start <= end) {
-        while (current <= end) {
-          rangeDates.push(new Date(current));
-          current.setDate(current.getDate() + 1);
-        }
-      } else {
-        while (current >= end) {
-          rangeDates.push(new Date(current));
-          current.setDate(current.getDate() - 1);
-        }
-      }
-      
-      // Handle date-range entries
-      if (entry.startDate && entry.endDate) {
-        const start = parseISO(entry.startDate);
-        const end = parseISO(entry.endDate);
-        return date >= start && date <= end;
-      }
-      
-      return false;
-    });
   };
 
-  // Handlers
   const handleAddTimeOff = () => {
     setEditingEntry(null);
     setIsReadMode(false);
     setFormData({
       name: "",
-      date: format(new Date(), "yyyy-MM-dd"),
+      type: "Holiday" as CalendarEntryType,
+      description: "",
       startDate: format(new Date(), "yyyy-MM-dd"),
       endDate: format(new Date(), "yyyy-MM-dd"),
-      country: "",
-      teamId: "",
-      appliesToAllTeams: true,
+      country: ["all"],
+      team: ["all"],
+      appliesTo: "All" as CalendarAppliesTo,
     });
     setDateRangeMode("single");
     setDrawerOpen(true);
   };
 
-  const handleEditEntry = (entry: CalendarEntry, readOnly = false) => {
+  const handleEditEntry = (entry: TimeOffEntry, readOnly = false) => {
     setEditingEntry(entry);
     setIsReadMode(readOnly);
     setFormData({
       name: entry.name,
-      date: entry.date || format(new Date(), "yyyy-MM-dd"),
-      startDate: entry.startDate || format(new Date(), "yyyy-MM-dd"),
-      endDate: entry.endDate || format(new Date(), "yyyy-MM-dd"),
-      country: entry.country || "",
-      teamId: entry.teamId || "",
-      appliesToAllTeams: entry.appliesToAllTeams ?? true,
+      type: entry.type,
+      description: entry.description || "",
+      startDate: format(entry.startDate, "yyyy-MM-dd"),
+      endDate: format(entry.endDate, "yyyy-MM-dd"),
+      country: entry.country || ["all"],
+      team: entry.team || ["all"],
+      appliesTo: entry.appliesTo,
     });
-    setDateRangeMode(entry.startDate && entry.endDate ? "range" : "single");
+    setDateRangeMode(entry.startDate !== entry.endDate ? "range" : "single");
     setDrawerOpen(true);
+  };
+
+  const handleUpcomingItemClick = (entry: TimeOffEntry) => {
+    handleEditEntry(entry, true);
   };
 
   const handleSave = async () => {
@@ -235,21 +161,6 @@ export function AdminCalendar() {
       toast.error("Please enter a name for this time off");
       return;
     }
-
-    try {
-      const input: CreateCalendarEntryInput = {
-        name: formData.name,
-        country: formData.country || null,
-        teamId: formData.teamId || null,
-        appliesToAllTeams: formData.appliesToAllTeams,
-      };
-
-      if (dateRangeMode === "single") {
-        input.date = formData.date;
-      } else {
-        input.startDate = formData.startDate;
-        input.endDate = formData.endDate;
-      }
 
     const entryData = {
       name: formData.name,
@@ -260,7 +171,7 @@ export function AdminCalendar() {
       country: formData.country,
       team: formData.team,
       appliesTo: formData.appliesTo,
-      affectedCount: count,
+      affectedCount: affectedCount,
     };
 
     if (editingEntry) {
@@ -269,7 +180,7 @@ export function AdminCalendar() {
         id: editingEntry.id,
       }, {
         onSuccess: () => {
-           setDrawerOpen(false);
+          setDrawerOpen(false);
         }
       });
     } else {
@@ -279,9 +190,6 @@ export function AdminCalendar() {
         }
       });
     }
-
-    setSelectedDates([]);
-    setRangeStart(null);
   };
 
   const handleDelete = async () => {
@@ -292,27 +200,6 @@ export function AdminCalendar() {
         setDrawerOpen(false);
       }
     });
-  };
-
-  const getEntryColor = (type: string) => {
-    if (type === "Holiday") return "bg-green-50 border-l-4 border-l-green-500";
-    if (type === "Special Time Off") return "bg-blue-50 border-l-4 border-l-blue-500";
-    return "bg-yellow-50 border-l-4 border-l-yellow-500";
-  };
-
-  const handleDateClick = (_date: Date, entries: CalendarEntry[]) => {
-    if (entries.length > 0) {
-      handleEditEntry(entries[0], true);
-    }
-  };
-
-  const handleUpcomingItemClick = (entry: CalendarEntry) => {
-    // Open the entry details
-    // Note: Could navigate to the month containing this entry by adding
-    // a setCurrentDate method to useAdminCalendarState hook
-    setTimeout(() => {
-      handleEditEntry(entry, true);
-    }, 100);
   };
 
   // Loading state
@@ -355,9 +242,6 @@ export function AdminCalendar() {
       </div>
     );
   }
-
-  const entries = entriesQuery.data || [];
-  const upcomingEntries = upcomingQuery.data || [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -479,9 +363,9 @@ export function AdminCalendar() {
                                 {/* Tooltip */}
                                 <div className="absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg min-w-[200px]">
                                   <div className="font-semibold mb-1">{entry.name}</div>
-                                  {entry.affectedContractorCount !== null && (
+                                  {entry.affectedCount !== null && (
                                     <div className="text-gray-400">
-                                      Affects {entry.affectedContractorCount} contractors
+                                      Affects {entry.affectedCount} people
                                     </div>
                                   )}
                                 </div>
@@ -494,7 +378,7 @@ export function AdminCalendar() {
                   </div>
 
                   {/* Empty State */}
-                  {entries.length === 0 && (
+                  {timeOffEntries.length === 0 && (
                     <div className="text-center py-16">
                       <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
                         <CalendarPlus className="w-8 h-8 text-gray-400" />
@@ -526,7 +410,7 @@ export function AdminCalendar() {
               </div>
               <p className="text-xs text-gray-500 mb-4">Next 90 days</p>
 
-              {upcomingQuery.isLoading ? (
+              {entriesQuery.isLoading ? (
                 <div className="text-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
                 </div>
@@ -540,15 +424,13 @@ export function AdminCalendar() {
               ) : (
                 <div className="space-y-3 max-h-[600px] overflow-y-auto">
                   {upcomingEntries.map(entry => {
-                    const displayDate = entry.date 
-                      ? format(parseISO(entry.date), "MMM d, yyyy")
-                      : entry.startDate && entry.endDate
-                        ? `${format(parseISO(entry.startDate), "MMM d")} - ${format(parseISO(entry.endDate), "MMM d, yyyy")}`
-                        : "Date TBD";
+                    const displayDate = entry.startDate.getTime() === entry.endDate.getTime()
+                      ? format(entry.startDate, "MMM d, yyyy")
+                      : `${format(entry.startDate, "MMM d")} - ${format(entry.endDate, "MMM d, yyyy")}`;
 
-                    const scopeLabel = entry.appliesToAllTeams 
+                    const scopeLabel = entry.team?.includes("all") 
                       ? "All Teams"
-                      : entry.teamName || "Specific Team";
+                      : "Specific Team";
 
                     return (
                       <div
@@ -568,12 +450,12 @@ export function AdminCalendar() {
                           <div className="w-2 h-2 rounded-full mt-1.5 bg-green-500" />
                         </div>
                         <div className="text-xs text-gray-500 mb-2">
-                          {scopeLabel}{entry.country && ` · ${entry.country}`}
+                          {scopeLabel}{entry.country && entry.country[0] !== "all" ? ` · ${entry.country[0]}` : ""}
                         </div>
-                        {entry.affectedContractorCount !== null && (
+                        {entry.affectedCount !== null && (
                           <div className="flex items-center gap-1.5 text-xs text-gray-600">
                             <Info className="w-3 h-3" />
-                            <span>Affects {entry.affectedContractorCount} contractors</span>
+                            <span>Affects {entry.affectedCount} people</span>
                           </div>
                         )}
                       </div>
@@ -621,26 +503,25 @@ export function AdminCalendar() {
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Date</Label>
                   <div className="font-medium text-gray-900">
-                    {editingEntry.date 
-                      ? format(parseISO(editingEntry.date), "MMM d, yyyy")
-                      : editingEntry.startDate && editingEntry.endDate
-                        ? `${format(parseISO(editingEntry.startDate), "MMM d, yyyy")} - ${format(parseISO(editingEntry.endDate), "MMM d, yyyy")}`
-                        : "Date TBD"}
+                    {editingEntry.startDate.getTime() === editingEntry.endDate.getTime()
+                      ? format(editingEntry.startDate, "MMM d, yyyy")
+                      : `${format(editingEntry.startDate, "MMM d, yyyy")} - ${format(editingEntry.endDate, "MMM d, yyyy")}`}
                   </div>
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-500 mb-1 block">Scope</Label>
-                  <div className="text-sm text-gray-700">
-                    {editingEntry.appliesToAllTeams ? "All Teams" : editingEntry.teamName || "Specific Team"}
-                    {editingEntry.country && ` • ${editingEntry.country}`}
-                  </div>
+                  <Label className="text-xs text-gray-500 mb-1 block">Type</Label>
+                  <div className="text-sm text-gray-700">{editingEntry.type}</div>
                 </div>
-                {editingEntry.affectedContractorCount !== null && (
+                <div>
+                  <Label className="text-xs text-gray-500 mb-1 block">Applies To</Label>
+                  <div className="text-sm text-gray-700">{editingEntry.appliesTo}</div>
+                </div>
+                {editingEntry.affectedCount !== null && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
                     <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <div className="font-medium text-blue-900 text-sm">
-                        Affects {editingEntry.affectedContractorCount} contractors
+                        Affects {editingEntry.affectedCount} people
                       </div>
                     </div>
                   </div>
@@ -680,6 +561,23 @@ export function AdminCalendar() {
                   />
                 </div>
 
+                {/* Type */}
+                <div>
+                  <Label htmlFor="type" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    Type
+                  </Label>
+                  <select
+                    id="type"
+                    value={formData.type}
+                    onChange={e => setFormData({ ...formData, type: e.target.value as CalendarEntryType })}
+                    className="w-full h-10 px-3 border border-gray-200 rounded-md text-sm"
+                  >
+                    <option value="Holiday">Holiday</option>
+                    <option value="Special Time Off">Special Time Off</option>
+                    <option value="Company Event">Company Event</option>
+                  </select>
+                </div>
+
                 {/* Date Selection */}
                 <div className="space-y-4">
                   <Label className="text-sm font-medium text-gray-900">Date Selection</Label>
@@ -709,12 +607,12 @@ export function AdminCalendar() {
 
                   {dateRangeMode === "single" ? (
                     <div>
-                      <Label htmlFor="date" className="text-xs text-gray-700 mb-1.5 block">Date</Label>
+                      <Label htmlFor="startDate" className="text-xs text-gray-700 mb-1.5 block">Date</Label>
                       <Input
-                        id="date"
+                        id="startDate"
                         type="date"
-                        value={formData.date}
-                        onChange={e => setFormData({ ...formData, date: e.target.value })}
+                        value={formData.startDate}
+                        onChange={e => setFormData({ ...formData, startDate: e.target.value, endDate: e.target.value })}
                         className="border-gray-200"
                       />
                     </div>
@@ -744,42 +642,41 @@ export function AdminCalendar() {
                   )}
                 </div>
 
-                {/* Country */}
+                {/* Description */}
                 <div>
-                  <Label htmlFor="country" className="text-sm font-medium text-gray-900 mb-1.5 block">
-                    Country (Optional)
+                  <Label htmlFor="description" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    Description (Optional)
                   </Label>
                   <Input
-                    id="country"
-                    value={formData.country}
-                    onChange={e => setFormData({ ...formData, country: e.target.value })}
-                    placeholder="e.g., United States"
+                    id="description"
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Add details about this time off"
                     className="border-gray-200"
                   />
                 </div>
 
-                {/* Scope */}
+                {/* Applies To */}
                 <div>
                   <Label className="text-sm font-medium text-gray-900 mb-3 block">Applies To</Label>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={formData.appliesToAllTeams}
-                        onChange={() => setFormData({ ...formData, appliesToAllTeams: true, teamId: "" })}
-                        className="w-4 h-4 text-purple-600"
-                      />
-                      <span className="text-sm text-gray-700">All Teams</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={!formData.appliesToAllTeams}
-                        onChange={() => setFormData({ ...formData, appliesToAllTeams: false })}
-                        className="w-4 h-4 text-purple-600"
-                      />
-                      <span className="text-sm text-gray-700">Specific Team</span>
-                    </label>
+                  <select
+                    value={formData.appliesTo}
+                    onChange={e => setFormData({ ...formData, appliesTo: e.target.value as CalendarAppliesTo })}
+                    className="w-full h-10 px-3 border border-gray-200 rounded-md text-sm"
+                  >
+                    <option value="All">All Employees</option>
+                    <option value="Contractors">Contractors Only</option>
+                    <option value="Managers">Managers Only</option>
+                  </select>
+                </div>
+
+                {/* Affected Count Display */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-medium text-blue-900 text-sm">
+                      Will affect approximately {affectedCount} people
+                    </div>
                   </div>
                 </div>
 

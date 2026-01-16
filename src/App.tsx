@@ -33,7 +33,7 @@ import { ContractorDetailDrawer } from "./pages/ContractorDetailDrawer";
 import { ContractorSubmissions } from "./pages/ContractorSubmissions";
 import { useAuth } from "./lib/hooks/useAuth";
 import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
-import type { Employee, User, Submission, Notification, MetricData, EmployeeDirectoryRow } from "./lib/types";
+import type { EmployeeDirectoryRow } from "./lib/types";
 
 type Screen = "dashboard" | "directory" | "access" | "calendar";
 type ManagerScreen = "dashboard" | "team";
@@ -59,15 +59,6 @@ function App() {
   const [selectedEmployee, setSelectedEmployee] =
     React.useState<EmployeeDirectoryRow | null>(null);
   const [employees, setEmployees] = React.useState<EmployeeDirectoryRow[]>([]);
-  const [users, setUsers] = React.useState<User[]>([]);
-  const [notifications, setNotifications] = React.useState<Notification[]>([]);
-  const [submissions, setSubmissions] = React.useState<Submission[]>([]);
-  const [metrics, setMetrics] = React.useState<MetricData>({
-    totalEmployees: 0,
-    pendingPayments: 0,
-    totalPayout: 0,
-    payoutChange: 0,
-  });
 
   // Filter options - these could come from Supabase in the future
   // const projects: string[] = []; // Unused - kept for future use
@@ -570,7 +561,6 @@ function App() {
         open={contractorDrawerOpen}
         onOpenChange={setContractorDrawerOpen}
         employee={selectedEmployee}
-        submissions={[]} // Pass empty array as it's now ignored/optional in the drawer until prop is removed from interface
         onSave={handleSaveEmployee}
       />
     </div>
