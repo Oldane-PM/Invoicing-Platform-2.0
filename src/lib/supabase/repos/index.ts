@@ -9,3 +9,4 @@ export * from "./auth.repo";
 export * from "./team.repo";
 export * from "./managerSubmissions.repo";
 export * from "./managerDashboard.repo";
+export * from "./contractorProfile.repo";

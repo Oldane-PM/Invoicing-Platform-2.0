@@ -17,20 +17,19 @@ import {
   LogOut,
   User as UserIcon,
 } from "lucide-react";
-import { Login } from "./pages/Login";
-import { AdminDashboard } from "./pages/AdminDashboard";
-import { ManagerDashboard } from "./pages/ManagerDashboard";
-import { ManagerTeamView } from "./pages/ManagerTeamView";
-import { ContractorDashboard } from "./pages/ContractorDashboard";
-import { ContractorProfile } from "./pages/ContractorProfile";
-import { SubmitHoursPage } from "./pages/SubmitHoursPage";
-import { EmployeeDirectory } from "./pages/EmployeeDirectory";
-import { UserAccessManagement } from "./pages/UserAccessManagement";
-import { AdminCalendar } from "./pages/AdminCalendar";
+import { Login } from "./pages/auth/Login";
+import { AdminDashboard } from "./pages/admin/Dashboard";
+import { ManagerDashboard } from "./pages/manager/Dashboard";
+import { ManagerTeamView } from "./pages/manager/Team";
+import { ContractorDashboard } from "./pages/contractor/Dashboard";
+import { ContractorProfile } from "./pages/contractor/Profile";
+import { SubmitHoursPage } from "./pages/contractor/SubmitHours";
+import { EmployeeDirectory } from "./pages/admin/EmployeeDirectory";
+import { UserAccessManagement } from "./pages/admin/UserAccessManagement";
+import { AdminCalendar } from "./pages/admin/Calendar";
 import { NotificationBell } from "./components/shared/NotificationBell";
 import { NotificationDrawer } from "./components/shared/NotificationDrawer";
-import { ContractorDetailDrawer } from "./pages/ContractorDetailDrawer";
-import { ContractorSubmissions } from "./pages/ContractorSubmissions";
+import { ContractorDetailDrawer } from "./components/drawers/ContractorDetailDrawer";
 import { useAuth } from "./lib/hooks/useAuth";
 import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
 import type { EmployeeDirectoryRow } from "./lib/types";
@@ -40,8 +39,7 @@ type ManagerScreen = "dashboard" | "team";
 type ContractorScreen =
   | "dashboard"
   | "profile"
-  | "submit-hours"
-  | "submissions";
+  | "submit-hours";
 type UserRole = "Admin" | "Manager" | "Contractor" | null;
 
 function App() {
@@ -387,7 +385,6 @@ function App() {
           {contractorScreen === "dashboard" && (
             <ContractorDashboard
               onNavigateToSubmit={() => setContractorScreen("submit-hours")}
-              onNavigateToSubmissions={() => setContractorScreen("submissions")}
             />
           )}
           {contractorScreen === "profile" && (
@@ -398,13 +395,7 @@ function App() {
           {contractorScreen === "submit-hours" && (
             <SubmitHoursPage
               onCancel={() => setContractorScreen("dashboard")}
-              onSuccess={() => setContractorScreen("submissions")}
-            />
-          )}
-          {contractorScreen === "submissions" && (
-            <ContractorSubmissions
-              onSubmitHours={() => setContractorScreen("submit-hours")}
-              onBack={() => setContractorScreen("dashboard")}
+              onSuccess={() => setContractorScreen("dashboard")}
             />
           )}
         </main>

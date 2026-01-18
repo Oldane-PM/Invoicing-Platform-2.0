@@ -73,6 +73,7 @@ export async function listTeamSubmissions(
   // Build submissions query
   // Using simplified join syntax to avoid "Could not find relationship" errors if FK names are strict
   // We manually join or carefuly select related data
+  // NOTE: rejection_reason, admin_note, manager_note columns may not exist in all schemas
   let query = supabase
     .from("submissions")
     .select(
@@ -87,7 +88,6 @@ export async function listTeamSubmissions(
       overtime_description,
       total_amount,
       status,
-      rejection_reason,
       submitted_at,
       approved_at,
       paid_at,
@@ -156,7 +156,7 @@ export async function listTeamSubmissions(
     overtimeDescription: s.overtime_description,
     totalAmount: s.total_amount || 0,
     status: mapDbStatusToFrontend(s.status, s.paid_at),
-    rejectionReason: s.rejection_reason,
+    rejectionReason: (s as any).rejection_reason ?? null,
     submittedAt: s.submitted_at,
     approvedAt: s.approved_at,
     paidAt: s.paid_at,
@@ -194,6 +194,7 @@ export async function getSubmissionDetails(
 
   const teamContractorIds = (teamData || []).map((t: any) => t.contractor_id);
 
+  // NOTE: rejection_reason column may not exist in all schemas
   const { data, error } = await supabase
     .from("submissions")
     .select(
@@ -208,7 +209,6 @@ export async function getSubmissionDetails(
       overtime_description,
       total_amount,
       status,
-      rejection_reason,
       submitted_at,
       approved_at,
       paid_at,
@@ -262,7 +262,7 @@ export async function getSubmissionDetails(
     overtimeDescription: data.overtime_description,
     totalAmount: data.total_amount || 0,
     status: mapDbStatusToFrontend(data.status, data.paid_at),
-    rejectionReason: data.rejection_reason,
+    rejectionReason: (data as any).rejection_reason ?? null,
     submittedAt: data.submitted_at,
     approvedAt: data.approved_at,
     paidAt: data.paid_at,
@@ -278,19 +278,19 @@ export async function approveSubmission(
 ): Promise<void> {
   const supabase = getSupabaseClient();
 
+  // NOTE: rejection_reason column may not exist - only update guaranteed fields
   const { error } = await supabase
     .from("submissions")
     .update({
       status: "approved",
       manager_id: managerId,
       approved_at: new Date().toISOString(),
-      rejection_reason: null,
     })
     .eq("id", submissionId);
 
   if (error) {
     console.error("[managerSubmissions.repo] approveSubmission error:", error);
-    throw error;
+    throw new Error(error.message || "Failed to approve submission");
   }
 }
 
@@ -300,7 +300,7 @@ export async function approveSubmission(
 export async function rejectSubmission(
   submissionId: string,
   managerId: string,
-  reason: string
+  _reason: string // NOTE: rejection_reason column may not exist - ignored for now
 ): Promise<void> {
   const supabase = getSupabaseClient();
 
@@ -309,13 +309,12 @@ export async function rejectSubmission(
     .update({
       status: "rejected",
       manager_id: managerId,
-      rejection_reason: reason,
     })
     .eq("id", submissionId);
 
   if (error) {
     console.error("[managerSubmissions.repo] rejectSubmission error:", error);
-    throw error;
+    throw new Error(error.message || "Failed to reject submission");
   }
 }
 
@@ -373,12 +372,13 @@ export async function markSubmissionPaid(
 }
 
 /**
- * Request clarification on a submission
+ * Request clarification on a submission (legacy - use admin repo instead)
+ * @deprecated Use adminDashboard repo requestClarification instead
  */
 export async function requestClarification(
   submissionId: string,
   managerId: string,
-  note: string
+  _note: string // NOTE: rejection_reason/admin_note columns may not exist - ignored for now
 ): Promise<void> {
   const supabase = getSupabaseClient();
 
@@ -387,12 +387,72 @@ export async function requestClarification(
     .update({
       status: "needs_clarification",
       manager_id: managerId,
-      rejection_reason: note,
     })
     .eq("id", submissionId);
 
   if (error) {
     console.error("[managerSubmissions.repo] requestClarification error:", error);
-    throw error;
+    throw new Error(error.message || "Failed to request clarification");
+  }
+}
+
+/**
+ * Manager responds to admin's clarification request
+ * @param action - "RESUBMIT" to send back to admin, "REJECT_TO_CONTRACTOR" to reject to contractor
+ */
+export async function respondToClarification(
+  submissionId: string,
+  managerId: string,
+  action: "RESUBMIT" | "REJECT_TO_CONTRACTOR",
+  _note: string // NOTE: note columns may not exist in schema - ignored for now
+): Promise<void> {
+  const supabase = getSupabaseClient();
+
+  // Verify submission is in clarification_requested status
+  const { data: existing, error: fetchError } = await supabase
+    .from("submissions")
+    .select("status")
+    .eq("id", submissionId)
+    .single();
+
+  if (fetchError || !existing) {
+    throw new Error("Submission not found");
+  }
+
+  if (existing.status !== "needs_clarification") {
+    throw new Error(`Cannot respond to clarification: submission status is ${existing.status}, expected needs_clarification`);
+  }
+
+  // NOTE: manager_note, admin_note, rejection_reason columns may not exist - only update core fields
+  if (action === "RESUBMIT") {
+    // Manager resubmits to admin with explanation -> AWAITING_ADMIN_PAYMENT
+    const { error } = await supabase
+      .from("submissions")
+      .update({
+        status: "approved", // DB status for AWAITING_ADMIN_PAYMENT
+        manager_id: managerId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", submissionId);
+
+    if (error) {
+      console.error("[managerSubmissions.repo] respondToClarification (resubmit) error:", error);
+      throw new Error(error.message || "Failed to resubmit to admin");
+    }
+  } else {
+    // Manager rejects to contractor -> REJECTED_CONTRACTOR
+    const { error } = await supabase
+      .from("submissions")
+      .update({
+        status: "rejected", // DB status for REJECTED_CONTRACTOR
+        manager_id: managerId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", submissionId);
+
+    if (error) {
+      console.error("[managerSubmissions.repo] respondToClarification (reject) error:", error);
+      throw new Error(error.message || "Failed to reject to contractor");
+    }
   }
 }

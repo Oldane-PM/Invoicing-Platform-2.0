@@ -11,6 +11,7 @@
  */
 
 import type { ContractorSubmission, SubmissionDraft, SubmissionStatus } from "../types";
+import { mapDbStatusToSubmissionStatus } from "../types";
 import { supabase, isSupabaseConfigured } from "../supabase/client";
 import { format, parse, startOfMonth, endOfMonth } from "date-fns";
 
@@ -25,40 +26,37 @@ const DEFAULT_OT_MULTIPLIER = 1.5;
 export interface SubmissionsDataSource {
   listMySubmissions(): Promise<ContractorSubmission[]>;
   createSubmission(draft: SubmissionDraft): Promise<ContractorSubmission>;
+  getSubmittedWorkPeriods(): Promise<string[]>;
+  hasSubmissionForPeriod(workPeriod: string): Promise<boolean>;
+  /** Resubmit a rejected submission - updates status back to PENDING_MANAGER */
+  resubmitAfterRejection(submissionId: string, updatedData?: Partial<SubmissionDraft>): Promise<ContractorSubmission>;
 }
 
 
-
-/**
- * Map database submission status to frontend SubmissionStatus type
- */
-function mapDbStatusToFrontend(dbStatus: string, hasPaidInvoice: boolean): SubmissionStatus {
-  // If there's a paid invoice, show as PAID regardless of submission status
-  if (hasPaidInvoice) {
-    return "PAID";
-  }
-
-  const statusMap: Record<string, SubmissionStatus> = {
-    draft: "PENDING",
-    submitted: "PENDING",
-    pending_review: "PENDING",
-    approved: "APPROVED",
-    rejected: "REJECTED",
-    needs_clarification: "NEEDS_CLARIFICATION",
-  };
-  return statusMap[dbStatus] || "PENDING";
-}
-
-
-/**
- * Supabase implementation of SubmissionsDataSource
- * Works with the normalized schema (submissions, submission_line_items, overtime_entries)
- */
 /**
  * Supabase implementation of SubmissionsDataSource
  * Works with the actual schema (flat submissions table, contractors table)
+ *
+ * DEDUPLICATION: Uses static (class-level) tracking to prevent duplicate concurrent fetches.
+ * Static ensures deduplication works even if multiple instances somehow exist.
  */
 class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
+  // STATIC: Ensures in-flight tracking survives any instance recreation
+  private static inFlightListRequest: Promise<ContractorSubmission[]> | null = null;
+  private static cachedResult: ContractorSubmission[] | null = null;
+  private static cacheTimestamp = 0;
+  private static readonly CACHE_TTL_MS = 5000; // Cache results for 5 seconds
+  private static fetchCount = 0; // Debug counter
+
+  /** Clear cache and reset state (called on logout/user change) */
+  static clearCache(): void {
+    SupabaseSubmissionsDataSource.inFlightListRequest = null;
+    SupabaseSubmissionsDataSource.cachedResult = null;
+    SupabaseSubmissionsDataSource.cacheTimestamp = 0;
+    SupabaseSubmissionsDataSource.fetchCount = 0;
+    console.log("[SupabaseSubmissionsDataSource] Cache cleared");
+  }
+
   private async getContractorUserId(): Promise<string> {
     if (!supabase) {
       throw new Error("Supabase client not available");
@@ -109,11 +107,57 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       throw new Error("Supabase client not available");
     }
 
-    const contractorUserId = await this.getContractorUserId();
-    console.log("[SupabaseSubmissionsDataSource] Fetching submissions for:", contractorUserId);
+    const now = Date.now();
+    const cacheAge = SupabaseSubmissionsDataSource.cacheTimestamp > 0 
+      ? now - SupabaseSubmissionsDataSource.cacheTimestamp 
+      : Infinity;
 
-    // Fetch submissions with related data
-    const { data: submissions, error } = await supabase
+    // DEDUPLICATION 1: If there's already an in-flight request, return it
+    if (SupabaseSubmissionsDataSource.inFlightListRequest) {
+      console.log("[SupabaseSubmissionsDataSource] ⏳ Returning in-flight request (deduped)");
+      return SupabaseSubmissionsDataSource.inFlightListRequest;
+    }
+
+    // DEDUPLICATION 2: Return cached result if still fresh (within TTL)
+    if (SupabaseSubmissionsDataSource.cachedResult && cacheAge < SupabaseSubmissionsDataSource.CACHE_TTL_MS) {
+      console.log(`[SupabaseSubmissionsDataSource] 📦 Returning cached result (age: ${cacheAge}ms)`);
+      return SupabaseSubmissionsDataSource.cachedResult;
+    }
+
+    // No cache hit - perform actual fetch
+    SupabaseSubmissionsDataSource.fetchCount++;
+    const fetchNum = SupabaseSubmissionsDataSource.fetchCount;
+    console.log(`[SupabaseSubmissionsDataSource] 🔄 Fetch #${fetchNum} starting (cache age: ${cacheAge === Infinity ? 'never' : cacheAge + 'ms'})`);
+
+    // Create the promise IMMEDIATELY (before any await) to prevent race conditions
+    const fetchPromise = this.performListSubmissions();
+    SupabaseSubmissionsDataSource.inFlightListRequest = fetchPromise;
+
+    try {
+      const result = await fetchPromise;
+      // Cache the successful result
+      SupabaseSubmissionsDataSource.cachedResult = result;
+      SupabaseSubmissionsDataSource.cacheTimestamp = Date.now();
+      console.log(`[SupabaseSubmissionsDataSource] ✅ Fetch #${fetchNum} complete, cached ${result.length} submissions`);
+      return result;
+    } finally {
+      // Clear in-flight tracking when done
+      SupabaseSubmissionsDataSource.inFlightListRequest = null;
+    }
+  }
+
+  /**
+   * Internal method that performs the actual fetch
+   */
+  private async performListSubmissions(): Promise<ContractorSubmission[]> {
+    const contractorUserId = await this.getContractorUserId();
+    console.log("[SupabaseSubmissionsDataSource] Fetching submissions for contractor:", contractorUserId);
+
+    // Fetch submissions - NO relationship joins, just base columns that exist
+    // Order by work_period_key (descending) to show most recent work periods first
+    // Secondary sort by created_at for submissions in the same work period
+    // NOTE: admin_note, manager_note, rejection_reason columns may not exist in all schemas
+    const { data: submissions, error } = await supabase!
       .from("submissions")
       .select(
         `
@@ -123,30 +167,48 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         period_start,
         period_end,
         work_period,
+        work_period_key,
         regular_hours,
         overtime_hours,
         overtime_description,
         total_amount,
         status,
         submitted_at,
-        created_at
+        created_at,
+        updated_at,
+        paid_at
       `
       )
       .eq("contractor_user_id", contractorUserId)
+      .order("work_period_key", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("[SupabaseSubmissionsDataSource] Error fetching submissions:", error);
-      throw error;
+      console.error("[SupabaseSubmissionsDataSource] Error fetching submissions:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      // Throw a proper Error object with the message for the UI to display
+      throw new Error(error.message || "Failed to fetch submissions from database");
+    }
+
+    console.log(`[SupabaseSubmissionsDataSource] Fetched ${submissions?.length ?? 0} submissions`);
+
+    // Handle empty results gracefully (NOT an error)
+    if (!submissions || submissions.length === 0) {
+      console.log("[SupabaseSubmissionsDataSource] No submissions found for user");
+      return [];
     }
 
     // Transform to ContractorSubmission format
-    return (submissions || []).map((sub) => {
-      // Determine status
-      const status = mapDbStatusToFrontend(sub.status, false); // No invoices table, so passed false
+    return submissions.map((sub: any) => {
+      // Use centralized status mapping from types
+      const status = mapDbStatusToSubmissionStatus(sub.status, sub.paid_at);
 
       // Format work period as "YYYY-MM" if not present
-      const workPeriod = sub.work_period || format(new Date(sub.period_start), "yyyy-MM");
+      const workPeriod = sub.work_period || (sub.period_start ? format(new Date(sub.period_start), "yyyy-MM") : "");
 
       return {
         id: sub.id,
@@ -161,6 +223,11 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         workPeriod,
         excludedDates: [], // Not stored in flat schema
         overtimeDescription: sub.overtime_description,
+        // Workflow notes (columns may not exist in all schemas - set to null/undefined)
+        rejectionReason: sub.rejection_reason ?? null,
+        adminNote: sub.admin_note ?? null,
+        managerNote: sub.manager_note ?? null,
+        updatedAt: sub.updated_at,
       };
     });
   }
@@ -172,6 +239,14 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
 
     const contractorUserId = await this.getContractorUserId();
     console.log("[SupabaseSubmissionsDataSource] Creating submission for:", contractorUserId);
+
+    // Check for duplicate work period submission
+    const hasDuplicate = await this.hasSubmissionForPeriod(draft.workPeriod);
+    if (hasDuplicate) {
+      const periodDate = parse(draft.workPeriod, "yyyy-MM", new Date());
+      const periodLabel = format(periodDate, "MMMM yyyy");
+      throw new Error(`You have already submitted hours for ${periodLabel}. Each work period can only have one submission.`);
+    }
 
     // Get contractor's active contract (most recent if multiple)
     const { data: contractData, error: contractError } = await supabase
@@ -219,12 +294,13 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       .from("submissions")
       .insert({
         contractor_user_id: contractorUserId,
-        contract_id: contractId, // ✅ Now includes contract_id
+        contract_id: contractId,
         project_name: projectName,
         description: draft.description,
         period_start: periodStart,
         period_end: periodEnd,
         work_period: draft.workPeriod,
+        work_period_key: periodStart, // First day of month for sorting
         regular_hours: draft.hoursSubmitted,
         overtime_hours: draft.overtimeHours,
         overtime_description: draft.overtimeDescription || null,
@@ -250,11 +326,163 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       regularHours: submission.regular_hours,
       overtimeHours: submission.overtime_hours,
       totalAmount: submission.total_amount,
-      status: "PENDING",
+      status: "PENDING_MANAGER" as SubmissionStatus,
       invoiceUrl: null,
       workPeriod: submission.work_period,
       excludedDates: draft.excludedDates, // Returned from input, but not persisted deeply
       overtimeDescription: submission.overtime_description,
+      rejectionReason: null,
+      adminNote: null,
+      managerNote: null,
+      updatedAt: submission.created_at,
+    };
+  }
+
+  /**
+   * Get all work periods that already have submissions for the current user
+   * Returns array of work periods in "YYYY-MM" format
+   */
+  async getSubmittedWorkPeriods(): Promise<string[]> {
+    if (!supabase) {
+      throw new Error("Supabase client not available");
+    }
+
+    const contractorUserId = await this.getContractorUserId();
+
+    const { data, error } = await supabase
+      .from("submissions")
+      .select("work_period")
+      .eq("contractor_user_id", contractorUserId)
+      .not("work_period", "is", null);
+
+    if (error) {
+      console.error("[SupabaseSubmissionsDataSource] Error fetching work periods:", error);
+      throw new Error(error.message || "Failed to fetch work periods");
+    }
+
+    // Extract unique work periods
+    const periods = (data || [])
+      .map((row) => row.work_period)
+      .filter((period): period is string => !!period);
+
+    return [...new Set(periods)];
+  }
+
+  /**
+   * Check if a submission already exists for the given work period
+   */
+  async hasSubmissionForPeriod(workPeriod: string): Promise<boolean> {
+    if (!supabase) {
+      throw new Error("Supabase client not available");
+    }
+
+    const contractorUserId = await this.getContractorUserId();
+
+    const { count, error } = await supabase
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("contractor_user_id", contractorUserId)
+      .eq("work_period", workPeriod);
+
+    if (error) {
+      console.error("[SupabaseSubmissionsDataSource] Error checking for existing submission:", error);
+      throw new Error(error.message || "Failed to check for existing submission");
+    }
+
+    return (count ?? 0) > 0;
+  }
+
+  /**
+   * Resubmit a rejected submission
+   * Only allowed when status is REJECTED_CONTRACTOR
+   * Transitions status back to PENDING_MANAGER (submitted)
+   */
+  async resubmitAfterRejection(
+    submissionId: string,
+    updatedData?: Partial<SubmissionDraft>
+  ): Promise<ContractorSubmission> {
+    if (!supabase) {
+      throw new Error("Supabase client not available");
+    }
+
+    const contractorUserId = await this.getContractorUserId();
+
+    // First verify this submission belongs to the user and is in rejected status
+    const { data: existing, error: fetchError } = await supabase
+      .from("submissions")
+      .select("*")
+      .eq("id", submissionId)
+      .eq("contractor_user_id", contractorUserId)
+      .single();
+
+    if (fetchError || !existing) {
+      throw new Error("Submission not found or access denied");
+    }
+
+    // Check status - only allow resubmit from rejected
+    const currentStatus = mapDbStatusToSubmissionStatus(existing.status, existing.paid_at);
+    if (currentStatus !== "REJECTED_CONTRACTOR") {
+      throw new Error(`Cannot resubmit: submission is not in rejected status (current: ${currentStatus})`);
+    }
+
+    // Build update payload - only include columns that are guaranteed to exist
+    // NOTE: rejection_reason, admin_note, manager_note columns may not exist in all schemas
+    const updatePayload: Record<string, any> = {
+      status: "submitted", // Back to pending manager review
+      updated_at: new Date().toISOString(),
+      submitted_at: new Date().toISOString(), // Update submission date
+    };
+
+    // Apply any updates from the contractor (e.g., updated description, hours)
+    if (updatedData?.description) {
+      updatePayload.description = updatedData.description;
+    }
+    if (updatedData?.hoursSubmitted !== undefined) {
+      updatePayload.regular_hours = updatedData.hoursSubmitted;
+      // Recalculate total if hours changed
+      const hourlyRate = DEFAULT_HOURLY_RATE;
+      const overtimeRate = hourlyRate * DEFAULT_OT_MULTIPLIER;
+      const overtimeHours = updatedData.overtimeHours ?? existing.overtime_hours ?? 0;
+      updatePayload.total_amount = (updatedData.hoursSubmitted * hourlyRate) + (overtimeHours * overtimeRate);
+    }
+    if (updatedData?.overtimeHours !== undefined) {
+      updatePayload.overtime_hours = updatedData.overtimeHours;
+    }
+    if (updatedData?.overtimeDescription !== undefined) {
+      updatePayload.overtime_description = updatedData.overtimeDescription;
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from("submissions")
+      .update(updatePayload)
+      .eq("id", submissionId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("[SupabaseSubmissionsDataSource] Error resubmitting:", updateError);
+      throw updateError;
+    }
+
+    console.log("[SupabaseSubmissionsDataSource] Resubmitted submission:", submissionId);
+
+    return {
+      id: updated.id,
+      submissionDate: updated.submitted_at || updated.created_at,
+      projectName: updated.project_name || "General Work",
+      description: updated.description || "",
+      regularHours: updated.regular_hours || 0,
+      overtimeHours: updated.overtime_hours || 0,
+      totalAmount: updated.total_amount || 0,
+      status: "PENDING_MANAGER" as SubmissionStatus,
+      invoiceUrl: null,
+      workPeriod: updated.work_period,
+      excludedDates: [],
+      overtimeDescription: updated.overtime_description,
+      rejectionReason: null,
+      adminNote: null,
+      managerNote: null,
+      updatedAt: updated.updated_at,
     };
   }
 }
@@ -280,8 +508,10 @@ export function getSubmissionsDataSource(): SubmissionsDataSource {
 }
 
 /**
- * Reset the data source instance (useful for testing)
+ * Reset the data source instance and cache (useful for testing and logout)
  */
 export function resetSubmissionsDataSource(): void {
   dataSourceInstance = null;
+  // Also clear static cache since user may have changed
+  SupabaseSubmissionsDataSource.clearCache();
 }

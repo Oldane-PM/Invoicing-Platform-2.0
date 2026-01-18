@@ -2,10 +2,12 @@
  * useTeam Hook
  *
  * Provides team management functionality for Manager portal.
- * Uses repos for data access - NEVER imports supabase client directly.
+ * Uses React Query for caching and mutations.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   listTeamContractors,
   getTeamSize,
@@ -17,6 +19,10 @@ import {
   type AvailableContractor,
 } from "../../supabase/repos/team.repo";
 import { useAuth } from "../useAuth";
+
+// Query keys for cache invalidation
+export const MANAGER_TEAM_KEY = "managerTeam";
+export const MANAGER_AVAILABLE_CONTRACTORS_KEY = "managerAvailableContractors";
 
 interface UseTeamResult {
   // Team list
@@ -43,176 +49,146 @@ interface UseTeamResult {
 
 export function useTeam(): UseTeamResult {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const managerId = user?.id ?? null;
 
-  // Team list state
-  const [contractors, setContractors] = useState<TeamContractor[]>([]);
-  const [teamSize, setTeamSize] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  // Search query state (for available contractors search)
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
 
-  // Available contractors state
-  const [availableContractors, setAvailableContractors] = useState<
-    AvailableContractor[]
-  >([]);
-  const [availableLoading, setAvailableLoading] = useState(false);
-  const [availableError, setAvailableError] = useState<Error | null>(null);
-
-  // Action states
-  const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const [actionError, setActionError] = useState<Error | null>(null);
-
-  // Fetch team
-  const fetchTeam = useCallback(async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
+  // Fetch team contractors
+  const teamQuery = useQuery({
+    queryKey: [MANAGER_TEAM_KEY, managerId],
+    queryFn: async () => {
+      if (!managerId) return { contractors: [] as TeamContractor[], size: 0 };
       const [contractorsData, sizeData] = await Promise.all([
-        listTeamContractors(user.id),
-        getTeamSize(user.id),
+        listTeamContractors(managerId),
+        getTeamSize(managerId),
       ]);
+      return { contractors: contractorsData, size: sizeData };
+    },
+    enabled: !!managerId,
+    staleTime: 30000,
+    gcTime: 300000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
 
-      setContractors(contractorsData);
-      setTeamSize(sizeData);
-    } catch (err) {
-      console.error("[useTeam] Error fetching team:", err);
-      setError(err instanceof Error ? err : new Error("Failed to fetch team"));
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
+  // Fetch available contractors
+  const availableQuery = useQuery({
+    queryKey: [MANAGER_AVAILABLE_CONTRACTORS_KEY, managerId, searchQuery],
+    queryFn: async () => {
+      if (!managerId) return [];
+      if (searchQuery) {
+        return searchContractors(managerId, searchQuery);
+      }
+      return getAvailableContractors(managerId);
+    },
+    enabled: false, // Only fetch on demand
+    staleTime: 30000,
+    gcTime: 300000,
+    retry: 1,
+  });
 
-  useEffect(() => {
-    fetchTeam();
-  }, [fetchTeam]);
+  // Add contractor mutation
+  const addMutation = useMutation({
+    mutationFn: async (contractorId: string) => {
+      if (!managerId) throw new Error("Not authenticated");
+      await addContractorToTeam(managerId, contractorId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [MANAGER_TEAM_KEY] });
+      queryClient.invalidateQueries({ queryKey: [MANAGER_AVAILABLE_CONTRACTORS_KEY] });
+      toast.success("Contractor added to team");
+    },
+    onError: (error: Error) => {
+      console.error("[useTeam] Error adding contractor:", error);
+      toast.error(error.message || "Failed to add contractor");
+    },
+  });
 
-  // Fetch available contractors (not in team)
+  // Remove contractor mutation
+  const removeMutation = useMutation({
+    mutationFn: async (contractorId: string) => {
+      if (!managerId) throw new Error("Not authenticated");
+      await removeContractorFromTeam(managerId, contractorId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [MANAGER_TEAM_KEY] });
+      queryClient.invalidateQueries({ queryKey: [MANAGER_AVAILABLE_CONTRACTORS_KEY] });
+      toast.success("Contractor removed from team");
+    },
+    onError: (error: Error) => {
+      console.error("[useTeam] Error removing contractor:", error);
+      toast.error(error.message || "Failed to remove contractor");
+    },
+  });
+
+  // Fetch available contractors
   const fetchAvailable = useCallback(async () => {
-    if (!user?.id) return;
-
-    setAvailableLoading(true);
-    setAvailableError(null);
-
-    try {
-      const data = await getAvailableContractors(user.id);
-      setAvailableContractors(data);
-    } catch (err) {
-      console.error("[useTeam] Error fetching available contractors:", err);
-      setAvailableError(
-        err instanceof Error ? err : new Error("Failed to fetch contractors")
-      );
-    } finally {
-      setAvailableLoading(false);
-    }
-  }, [user?.id]);
+    setSearchQuery(null);
+    await availableQuery.refetch();
+  }, [availableQuery]);
 
   // Search available contractors
   const searchAvailable = useCallback(
     async (query: string) => {
-      if (!user?.id) return;
-
-      setAvailableLoading(true);
-      setAvailableError(null);
-
-      try {
-        const data = await searchContractors(user.id, query);
-        setAvailableContractors(data);
-      } catch (err) {
-        console.error("[useTeam] Error searching contractors:", err);
-        setAvailableError(
-          err instanceof Error ? err : new Error("Search failed")
-        );
-      } finally {
-        setAvailableLoading(false);
-      }
+      setSearchQuery(query);
+      await availableQuery.refetch();
     },
-    [user?.id]
+    [availableQuery]
   );
 
-  // Add contractor to team
+  // Add to team wrapper
   const addToTeam = useCallback(
     async (contractorId: string): Promise<boolean> => {
-      if (!user?.id) {
-        setActionError(new Error("Not authenticated"));
-        return false;
-      }
-
-      setAdding(true);
-      setActionError(null);
-
       try {
-        await addContractorToTeam(user.id, contractorId);
-        // Refetch team and available contractors
-        await Promise.all([fetchTeam(), fetchAvailable()]);
+        await addMutation.mutateAsync(contractorId);
         return true;
-      } catch (err) {
-        console.error("[useTeam] Error adding contractor:", err);
-        setActionError(
-          err instanceof Error ? err : new Error("Failed to add contractor")
-        );
+      } catch {
         return false;
-      } finally {
-        setAdding(false);
       }
     },
-    [user?.id, fetchTeam, fetchAvailable]
+    [addMutation]
   );
 
-  // Remove contractor from team
+  // Remove from team wrapper
   const removeFromTeam = useCallback(
     async (contractorId: string): Promise<boolean> => {
-      if (!user?.id) {
-        setActionError(new Error("Not authenticated"));
-        return false;
-      }
-
-      setRemoving(true);
-      setActionError(null);
-
       try {
-        await removeContractorFromTeam(user.id, contractorId);
-        // Refetch team
-        await fetchTeam();
+        await removeMutation.mutateAsync(contractorId);
         return true;
-      } catch (err) {
-        console.error("[useTeam] Error removing contractor:", err);
-        setActionError(
-          err instanceof Error ? err : new Error("Failed to remove contractor")
-        );
+      } catch {
         return false;
-      } finally {
-        setRemoving(false);
       }
     },
-    [user?.id, fetchTeam]
+    [removeMutation]
   );
+
+  const refetch = async () => {
+    await teamQuery.refetch();
+  };
 
   return {
     // Team list
-    contractors,
-    teamSize,
-    loading,
-    error,
-    refetch: fetchTeam,
+    contractors: teamQuery.data?.contractors ?? [],
+    teamSize: teamQuery.data?.size ?? 0,
+    loading: teamQuery.isLoading,
+    error: teamQuery.error instanceof Error ? teamQuery.error : teamQuery.error ? new Error("Failed to fetch team") : null,
+    refetch,
 
     // Available contractors
-    availableContractors,
-    availableLoading,
-    availableError,
+    availableContractors: availableQuery.data ?? [],
+    availableLoading: availableQuery.isFetching,
+    availableError: availableQuery.error instanceof Error ? availableQuery.error : availableQuery.error ? new Error("Failed to fetch contractors") : null,
     fetchAvailable,
     searchAvailable,
 
     // Actions
     addToTeam,
     removeFromTeam,
-    adding,
-    removing,
-    actionError,
+    adding: addMutation.isPending,
+    removing: removeMutation.isPending,
+    actionError: addMutation.error ?? removeMutation.error ?? null,
   };
 }

@@ -2,10 +2,10 @@
  * useManagerDashboard Hook
  *
  * Provides dashboard metrics and recent submissions for the Manager portal.
- * Uses repos for data access - NEVER imports supabase client directly.
+ * Uses React Query for caching and automatic invalidation.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   getDashboardMetrics,
   getRecentSubmissions,
@@ -13,6 +13,10 @@ import {
   type RecentSubmission,
 } from "../../supabase/repos/managerDashboard.repo";
 import { useAuth } from "../useAuth";
+
+// Query keys for cache invalidation
+export const MANAGER_DASHBOARD_METRICS_KEY = "managerDashboardMetrics";
+export const MANAGER_DASHBOARD_SUBMISSIONS_KEY = "managerDashboardSubmissions";
 
 interface UseManagerDashboardResult {
   metrics: DashboardMetrics | null;
@@ -24,45 +28,50 @@ interface UseManagerDashboardResult {
 
 export function useManagerDashboard(): UseManagerDashboardResult {
   const { user } = useAuth();
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [recentSubmissions, setRecentSubmissions] = useState<RecentSubmission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const managerId = user?.id ?? null;
 
-  const fetchDashboard = useCallback(async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
+  // Fetch metrics
+  const metricsQuery = useQuery({
+    queryKey: [MANAGER_DASHBOARD_METRICS_KEY, managerId],
+    queryFn: async () => {
+      if (!managerId) return null;
+      return getDashboardMetrics(managerId);
+    },
+    enabled: !!managerId,
+    staleTime: 30000, // 30 seconds
+    gcTime: 300000, // 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
 
-    setLoading(true);
-    setError(null);
+  // Fetch recent submissions
+  const submissionsQuery = useQuery({
+    queryKey: [MANAGER_DASHBOARD_SUBMISSIONS_KEY, managerId],
+    queryFn: async () => {
+      if (!managerId) return [];
+      return getRecentSubmissions(managerId, 5);
+    },
+    enabled: !!managerId,
+    staleTime: 30000, // 30 seconds
+    gcTime: 300000, // 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
 
-    try {
-      const [metricsData, submissionsData] = await Promise.all([
-        getDashboardMetrics(user.id),
-        getRecentSubmissions(user.id, 5),
-      ]);
+  const refetch = async () => {
+    await Promise.all([metricsQuery.refetch(), submissionsQuery.refetch()]);
+  };
 
-      setMetrics(metricsData);
-      setRecentSubmissions(submissionsData);
-    } catch (err) {
-      console.error("[useManagerDashboard] Error fetching dashboard:", err);
-      setError(err instanceof Error ? err : new Error("Failed to fetch dashboard data"));
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+  const loading = metricsQuery.isLoading || submissionsQuery.isLoading;
+  const error = metricsQuery.error || submissionsQuery.error;
 
   return {
-    metrics,
-    recentSubmissions,
+    metrics: metricsQuery.data ?? null,
+    recentSubmissions: submissionsQuery.data ?? [],
     loading,
-    error,
-    refetch: fetchDashboard,
+    error: error instanceof Error ? error : error ? new Error("Failed to fetch dashboard data") : null,
+    refetch,
   };
 }

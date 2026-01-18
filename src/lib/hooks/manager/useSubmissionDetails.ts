@@ -2,15 +2,18 @@
  * useSubmissionDetails Hook
  *
  * Provides detailed submission data for a single submission.
- * Uses repos for data access - NEVER imports supabase client directly.
+ * Uses React Query for caching and automatic invalidation.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   getSubmissionDetails,
   type ManagerSubmission,
 } from "../../supabase/repos/managerSubmissions.repo";
 import { useAuth } from "../useAuth";
+
+// Query key for cache invalidation
+export const MANAGER_SUBMISSION_DETAILS_QUERY_KEY = "managerSubmissionDetails";
 
 interface UseSubmissionDetailsResult {
   submission: ManagerSubmission | null;
@@ -23,39 +26,35 @@ export function useSubmissionDetails(
   submissionId: string | null
 ): UseSubmissionDetailsResult {
   const { user } = useAuth();
-  const [submission, setSubmission] = useState<ManagerSubmission | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const managerId = user?.id ?? null;
 
-  const fetchSubmission = useCallback(async () => {
-    if (!user?.id || !submissionId) {
-      setSubmission(null);
-      setLoading(false);
-      return;
-    }
+  const {
+    data: submission = null,
+    isLoading,
+    error,
+    refetch: queryRefetch,
+  } = useQuery({
+    queryKey: [MANAGER_SUBMISSION_DETAILS_QUERY_KEY, submissionId, managerId],
+    queryFn: async () => {
+      if (!managerId || !submissionId) return null;
+      return getSubmissionDetails(submissionId, managerId);
+    },
+    enabled: !!managerId && !!submissionId,
+    staleTime: 30000, // 30 seconds
+    gcTime: 300000, // 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data = await getSubmissionDetails(submissionId, user.id);
-      setSubmission(data);
-    } catch (err) {
-      console.error("[useSubmissionDetails] Error fetching submission:", err);
-      setError(err instanceof Error ? err : new Error("Failed to fetch submission details"));
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, submissionId]);
-
-  useEffect(() => {
-    fetchSubmission();
-  }, [fetchSubmission]);
+  const refetch = async () => {
+    await queryRefetch();
+  };
 
   return {
     submission,
-    loading,
-    error,
-    refetch: fetchSubmission,
+    loading: isLoading,
+    error: error instanceof Error ? error : error ? new Error("Failed to fetch submission details") : null,
+    refetch,
   };
 }

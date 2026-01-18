@@ -5,14 +5,14 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateEntry } from '../../data/adminCalendar';
-import type { UpdateCalendarEntryInput } from '../../data/adminCalendar';
+import { updateCalendarEntry } from '../../data/adminCalendar';
+import type { UpdateTimeOffEntryParams } from '../../data/adminCalendar';
 
 export function useUpdateCalendarEntry() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: UpdateCalendarEntryInput) => updateEntry(input),
+    mutationFn: (input: UpdateTimeOffEntryParams) => updateCalendarEntry(input),
     onSuccess: () => {
       // Invalidate all calendar queries to refetch data
       queryClient.invalidateQueries({ queryKey: ['adminCalendar'] });

@@ -11,18 +11,27 @@ import { format } from "date-fns";
 
 /**
  * Map database submission status to frontend SubmissionStatus type
+ * Uses the new workflow statuses
  */
-function mapDbStatusToFrontend(dbStatus: string): SubmissionStatus {
+function mapDbStatusToFrontend(dbStatus: string, paidAt?: string | null): SubmissionStatus {
+  // If paid_at is set, it's paid regardless of status field
+  if (paidAt) return "PAID";
+
   const statusMap: Record<string, SubmissionStatus> = {
-    draft: "PENDING",
-    submitted: "PENDING",
-    pending_review: "PENDING",
-    approved: "APPROVED",
-    rejected: "REJECTED",
-    needs_clarification: "NEEDS_CLARIFICATION",
-    paid: "PAID"
+    draft: "PENDING_MANAGER",
+    submitted: "PENDING_MANAGER",
+    pending_review: "PENDING_MANAGER",
+    pending: "PENDING_MANAGER",
+    pending_manager: "PENDING_MANAGER",
+    approved: "AWAITING_ADMIN_PAYMENT",
+    awaiting_admin_payment: "AWAITING_ADMIN_PAYMENT",
+    rejected: "REJECTED_CONTRACTOR",
+    rejected_contractor: "REJECTED_CONTRACTOR",
+    needs_clarification: "CLARIFICATION_REQUESTED",
+    clarification_requested: "CLARIFICATION_REQUESTED",
+    paid: "PAID",
   };
-  return statusMap[dbStatus] || "PENDING";
+  return statusMap[dbStatus?.toLowerCase()] || "PENDING_MANAGER";
 }
 
 /**
@@ -56,7 +65,8 @@ export async function listContractorSubmissions(contractorId: string): Promise<C
       status,
       submitted_at,
       created_at,
-      contractor_user_id
+      contractor_user_id,
+      rejection_reason
     `)
     .eq("contractor_user_id", contractorId)
     .order("created_at", { ascending: false });
@@ -97,6 +107,7 @@ export async function listContractorSubmissions(contractorId: string): Promise<C
       workPeriod,
       excludedDates: [],
       overtimeDescription: sub.overtime_entries?.[0]?.description || null,
+      rejectionReason: sub.rejection_reason || null,
     };
   });
 }

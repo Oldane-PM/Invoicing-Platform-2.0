@@ -2,10 +2,11 @@
  * useManagerSubmissions Hook
  *
  * Provides team submissions list with filtering for Manager portal.
- * Uses repos for data access - NEVER imports supabase client directly.
+ * Uses React Query for caching and automatic invalidation.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import {
   listTeamSubmissions,
   type ManagerSubmission,
@@ -13,54 +14,60 @@ import {
 } from "../../supabase/repos/managerSubmissions.repo";
 import { useAuth } from "../useAuth";
 
+// Query key for cache invalidation
+export const MANAGER_SUBMISSIONS_QUERY_KEY = "managerSubmissions";
+
 interface UseManagerSubmissionsResult {
   submissions: ManagerSubmission[];
   loading: boolean;
   error: Error | null;
-  filters: SubmissionFilters;
-  setFilters: (filters: SubmissionFilters) => void;
   refetch: () => Promise<void>;
 }
 
 export function useManagerSubmissions(
-  initialFilters: SubmissionFilters = {}
+  filters: SubmissionFilters = {}
 ): UseManagerSubmissionsResult {
   const { user } = useAuth();
-  const [submissions, setSubmissions] = useState<ManagerSubmission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [filters, setFilters] = useState<SubmissionFilters>(initialFilters);
+  const managerId = user?.id ?? null;
 
-  const fetchSubmissions = useCallback(async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
+  // Memoize filters to prevent unnecessary refetches
+  const stableFilters = useMemo(
+    () => filters,
+    [filters.status, filters.search, filters.limit]
+  );
 
-    setLoading(true);
-    setError(null);
+  const queryKey = useMemo(
+    () => [MANAGER_SUBMISSIONS_QUERY_KEY, managerId, stableFilters] as const,
+    [managerId, stableFilters]
+  );
 
-    try {
-      const data = await listTeamSubmissions(user.id, filters);
-      setSubmissions(data);
-    } catch (err) {
-      console.error("[useManagerSubmissions] Error fetching submissions:", err);
-      setError(err instanceof Error ? err : new Error("Failed to fetch submissions"));
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, filters]);
+  const {
+    data: submissions = [],
+    isLoading,
+    error,
+    refetch: queryRefetch,
+  } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      if (!managerId) return [];
+      return listTeamSubmissions(managerId, stableFilters);
+    },
+    enabled: !!managerId,
+    staleTime: 30000, // 30 seconds
+    gcTime: 300000, // 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
 
-  useEffect(() => {
-    fetchSubmissions();
-  }, [fetchSubmissions]);
+  const refetch = async () => {
+    await queryRefetch();
+  };
 
   return {
     submissions,
-    loading,
-    error,
-    filters,
-    setFilters,
-    refetch: fetchSubmissions,
+    loading: isLoading,
+    error: error instanceof Error ? error : error ? new Error("Failed to fetch submissions") : null,
+    refetch,
   };
 }

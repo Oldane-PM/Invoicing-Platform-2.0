@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
-import { ErrorBoundary } from "./pages/ErrorBoundary";
+import { ErrorBoundary } from "./components/shared/ErrorBoundary";
 import "./styles/index.css";
 
 // Create a React Query client

@@ -7,7 +7,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { listContractorSubmissions } from "../../supabase/repos/submissions.repo";
-import type { ContractorSubmission } from "../../types";
 
 export function useContractorSubmissions(contractorId: string | undefined) {
   return useQuery({

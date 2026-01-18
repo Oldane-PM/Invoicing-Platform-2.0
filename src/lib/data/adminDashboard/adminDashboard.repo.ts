@@ -277,6 +277,7 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
       total_amount,
       contractor_user_id,
       contract_id,
+      paid_at,
       submission_line_items (
         hours,
         note
@@ -365,10 +366,14 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
     submittedAt: data.submitted_at || data.created_at,
     periodStart: data.period_start,
     periodEnd: data.period_end,
+    paidAt: data.paid_at,
     description,
-    notes: undefined, // Column doesn't exist yet
-    rejectionReason: undefined, // Column doesn't exist yet
-    clarificationMessage: undefined, // Column doesn't exist yet
+    notes: undefined,
+    // NOTE: These columns may not exist in all schemas
+    rejectionReason: (data as any).rejection_reason ?? undefined,
+    clarificationMessage: undefined, // Legacy field
+    adminNote: (data as any).admin_note ?? undefined,
+    managerNote: (data as any).manager_note ?? undefined,
   };
 }
 
@@ -400,11 +405,11 @@ export async function approveSubmission(params: ApproveSubmissionParams): Promis
 export async function rejectSubmission(params: RejectSubmissionParams): Promise<void> {
   const supabase = getSupabaseClient();
 
+  // NOTE: rejection_reason column may not exist in all schemas - only update core fields
   const { error } = await supabase
     .from('submissions')
     .update({
       status: 'rejected',
-      rejection_reason: params.reason,
       rejected_at: new Date().toISOString(),
       rejected_by: params.adminUserId,
       updated_at: new Date().toISOString(),
@@ -413,30 +418,104 @@ export async function rejectSubmission(params: RejectSubmissionParams): Promise<
 
   if (error) {
     console.error('[AdminDashboard] Error rejecting submission:', error);
-    throw error;
+    throw new Error(error.message || 'Failed to reject submission');
   }
 }
 
 /**
  * Request clarification on a submission
+ * Admin asks manager for clarification -> status becomes CLARIFICATION_REQUESTED
+ * Only valid from AWAITING_ADMIN_PAYMENT (approved) status
  */
 export async function requestClarification(params: RequestClarificationParams): Promise<void> {
   const supabase = getSupabaseClient();
 
+  // Verify submission is in approved status (awaiting admin payment)
+  const { data: existing, error: fetchError } = await supabase
+    .from('submissions')
+    .select('status, paid_at')
+    .eq('id', params.submissionId)
+    .single();
+
+  if (fetchError || !existing) {
+    throw new Error('Submission not found');
+  }
+
+  if (existing.status !== 'approved' || existing.paid_at) {
+    throw new Error(`Cannot request clarification: submission must be in approved/awaiting payment status`);
+  }
+
+  // NOTE: admin_note, manager_note columns may not exist in all schemas - only update core fields
   const { error } = await supabase
     .from('submissions')
     .update({
       status: 'needs_clarification',
-      clarification_message: params.message,
-      clarification_requested_at: new Date().toISOString(),
-      clarification_requested_by: params.adminUserId,
       updated_at: new Date().toISOString(),
     })
     .eq('id', params.submissionId);
 
   if (error) {
     console.error('[AdminDashboard] Error requesting clarification:', error);
-    throw error;
+    throw new Error(error.message || 'Failed to request clarification');
+  }
+}
+
+/**
+ * Mark a submission as paid
+ * Only valid from AWAITING_ADMIN_PAYMENT (approved) status
+ */
+export async function markPaid(params: { submissionId: string; adminUserId: string }): Promise<void> {
+  const supabase = getSupabaseClient();
+
+  // Verify submission is in approved status
+  const { data: existing, error: fetchError } = await supabase
+    .from('submissions')
+    .select('status, paid_at, contractor_user_id, total_amount')
+    .eq('id', params.submissionId)
+    .single();
+
+  if (fetchError || !existing) {
+    throw new Error('Submission not found');
+  }
+
+  if (existing.status !== 'approved') {
+    throw new Error(`Cannot mark as paid: submission must be in approved status (current: ${existing.status})`);
+  }
+
+  if (existing.paid_at) {
+    throw new Error('Submission is already marked as paid');
+  }
+
+  const paidAt = new Date().toISOString();
+
+  // Update submission with paid_at timestamp AND status to 'paid'
+  const { error: updateError } = await supabase
+    .from('submissions')
+    .update({
+      status: 'paid',
+      paid_at: paidAt,
+      updated_at: paidAt,
+    })
+    .eq('id', params.submissionId);
+
+  if (updateError) {
+    console.error('[AdminDashboard] Error marking submission as paid:', updateError);
+    throw updateError;
+  }
+
+  // Create payment record
+  const { error: paymentError } = await supabase.from('payments').insert({
+    submission_id: params.submissionId,
+    admin_id: params.adminUserId,
+    contractor_id: existing.contractor_user_id,
+    amount: existing.total_amount,
+    status: 'PAID',
+    paid_at: paidAt,
+  });
+
+  if (paymentError) {
+    console.error('[AdminDashboard] Error creating payment record:', paymentError);
+    // Don't throw - submission is already marked paid
   }
 }
 

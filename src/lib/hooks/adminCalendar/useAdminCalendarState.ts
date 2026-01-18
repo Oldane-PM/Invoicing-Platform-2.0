@@ -7,7 +7,9 @@
 
 import { useState, useMemo } from 'react';
 import { startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
-import type { CalendarViewMode } from '../../data/adminCalendar';
+
+// View mode for calendar display
+type CalendarViewMode = 'month' | 'week' | 'day';
 
 export function useAdminCalendarState() {
   const [currentDate, setCurrentDate] = useState(new Date());
