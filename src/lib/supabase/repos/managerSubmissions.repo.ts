@@ -73,7 +73,6 @@ export async function listTeamSubmissions(
   // Build submissions query
   // Using simplified join syntax to avoid "Could not find relationship" errors if FK names are strict
   // We manually join or carefuly select related data
-  // NOTE: rejection_reason, admin_note, manager_note columns may not exist in all schemas
   let query = supabase
     .from("submissions")
     .select(
@@ -92,6 +91,7 @@ export async function listTeamSubmissions(
       approved_at,
       paid_at,
       created_at,
+      rejection_reason,
       profiles: contractor_user_id (
         full_name,
         email
@@ -194,7 +194,6 @@ export async function getSubmissionDetails(
 
   const teamContractorIds = (teamData || []).map((t: any) => t.contractor_id);
 
-  // NOTE: rejection_reason column may not exist in all schemas
   const { data, error } = await supabase
     .from("submissions")
     .select(
@@ -213,6 +212,7 @@ export async function getSubmissionDetails(
       approved_at,
       paid_at,
       created_at,
+      rejection_reason,
       profiles: contractor_user_id (
         full_name,
         email
@@ -300,7 +300,7 @@ export async function approveSubmission(
 export async function rejectSubmission(
   submissionId: string,
   managerId: string,
-  _reason: string // NOTE: rejection_reason column may not exist - ignored for now
+  reason: string
 ): Promise<void> {
   const supabase = getSupabaseClient();
 
@@ -309,6 +309,7 @@ export async function rejectSubmission(
     .update({
       status: "rejected",
       manager_id: managerId,
+      rejection_reason: reason,
     })
     .eq("id", submissionId);
 

@@ -9,6 +9,15 @@ interface SubmissionCardProps {
 }
 
 export function SubmissionCard({ submission }: SubmissionCardProps) {
+  // Debug logging
+  console.log('[SubmissionCard] Rendering submission:', {
+    id: submission.id,
+    status: submission.status,
+    rejectionReason: submission.rejectionReason,
+    hasRejectionReason: !!submission.rejectionReason,
+    isRejected: submission.status === "REJECTED_CONTRACTOR"
+  });
+
   return (
     <Card className="bg-white rounded-[14px] border border-[#EFEFEF] p-5 transition-all hover:shadow-md">
       {/* Header Row: Date + Status */}
@@ -53,6 +62,18 @@ export function SubmissionCard({ submission }: SubmissionCardProps) {
           </p>
         </div>
       </div>
+
+      {/* Rejection Reason - shown when status is REJECTED_CONTRACTOR */}
+      {submission.status === "REJECTED_CONTRACTOR" && submission.rejectionReason && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <p className="text-xs text-gray-500 mb-2">Rejection Reason</p>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-sm text-red-900 leading-relaxed">
+              {submission.rejectionReason.trim() || "No reason provided"}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* View Invoice Button */}
       <div className="mt-4">
