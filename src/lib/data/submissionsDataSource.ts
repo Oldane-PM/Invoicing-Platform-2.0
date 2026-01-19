@@ -156,7 +156,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     // Fetch submissions - NO relationship joins, just base columns that exist
     // Order by work_period_key (descending) to show most recent work periods first
     // Secondary sort by created_at for submissions in the same work period
-    // NOTE: admin_note, manager_note, rejection_reason columns may not exist in all schemas
+    // NOTE: rejection_reason column exists for manager rejection notes
     const { data: submissions, error } = await supabase!
       .from("submissions")
       .select(
@@ -176,7 +176,8 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         submitted_at,
         created_at,
         updated_at,
-        paid_at
+        paid_at,
+        rejection_reason
       `
       )
       .eq("contractor_user_id", contractorUserId)

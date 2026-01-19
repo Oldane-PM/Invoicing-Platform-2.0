@@ -319,6 +319,18 @@ export function ContractorDashboard({
                           </div>
                         </div>
 
+                        {/* Rejection Reason - shown when status is REJECTED_CONTRACTOR */}
+                        {submission.status === "REJECTED_CONTRACTOR" && submission.rejectionReason && (
+                          <div className="mt-4 pt-4 border-t border-gray-100">
+                            <p className="text-xs text-gray-500 mb-2">Manager Instructions</p>
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                              <p className="text-sm text-red-900 leading-relaxed">
+                                {submission.rejectionReason.trim() || "No reason provided"}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Row 5: View Invoice Button */}
                         <div className="mt-4">
                           <Button
