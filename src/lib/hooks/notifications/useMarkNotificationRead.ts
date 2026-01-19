@@ -14,6 +14,8 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: (notificationId: string) => markAsRead(notificationId),
     onMutate: async (notificationId) => {
+      console.log('[useMarkNotificationRead] Optimistically updating notification:', notificationId);
+      
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['notifications'] });
 
@@ -25,7 +27,8 @@ export function useMarkNotificationRead() {
       queryClient.setQueriesData(
         { queryKey: ['notifications'], exact: false },
         (old: any) => {
-          if (!old) return old;
+          // Type guard: ensure old is an array before mapping
+          if (!old || !Array.isArray(old)) return old;
           return old.map((notification: Notification) =>
             notification.id === notificationId
               ? { ...notification, isRead: true }
@@ -42,7 +45,9 @@ export function useMarkNotificationRead() {
 
       return { previousNotifications, previousCount };
     },
-    onError: (_err, _notificationId, context) => {
+    onError: (err, _notificationId, context) => {
+      console.error('[useMarkNotificationRead] Error marking notification as read:', err);
+      
       // Rollback on error
       if (context?.previousNotifications) {
         queryClient.setQueryData(['notifications'], context.previousNotifications);
@@ -50,6 +55,9 @@ export function useMarkNotificationRead() {
       if (context?.previousCount !== undefined) {
         queryClient.setQueryData(['notifications', 'unreadCount'], context.previousCount);
       }
+    },
+    onSuccess: (_data, notificationId) => {
+      console.log('[useMarkNotificationRead] Successfully marked notification as read:', notificationId);
     },
     onSettled: () => {
       // Refetch to ensure consistency

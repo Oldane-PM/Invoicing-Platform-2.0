@@ -40,9 +40,19 @@ export function NotificationDrawer({ open, onOpenChange, onNavigateToSubmission 
   const hasUnread = unreadNotifications.length > 0;
 
   const handleNotificationClick = (notification: Notification) => {
+    console.log('[NotificationDrawer] Notification clicked:', notification.id, 'isRead:', notification.isRead);
+    
     // Mark as read
     if (!notification.isRead) {
-      markAsReadMutation.mutate(notification.id);
+      console.log('[NotificationDrawer] Marking notification as read:', notification.id);
+      markAsReadMutation.mutate(notification.id, {
+        onSuccess: () => {
+          console.log('[NotificationDrawer] Successfully marked as read:', notification.id);
+        },
+        onError: (error) => {
+          console.error('[NotificationDrawer] Error marking as read:', error);
+        },
+      });
     }
 
     // Close drawer
