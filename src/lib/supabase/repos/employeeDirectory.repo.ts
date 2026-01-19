@@ -7,6 +7,44 @@
 import { getSupabaseClient } from "../client";
 import type { EmployeeDirectoryRow } from "../../types";
 
+/**
+ * Get unique roles from contractors/employees
+ * Returns sorted, unique, non-empty role strings
+ */
+export async function getUniqueRoles(): Promise<string[]> {
+  const supabase = getSupabaseClient();
+
+  // Get all contractor profiles with their roles
+  const { data: profiles, error } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("role", "CONTRACTOR");
+
+  if (error) {
+    console.error("[employeeDirectory.repo] getUniqueRoles error:", error);
+    throw new Error(`Failed to fetch roles: ${error.message}`);
+  }
+
+  if (!profiles || profiles.length === 0) {
+    return [];
+  }
+
+  // Get unique roles, filter out empty/null, and sort
+  const rolesSet = new Set<string>();
+  profiles.forEach((p) => {
+    if (p.role && typeof p.role === "string" && p.role.trim()) {
+      rolesSet.add(p.role.trim());
+    }
+  });
+
+  // Also check contractor_profiles table if it has position/role field
+  // For now, we'll use common roles as a baseline and add any found
+  const commonRoles = ["CONTRACTOR", "Engineer", "Designer", "QA", "DevOps", "Product Manager"];
+  commonRoles.forEach((role) => rolesSet.add(role));
+
+  return Array.from(rolesSet).sort((a, b) => a.localeCompare(b));
+}
+
 interface ListEmployeesParams {
   search?: string;
   page?: number;

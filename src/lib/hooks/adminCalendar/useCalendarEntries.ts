@@ -14,3 +14,6 @@ export function useCalendarEntries(monthStartISO: string, monthEndISO: string) {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
+
+// Note: useNonWorkingDays is exported from useAdminCalendar.ts
+// This file only exports useCalendarEntries for backward compatibility

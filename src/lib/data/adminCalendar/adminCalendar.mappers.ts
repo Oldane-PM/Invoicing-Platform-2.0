@@ -1,4 +1,4 @@
-import { TimeOffEntry } from './adminCalendar.types';
+import { TimeOffEntry, TimeOffScopeType } from './adminCalendar.types';
 
 export function mapCalendarEntryToDomain(data: any): TimeOffEntry {
   return {
@@ -12,5 +12,8 @@ export function mapCalendarEntryToDomain(data: any): TimeOffEntry {
     team: data.team || ['all'],
     appliesTo: data.applies_to,
     affectedCount: data.affected_count || 0,
+    // New role-based scope fields
+    appliesToType: (data.applies_to_type || 'ALL') as TimeOffScopeType,
+    appliesToRoles: data.applies_to_roles || [],
   };
 }

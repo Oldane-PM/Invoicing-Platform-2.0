@@ -28,6 +28,8 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { useCreateSubmission } from "../../lib/hooks/contractor/useCreateSubmission";
 import { useSubmittedPeriods } from "../../lib/hooks/contractor/useSubmittedPeriods";
+import { useContractorProfile } from "../../lib/hooks/contractor/useContractorProfile";
+import { useNonWorkingDays } from "../../lib/hooks/adminCalendar";
 import type { SubmissionDraft } from "../../lib/types";
 
 interface SubmitHoursPageProps {
@@ -35,11 +37,12 @@ interface SubmitHoursPageProps {
   onSuccess?: () => void;
 }
 
-type DayState = "working" | "excluded" | "weekend";
+type DayState = "working" | "excluded" | "weekend" | "holiday";
 
 interface DayInfo {
   date: Date;
   state: DayState;
+  holidayName?: string; // Name of the holiday/time-off if applicable
 }
 
 const MONTHS = [
@@ -78,6 +81,35 @@ export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
   // Get already-submitted periods to prevent duplicates
   const { isMonthSubmitted, loading: loadingPeriods } = useSubmittedPeriods();
 
+  // Contractor profile hook available if needed for role-based filtering
+  // Currently all contractors use role="CONTRACTOR" for time-off filtering
+  useContractorProfile();
+
+  // Calculate range for non-working days based on selected month
+  const monthRange = React.useMemo(() => {
+    if (selectedMonth === null) {
+      // Default to current month if none selected
+      const now = new Date();
+      return {
+        start: startOfMonth(now),
+        end: endOfMonth(now),
+      };
+    }
+    const monthStart = new Date(selectedYear, selectedMonth, 1);
+    return {
+      start: startOfMonth(monthStart),
+      end: endOfMonth(monthStart),
+    };
+  }, [selectedMonth, selectedYear]);
+
+  // Get non-working days (holidays/time-off) for contractors
+  // Pass contractor role for role-based filtering
+  const { nonWorkingDays } = useNonWorkingDays(
+    monthRange.start,
+    monthRange.end,
+    "CONTRACTOR" // Contractors have role="CONTRACTOR" - time-off entries targeting this role will apply
+  );
+
   // Check if overtime description is required
   const isOvertimeDescriptionRequired = React.useMemo(() => {
     const hours = parseFloat(overtimeHours);
@@ -100,15 +132,24 @@ export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
     return days.map((date) => {
+      // Check if it's a weekend first
       if (isWeekend(date)) {
         return { date, state: "weekend" as DayState };
       }
+
+      // Check if it's a non-working day (holiday/time-off)
+      const dateKey = format(date, "yyyy-MM-dd");
+      if (nonWorkingDays.has(dateKey)) {
+        return { date, state: "holiday" as DayState, holidayName: "Non-working day" };
+      }
+
+      // Check if manually excluded
       const isExcluded = excludedDates.some((excludedDate) =>
         isSameDay(excludedDate, date)
       );
       return { date, state: isExcluded ? "excluded" : "working" } as DayInfo;
     });
-  }, [selectedMonth, selectedYear, excludedDates]);
+  }, [selectedMonth, selectedYear, excludedDates, nonWorkingDays]);
 
   // Calculate working days
   const workingDaysCount = React.useMemo(() => {
@@ -136,7 +177,15 @@ export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
   };
 
   const handleDayClick = (dayInfo: DayInfo) => {
-    if (dayInfo.state === "weekend") return; // Weekends are not clickable
+    // Weekends and holidays are not clickable
+    if (dayInfo.state === "weekend") return;
+    
+    if (dayInfo.state === "holiday") {
+      toast.error("This is a non-working day (holiday/time-off)", {
+        description: "This day cannot be selected for work hours.",
+      });
+      return;
+    }
 
     const { date } = dayInfo;
 
@@ -456,7 +505,7 @@ export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
 
                     {/* Actual Days */}
                     {calendarDays.map((dayInfo, index) => {
-                      const isClickable = dayInfo.state !== "weekend";
+                      const isClickable = dayInfo.state !== "weekend" && dayInfo.state !== "holiday";
 
                       return (
                         <button
@@ -467,9 +516,11 @@ export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
                           title={
                             dayInfo.state === "weekend"
                               ? "Weekend - not counted"
-                              : dayInfo.state === "excluded"
-                                ? "Click to include this day"
-                                : "Click to exclude this day"
+                              : dayInfo.state === "holiday"
+                                ? "Non-working day (holiday/time-off)"
+                                : dayInfo.state === "excluded"
+                                  ? "Click to include this day"
+                                  : "Click to exclude this day"
                           }
                           className={`
                             aspect-square flex items-center justify-center rounded-full text-xs font-semibold transition-all
@@ -478,7 +529,9 @@ export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
                                 ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow-sm"
                                 : dayInfo.state === "excluded"
                                   ? "bg-white border-2 border-red-400 text-red-500 hover:bg-red-50 cursor-pointer"
-                                  : "bg-blue-50 text-blue-200 cursor-not-allowed"
+                                  : dayInfo.state === "holiday"
+                                    ? "bg-orange-100 text-orange-400 cursor-not-allowed border-2 border-orange-300"
+                                    : "bg-blue-50 text-blue-200 cursor-not-allowed"
                             }
                           `}
                         >
@@ -490,21 +543,27 @@ export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
                 </div>
 
                 {/* Legend */}
-                <div className="flex items-center justify-center gap-6 text-xs text-gray-600">
+                <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 text-xs text-gray-600">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-xs">
+                    <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-[10px] md:text-xs">
                       5
                     </div>
-                    <span>Working Day</span>
+                    <span>Working</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-white border-2 border-red-400 flex items-center justify-center text-red-500 font-semibold text-xs">
+                    <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-white border-2 border-red-400 flex items-center justify-center text-red-500 font-semibold text-[10px] md:text-xs">
                       5
                     </div>
-                    <span>Excluded Day</span>
+                    <span>Excluded</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-blue-200 font-semibold text-xs">
+                    <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-orange-100 border-2 border-orange-300 flex items-center justify-center text-orange-400 font-semibold text-[10px] md:text-xs">
+                      5
+                    </div>
+                    <span>Holiday</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-blue-50 flex items-center justify-center text-blue-200 font-semibold text-[10px] md:text-xs">
                       5
                     </div>
                     <span>Weekend</span>

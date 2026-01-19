@@ -2,6 +2,7 @@ import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { Badge } from "../../components/ui/badge";
 import {
   Sheet,
   SheetContent,
@@ -9,9 +10,23 @@ import {
   SheetTitle,
   SheetDescription,
 } from "../../components/ui/sheet";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../../components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "../../components/ui/command";
 import { toast } from "sonner";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, CalendarPlus, X, Info, Trash2, Loader2, Calendar as CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarPlus, X, Info, Trash2, Loader2, Calendar as CalendarIcon, ChevronsUpDown, Check, Users } from "lucide-react";
+import { cn } from "../../lib/utils";
 
 import { 
   useCalendarEntries, 
@@ -19,7 +34,8 @@ import {
   useUpdateCalendarEntry, 
   useDeleteCalendarEntry 
 } from "../../lib/hooks/adminCalendar";
-import { TimeOffEntry, CalendarEntryType, CalendarAppliesTo } from "../../lib/data/adminCalendar";
+import { useEmployeeRoles } from "../../lib/hooks/admin/useEmployeeRoles";
+import { TimeOffEntry, CalendarEntryType, CalendarAppliesTo, TimeOffScopeType } from "../../lib/data/adminCalendar";
 
 type ViewMode = "month" | "year";
 type DateRangeMode = "single" | "range";
@@ -31,6 +47,7 @@ export function AdminCalendar() {
   const [editingEntry, setEditingEntry] = React.useState<TimeOffEntry | null>(null);
   const [isReadMode, setIsReadMode] = React.useState(false);
   const [dateRangeMode, setDateRangeMode] = React.useState<DateRangeMode>("single");
+  const [rolePickerOpen, setRolePickerOpen] = React.useState(false);
   const [formData, setFormData] = React.useState({
     name: "",
     type: "Holiday" as CalendarEntryType,
@@ -40,7 +57,13 @@ export function AdminCalendar() {
     country: ["all"],
     team: ["all"],
     appliesTo: "All" as CalendarAppliesTo,
+    // New role-based scope fields
+    appliesToType: "ALL" as TimeOffScopeType,
+    appliesToRoles: [] as string[],
   });
+
+  // Get unique roles from employee directory
+  const { roles: availableRoles, isLoading: rolesLoading } = useEmployeeRoles();
 
   // Data fetching - fetch current month + 3 months ahead for upcoming list
   const queryStart = React.useMemo(() => subMonths(startOfMonth(currentDate), 1), [currentDate]);
@@ -78,23 +101,11 @@ export function AdminCalendar() {
     });
   };
 
-  // Calculate affected count
-  const calculateAffectedCount = (countries: string[], teams: string[], appliesTo: string): number => {
-    // Mock calculation - in real app, this would call an API
-    if (countries.includes("all") && teams.includes("all")) {
-      return appliesTo === "All" ? 127 : appliesTo === "Contractors" ? 85 : 42;
-    }
-    if (countries.includes("all")) {
-      return appliesTo === "All" ? 87 : appliesTo === "Contractors" ? 58 : 29;
-    }
-    return appliesTo === "All" ? 24 : appliesTo === "Contractors" ? 16 : 8;
-  };
+  // Affected count - set to 0 until real API is implemented
+  // TODO: Replace with real API call to calculate affected users
+  const affectedCount = 0;
 
-  const affectedCount = React.useMemo(() => {
-    return calculateAffectedCount(formData.country, formData.team, formData.appliesTo);
-  }, [formData.country, formData.team, formData.appliesTo]);
-
-  // Get upcoming entries (next 90 days)
+  // Get upcoming entries (entries that haven't ended yet, within next 90 days)
   const upcomingEntries = React.useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -103,11 +114,13 @@ export function AdminCalendar() {
     return timeOffEntries
       .filter(entry => {
         const entryStart = new Date(entry.startDate);
+        const entryEnd = new Date(entry.endDate);
         entryStart.setHours(0, 0, 0, 0);
-        return entryStart >= now && entryStart <= futureLimit;
+        entryEnd.setHours(0, 0, 0, 0);
+        // Show if: entry hasn't ended yet AND starts within 3 months
+        return entryEnd >= now && entryStart <= futureLimit;
       })
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-      .slice(0, 10); // Limit to 10 entries
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
   }, [timeOffEntries]);
 
   // Handlers
@@ -130,8 +143,11 @@ export function AdminCalendar() {
       country: ["all"],
       team: ["all"],
       appliesTo: "All" as CalendarAppliesTo,
+      appliesToType: "ALL" as TimeOffScopeType,
+      appliesToRoles: [],
     });
     setDateRangeMode("single");
+    setRolePickerOpen(false);
     setDrawerOpen(true);
   };
 
@@ -147,8 +163,11 @@ export function AdminCalendar() {
       country: entry.country || ["all"],
       team: entry.team || ["all"],
       appliesTo: entry.appliesTo,
+      appliesToType: entry.appliesToType || "ALL",
+      appliesToRoles: entry.appliesToRoles || [],
     });
-    setDateRangeMode(entry.startDate !== entry.endDate ? "range" : "single");
+    setDateRangeMode(entry.startDate.getTime() !== entry.endDate.getTime() ? "range" : "single");
+    setRolePickerOpen(false);
     setDrawerOpen(true);
   };
 
@@ -162,6 +181,12 @@ export function AdminCalendar() {
       return;
     }
 
+    // Validate role selection if scope is ROLES
+    if (formData.appliesToType === "ROLES" && formData.appliesToRoles.length === 0) {
+      toast.error("Please select at least one role");
+      return;
+    }
+
     const entryData = {
       name: formData.name,
       type: formData.type,
@@ -172,6 +197,8 @@ export function AdminCalendar() {
       team: formData.team,
       appliesTo: formData.appliesTo,
       affectedCount: affectedCount,
+      appliesToType: formData.appliesToType,
+      appliesToRoles: formData.appliesToType === "ROLES" ? formData.appliesToRoles : [],
     };
 
     if (editingEntry) {
@@ -428,9 +455,9 @@ export function AdminCalendar() {
                       ? format(entry.startDate, "MMM d, yyyy")
                       : `${format(entry.startDate, "MMM d")} - ${format(entry.endDate, "MMM d, yyyy")}`;
 
-                    const scopeLabel = entry.team?.includes("all") 
-                      ? "All Teams"
-                      : "Specific Team";
+                    const scopeLabel = entry.appliesToType === "ROLES" 
+                      ? `${entry.appliesToRoles?.length || 0} Role${(entry.appliesToRoles?.length || 0) !== 1 ? "s" : ""}`
+                      : "All Employees";
 
                     return (
                       <div
@@ -514,7 +541,29 @@ export function AdminCalendar() {
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Applies To</Label>
-                  <div className="text-sm text-gray-700">{editingEntry.appliesTo}</div>
+                  <div className="text-sm text-gray-700">
+                    {editingEntry.appliesToType === "ALL" ? (
+                      <span className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-gray-500" />
+                        All Employees
+                      </span>
+                    ) : (
+                      <div className="space-y-2">
+                        <span className="text-gray-900 font-medium">Specific Roles:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(editingEntry.appliesToRoles || []).map((role) => (
+                            <Badge
+                              key={role}
+                              variant="secondary"
+                              className="bg-purple-100 text-purple-700 px-2 py-0.5 text-xs"
+                            >
+                              {role}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {editingEntry.affectedCount !== null && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
@@ -656,18 +705,135 @@ export function AdminCalendar() {
                   />
                 </div>
 
-                {/* Applies To */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-900 mb-3 block">Applies To</Label>
-                  <select
-                    value={formData.appliesTo}
-                    onChange={e => setFormData({ ...formData, appliesTo: e.target.value as CalendarAppliesTo })}
-                    className="w-full h-10 px-3 border border-gray-200 rounded-md text-sm"
-                  >
-                    <option value="All">All Employees</option>
-                    <option value="Contractors">Contractors Only</option>
-                    <option value="Managers">Managers Only</option>
-                  </select>
+                {/* Applies To - Role Scope Selector */}
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium text-gray-900 block">Applies To</Label>
+                  
+                  {/* Toggle: All vs Specific Roles */}
+                  <div className="bg-gray-50 p-1 rounded-lg inline-flex w-full">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, appliesToType: "ALL", appliesToRoles: [] })}
+                      className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                        formData.appliesToType === "ALL"
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      <Users className="w-4 h-4" />
+                      All Employees
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, appliesToType: "ROLES" })}
+                      className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                        formData.appliesToType === "ROLES"
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Specific Roles
+                    </button>
+                  </div>
+
+                  {/* Role Multi-Select (only shown when ROLES is selected) */}
+                  {formData.appliesToType === "ROLES" && (
+                    <div className="space-y-3">
+                      {/* Role Picker */}
+                      <Popover open={rolePickerOpen} onOpenChange={setRolePickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={rolePickerOpen}
+                            className={cn(
+                              "w-full h-10 justify-between bg-white border-gray-200 rounded-md text-sm font-normal",
+                              formData.appliesToRoles.length === 0 && "text-gray-500"
+                            )}
+                          >
+                            {formData.appliesToRoles.length > 0
+                              ? `${formData.appliesToRoles.length} role${formData.appliesToRoles.length > 1 ? "s" : ""} selected`
+                              : "Select roles..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent 
+                          className="w-[--radix-popover-trigger-width] p-0" 
+                          align="start"
+                        >
+                          <Command>
+                            <CommandInput placeholder="Search roles..." />
+                            <CommandList>
+                              <CommandEmpty>
+                                {rolesLoading ? "Loading roles..." : "No roles found."}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {availableRoles.map((role) => (
+                                  <CommandItem
+                                    key={role}
+                                    value={role}
+                                    onSelect={() => {
+                                      const isSelected = formData.appliesToRoles.includes(role);
+                                      setFormData({
+                                        ...formData,
+                                        appliesToRoles: isSelected
+                                          ? formData.appliesToRoles.filter(r => r !== role)
+                                          : [...formData.appliesToRoles, role],
+                                      });
+                                    }}
+                                  >
+                                    <div className={cn(
+                                      "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-purple-600",
+                                      formData.appliesToRoles.includes(role)
+                                        ? "bg-purple-600 text-white"
+                                        : "opacity-50 [&_svg]:invisible"
+                                    )}>
+                                      <Check className="h-3 w-3" />
+                                    </div>
+                                    {role}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+
+                      {/* Selected Roles as Badges */}
+                      {formData.appliesToRoles.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {formData.appliesToRoles.map((role) => (
+                            <Badge
+                              key={role}
+                              variant="secondary"
+                              className="bg-purple-100 text-purple-700 hover:bg-purple-200 px-2.5 py-1 text-xs font-medium"
+                            >
+                              {role}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormData({
+                                    ...formData,
+                                    appliesToRoles: formData.appliesToRoles.filter(r => r !== role),
+                                  });
+                                }}
+                                className="ml-1.5 hover:text-purple-900"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Validation message */}
+                      {formData.appliesToRoles.length === 0 && (
+                        <p className="text-xs text-amber-600">
+                          Please select at least one role this time off applies to.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Affected Count Display */}

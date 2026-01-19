@@ -125,9 +125,10 @@ export function ContractorDashboard({
       0
     );
 
-    // Generate invoice data dynamically
+    // Generate invoice data from submission + profile
+    // TODO: Fetch contractor rates, banking details, and company info from Supabase
     const invoiceData = {
-      // Submission Data
+      // Submission Data (from Supabase)
       submissionId: submission.id,
       submissionDate: new Date(submission.submissionDate),
       workPeriodStart,
@@ -137,29 +138,29 @@ export function ContractorDashboard({
       regularDescription: submission.description,
       overtimeDescription: submission.overtimeDescription || undefined,
 
-      // Contractor Personal Info (live from profile)
-      contractorName: profile?.fullName || "Contractor Name",
-      contractorAddress: "Address Not on File", // Placeholder until DB update
-      contractorCountry: "United States",
-      contractorEmail: profile?.email || "email@example.com",
+      // Contractor Personal Info (from Supabase profile)
+      contractorName: profile?.fullName || "",
+      contractorAddress: "", // TODO: Add address field to contractor_profiles table
+      contractorCountry: "", // TODO: Add country field to contractor_profiles table
+      contractorEmail: profile?.email || "",
 
-      // Contract Info
-      hourlyRate: 75, // Ideally from DB, but keeping simple for now
-      overtimeRate: 112.5,
+      // Contract Info - TODO: Fetch from contracts table
+      hourlyRate: 0, // TODO: Fetch from contractor's active contract
+      overtimeRate: 0, // TODO: Calculate from contract overtime multiplier
       position: profile?.role === "CONTRACTOR" ? "Contractor" : "Staff",
 
-      // Banking Details (Placeholder until schema supports bank details)
-      bankName: "Bank details on file", 
-      bankAddress: "---",
-      swiftCode: "---",
-      routingNumber: "---",
-      accountType: "---",
-      accountNumber: "****",
+      // Banking Details - TODO: Add bank_details table or fields
+      bankName: "",
+      bankAddress: "",
+      swiftCode: "",
+      routingNumber: "",
+      accountType: "",
+      accountNumber: "",
       currency: "USD",
 
-      // Company/Client Info
-      companyName: "TechCorp Inc.",
-      companyAddress: "789 Business Park, Suite 100, San Francisco, CA 94102",
+      // Company/Client Info - TODO: Fetch from company_settings table
+      companyName: "",
+      companyAddress: "",
     };
 
     setPdfInvoiceData(invoiceData);

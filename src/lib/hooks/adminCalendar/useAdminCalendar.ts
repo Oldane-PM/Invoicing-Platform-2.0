@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -7,6 +8,7 @@ import {
   deleteCalendarEntry,
   CreateTimeOffEntryParams,
   UpdateTimeOffEntryParams,
+  TimeOffEntry,
 } from '../../data/adminCalendar';
 
 export const ADMIN_CALENDAR_keys = {
@@ -80,4 +82,72 @@ export function useDeleteCalendarEntry() {
       console.error(error);
     },
   });
+}
+
+/**
+ * Non-Working Days Hook
+ * 
+ * Returns a Set of yyyy-MM-dd strings representing non-working days
+ * for the contractor portal. Filters by:
+ * 1. appliesToType = "ALL" (applies to everyone)
+ * 2. appliesToType = "ROLES" AND contractor's role is in appliesToRoles
+ * 
+ * @param rangeStart - Start of the date range to check
+ * @param rangeEnd - End of the date range to check
+ * @param contractorRole - Optional role of the current contractor for filtering
+ */
+export function useNonWorkingDays(rangeStart: Date, rangeEnd: Date, contractorRole?: string) {
+  const query = useQuery({
+    queryKey: ADMIN_CALENDAR_keys.range(rangeStart, rangeEnd),
+    queryFn: () => getCalendarEntries(rangeStart, rangeEnd),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Build a Set of blocked date strings (yyyy-MM-dd)
+  const nonWorkingDays = useMemo(() => {
+    const daysSet = new Set<string>();
+
+    if (!query.data) return daysSet;
+
+    query.data.forEach((entry: TimeOffEntry) => {
+      // Check if this time-off entry applies to the contractor
+      let applies = false;
+      
+      // ALL scope always applies
+      if (entry.appliesToType === 'ALL') {
+        applies = true;
+      }
+      // ROLES scope - check if contractor's role is in the list
+      else if (entry.appliesToType === 'ROLES' && contractorRole) {
+        const rolesLower = (entry.appliesToRoles || []).map(r => r.toLowerCase());
+        applies = rolesLower.includes(contractorRole.toLowerCase());
+      }
+      // Legacy fallback: if no appliesToType, use old appliesTo field
+      else if (!entry.appliesToType) {
+        applies = entry.appliesTo === 'All' || entry.appliesTo === 'Contractors';
+      }
+
+      if (!applies) return;
+
+      const start = new Date(entry.startDate);
+      const end = new Date(entry.endDate);
+
+      // Normalize to midnight
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+
+      // Generate all dates in range
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const key = d.toISOString().slice(0, 10); // yyyy-MM-dd
+        daysSet.add(key);
+      }
+    });
+
+    return daysSet;
+  }, [query.data, contractorRole]);
+
+  return {
+    ...query,
+    nonWorkingDays,
+  };
 }

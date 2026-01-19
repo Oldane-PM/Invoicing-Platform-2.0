@@ -43,6 +43,9 @@ export async function createCalendarEntry(params: CreateTimeOffEntryParams): Pro
     team: params.team,
     applies_to: params.appliesTo,
     affected_count: params.affectedCount,
+    // New role-based scope fields
+    applies_to_type: params.appliesToType || 'ALL',
+    applies_to_roles: params.appliesToRoles || [],
   };
 
   console.log('[AdminCalendar] Creating entry with data:', insertData);
@@ -77,6 +80,9 @@ export async function updateCalendarEntry(params: UpdateTimeOffEntryParams): Pro
   if (params.team) updateData.team = params.team;
   if (params.appliesTo) updateData.applies_to = params.appliesTo;
   if (params.affectedCount !== undefined) updateData.affected_count = params.affectedCount;
+  // New role-based scope fields
+  if (params.appliesToType) updateData.applies_to_type = params.appliesToType;
+  if (params.appliesToRoles !== undefined) updateData.applies_to_roles = params.appliesToRoles;
   updateData.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase
@@ -109,4 +115,39 @@ export async function deleteCalendarEntry(id: string): Promise<void> {
     console.error('[AdminCalendar] Error deleting entry:', error);
     throw error;
   }
+}
+
+/**
+ * Get upcoming calendar entries that overlap with a date range.
+ * 
+ * An entry is "upcoming" if ANY part of it overlaps with [startDate, endDate]:
+ *   - entry.start_date <= endDate (starts before or on range end)
+ *   - entry.end_date >= startDate OR entry.end_date IS NULL (ends after or on range start, or is ongoing)
+ * 
+ * This catches:
+ *   - Today's holidays
+ *   - Ongoing multi-day time off (started in past, continues into future)
+ *   - All future time off within range
+ */
+export async function getUpcomingCalendarEntries(startDate: Date, endDate: Date): Promise<TimeOffEntry[]> {
+  const supabase = getSupabaseClient();
+  
+  const startStr = startDate.toISOString().split('T')[0];
+  const endStr = endDate.toISOString().split('T')[0];
+
+  // Use raw SQL filter for proper OR logic with NULL handling
+  // WHERE start_date <= endDate AND (end_date IS NULL OR end_date >= startDate)
+  const { data, error } = await supabase
+    .from('holidays')
+    .select('*')
+    .lte('start_date', endStr)
+    .or(`end_date.is.null,end_date.gte.${startStr}`)
+    .order('start_date', { ascending: true });
+
+  if (error) {
+    console.error('[AdminCalendar] Error fetching upcoming entries:', error);
+    throw error;
+  }
+
+  return (data || []).map(mapCalendarEntryToDomain);
 }
