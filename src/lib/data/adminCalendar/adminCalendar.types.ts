@@ -1,5 +1,6 @@
 export type CalendarEntryType = 'Holiday' | 'Special Time Off' | 'Company Event';
-export type CalendarAppliesTo = 'All' | 'Contractors' | 'Managers';
+// Must match DB CHECK constraint: applies_to IN ('All', 'Contractors', 'Employees')
+export type CalendarAppliesTo = 'All' | 'Contractors' | 'Employees';
 
 // New scope types for role-based time-off
 export type TimeOffScopeType = 'ALL' | 'ROLES';

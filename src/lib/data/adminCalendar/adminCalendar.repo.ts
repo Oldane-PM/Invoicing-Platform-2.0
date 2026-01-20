@@ -33,19 +33,19 @@ export async function getCalendarEntries(start: Date, end: Date): Promise<TimeOf
 export async function createCalendarEntry(params: CreateTimeOffEntryParams): Promise<TimeOffEntry> {
   const supabase = getSupabaseClient();
 
+  // Only include columns that exist in the base holidays table (migration 017)
+  // Columns: id, name, type, description, start_date, end_date, country, team, applies_to, affected_count
   const insertData = {
     name: params.name,
     type: params.type,
-    description: params.description,
+    description: params.description || null,
     start_date: params.startDate,
     end_date: params.endDate,
-    country: params.country,
-    team: params.team,
-    applies_to: params.appliesTo,
-    affected_count: params.affectedCount,
-    // New role-based scope fields
-    applies_to_type: params.appliesToType || 'ALL',
-    applies_to_roles: params.appliesToRoles || [],
+    country: params.country || ['all'],
+    team: params.team || ['all'],
+    // Map 'ROLES' scope to 'Contractors' for backward compatibility with 017 schema
+    applies_to: params.appliesToType === 'ROLES' ? 'Contractors' : params.appliesTo,
+    affected_count: params.affectedCount || 0,
   };
 
   console.log('[AdminCalendar] Creating entry with data:', insertData);
@@ -57,7 +57,14 @@ export async function createCalendarEntry(params: CreateTimeOffEntryParams): Pro
     .single();
 
   if (error) {
-    console.error('[AdminCalendar] Error creating entry:', error);
+    console.error('[AdminCalendar] Error creating entry:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      status: (error as any).status,
+      error,
+    });
     throw error;
   }
 
@@ -70,20 +77,21 @@ export async function createCalendarEntry(params: CreateTimeOffEntryParams): Pro
 export async function updateCalendarEntry(params: UpdateTimeOffEntryParams): Promise<TimeOffEntry> {
   const supabase = getSupabaseClient();
 
-  const updateData: any = {};
+  // Only include columns that exist in the base holidays table (migration 017)
+  const updateData: Record<string, any> = {};
   if (params.name) updateData.name = params.name;
   if (params.type) updateData.type = params.type;
   if (params.description !== undefined) updateData.description = params.description;
   if (params.startDate) updateData.start_date = params.startDate;
   if (params.endDate) updateData.end_date = params.endDate;
   if (params.country) updateData.country = params.country;
-  if (params.team) updateData.team = params.team;
   if (params.appliesTo) updateData.applies_to = params.appliesTo;
+  // Map 'ROLES' scope to 'Contractors'
+  if (params.appliesToType === 'ROLES') updateData.applies_to = 'Contractors';
   if (params.affectedCount !== undefined) updateData.affected_count = params.affectedCount;
-  // New role-based scope fields
-  if (params.appliesToType) updateData.applies_to_type = params.appliesToType;
-  if (params.appliesToRoles !== undefined) updateData.applies_to_roles = params.appliesToRoles;
   updateData.updated_at = new Date().toISOString();
+
+  console.log('[AdminCalendar] Updating entry:', params.id, updateData);
 
   const { data, error } = await supabase
     .from('holidays')
@@ -93,7 +101,14 @@ export async function updateCalendarEntry(params: UpdateTimeOffEntryParams): Pro
     .single();
 
   if (error) {
-    console.error('[AdminCalendar] Error updating entry:', error);
+    console.error('[AdminCalendar] Error updating entry:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      status: (error as any).status,
+      error,
+    });
     throw error;
   }
 
@@ -112,7 +127,14 @@ export async function deleteCalendarEntry(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) {
-    console.error('[AdminCalendar] Error deleting entry:', error);
+    console.error('[AdminCalendar] Error deleting entry:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      status: (error as any).status,
+      error,
+    });
     throw error;
   }
 }
@@ -193,9 +215,15 @@ export async function getAffectedContractorCount(
   const supabase = getSupabaseClient();
 
   try {
+    // Map domain scope types to DB parameters
+    const appliesTo = scopeType === 'ROLES' ? 'Contractors' : 'All';
+    // For now, we don't have a way to filter by roles in the default schema,
+    // so we just pass NULL for team unless we want to map roles to team?
+    // Leaving team as NULL or empty array.
+    
     const { data, error } = await supabase.rpc('get_time_off_affected_count', {
-      p_scope_type: scopeType,
-      p_scope_roles: scopeRoles,
+      p_applies_to: appliesTo,
+      p_team: null, // or pass scopeRoles as team if that was the intent? but team is usually 'engineering' etc.
     });
 
     if (error) {
