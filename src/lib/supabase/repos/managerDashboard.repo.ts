@@ -80,8 +80,8 @@ export async function getDashboardMetrics(
   let paidThisMonth = 0;
 
   (submissions || []).forEach((s: any) => {
-    // Count pending
-    if (s.status === "PENDING") {
+    // Count pending - database stores as 'submitted' for pending manager review
+    if (s.status === "submitted" || s.status === "pending_review") {
       pendingApprovals++;
     }
 
