@@ -32,7 +32,9 @@ import {
   useCalendarEntries, 
   useCreateCalendarEntry, 
   useUpdateCalendarEntry, 
-  useDeleteCalendarEntry 
+  useDeleteCalendarEntry,
+  useTotalContractorCount,
+  useUpcomingDaysOff 
 } from "../../lib/hooks/adminCalendar";
 import { useEmployeeRoles } from "../../lib/hooks/admin/useEmployeeRoles";
 import { TimeOffEntry, CalendarEntryType, CalendarAppliesTo, TimeOffScopeType } from "../../lib/data/adminCalendar";
@@ -101,27 +103,24 @@ export function AdminCalendar() {
     });
   };
 
-  // Affected count - set to 0 until real API is implemented
-  // TODO: Replace with real API call to calculate affected users
-  const affectedCount = 0;
+  // Get total contractor count for affected count display
+  const { data: totalContractorCount = 0 } = useTotalContractorCount();
+  
+  // Compute affected count based on scope type
+  const affectedCount = React.useMemo(() => {
+    if (formData.appliesToType === 'ALL') {
+      return totalContractorCount;
+    } else if (formData.appliesToType === 'ROLES' && formData.appliesToRoles.length > 0) {
+      // For ROLES scope, show total count as approximation
+      // (accurate count would require matching roles to contractors)
+      return totalContractorCount;
+    }
+    return 0;
+  }, [formData.appliesToType, formData.appliesToRoles, totalContractorCount]);
 
-  // Get upcoming entries (entries that haven't ended yet, within next 90 days)
-  const upcomingEntries = React.useMemo(() => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const futureLimit = addMonths(now, 3);
-    
-    return timeOffEntries
-      .filter(entry => {
-        const entryStart = new Date(entry.startDate);
-        const entryEnd = new Date(entry.endDate);
-        entryStart.setHours(0, 0, 0, 0);
-        entryEnd.setHours(0, 0, 0, 0);
-        // Show if: entry hasn't ended yet AND starts within 3 months
-        return entryEnd >= now && entryStart <= futureLimit;
-      })
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-  }, [timeOffEntries]);
+  // Get upcoming entries from dedicated hook (includes affected contractor count from Supabase)
+  const upcomingQuery = useUpcomingDaysOff(90);
+  const upcomingEntries = upcomingQuery.data || [];
 
   // Handlers
   const handleDateClick = (_date: Date, entries: TimeOffEntry[]) => {
@@ -437,7 +436,7 @@ export function AdminCalendar() {
               </div>
               <p className="text-xs text-gray-500 mb-4">Next 90 days</p>
 
-              {entriesQuery.isLoading ? (
+              {upcomingQuery.isLoading ? (
                 <div className="text-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
                 </div>
@@ -479,10 +478,10 @@ export function AdminCalendar() {
                         <div className="text-xs text-gray-500 mb-2">
                           {scopeLabel}{entry.country && entry.country[0] !== "all" ? ` · ${entry.country[0]}` : ""}
                         </div>
-                        {entry.affectedCount !== null && (
+                        {entry.affectedContractorCount > 0 && (
                           <div className="flex items-center gap-1.5 text-xs text-gray-600">
                             <Info className="w-3 h-3" />
-                            <span>Affects {entry.affectedCount} people</span>
+                            <span>Affects {entry.affectedContractorCount} people</span>
                           </div>
                         )}
                       </div>

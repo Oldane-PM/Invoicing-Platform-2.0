@@ -14,6 +14,7 @@ import {
 export const ADMIN_CALENDAR_keys = {
   all: ['adminCalendar'] as const,
   range: (start: Date, end: Date) => [...ADMIN_CALENDAR_keys.all, 'range', start.toISOString(), end.toISOString()] as const,
+  upcoming: (days: number) => ['adminCalendar', 'upcoming', days] as const,
 };
 
 /**
@@ -37,11 +38,15 @@ export function useCreateCalendarEntry() {
     mutationFn: (params: CreateTimeOffEntryParams) => createCalendarEntry(params),
     onSuccess: () => {
       toast.success('Time off added successfully');
+      // Invalidate all calendar queries (includes range queries)
       queryClient.invalidateQueries({ queryKey: ADMIN_CALENDAR_keys.all });
+      // Also invalidate upcoming queries (they have different key prefix pattern)
+      queryClient.invalidateQueries({ queryKey: ['adminCalendar', 'upcoming'] });
     },
-    onError: (error) => {
-      toast.error('Failed to create time off entry');
-      console.error(error);
+    onError: (error: any) => {
+      const message = error?.message || 'Unknown error';
+      toast.error(`Failed to create time off entry: ${message}`);
+      console.error('[useCreateCalendarEntry] Error:', { message, error });
     },
   });
 }
@@ -57,10 +62,12 @@ export function useUpdateCalendarEntry() {
     onSuccess: () => {
       toast.success('Time off updated successfully');
       queryClient.invalidateQueries({ queryKey: ADMIN_CALENDAR_keys.all });
+      queryClient.invalidateQueries({ queryKey: ['adminCalendar', 'upcoming'] });
     },
-    onError: (error) => {
-      toast.error('Failed to update time off entry');
-      console.error(error);
+    onError: (error: any) => {
+      const message = error?.message || 'Unknown error';
+      toast.error(`Failed to update time off entry: ${message}`);
+      console.error('[useUpdateCalendarEntry] Error:', { message, error });
     },
   });
 }
@@ -76,10 +83,12 @@ export function useDeleteCalendarEntry() {
     onSuccess: () => {
       toast.success('Time off removed successfully');
       queryClient.invalidateQueries({ queryKey: ADMIN_CALENDAR_keys.all });
+      queryClient.invalidateQueries({ queryKey: ['adminCalendar', 'upcoming'] });
     },
-    onError: (error) => {
-      toast.error('Failed to delete time off entry');
-      console.error(error);
+    onError: (error: any) => {
+      const message = error?.message || 'Unknown error';
+      toast.error(`Failed to delete time off entry: ${message}`);
+      console.error('[useDeleteCalendarEntry] Error:', { message, error });
     },
   });
 }

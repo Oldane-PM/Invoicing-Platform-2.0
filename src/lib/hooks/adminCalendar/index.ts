@@ -2,3 +2,4 @@
 export * from './useAdminCalendar';
 export * from './useUpcomingDaysOff';
 export * from './useAdminCalendarState';
+export * from './useAffectedCount';
