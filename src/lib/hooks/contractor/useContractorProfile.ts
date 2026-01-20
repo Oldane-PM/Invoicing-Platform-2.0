@@ -14,9 +14,10 @@ import {
   type ContractInfo,
   type ContractorProfilePatch,
 } from "../../supabase/repos/contractorProfile.repo";
+import { QUERY_KEYS } from "../queryKeys";
 
-// Query key constant
-export const CONTRACTOR_PROFILE_QUERY_KEY = "contractorProfile";
+// Query key constant - using shared key
+export const CONTRACTOR_PROFILE_QUERY_KEY = QUERY_KEYS.CONTRACTOR_PROFILE;
 
 export interface UseContractorProfileResult {
   // Data
@@ -47,7 +48,7 @@ export function useContractorProfile(): UseContractorProfileResult {
     error: fetchError,
     refetch,
   } = useQuery({
-    queryKey: [CONTRACTOR_PROFILE_QUERY_KEY, userId],
+    queryKey: [QUERY_KEYS.CONTRACTOR_PROFILE, userId],
     queryFn: async () => {
       if (!userId) throw new Error("No user ID");
       return getFullContractorProfile(userId);
@@ -66,14 +67,14 @@ export function useContractorProfile(): UseContractorProfileResult {
       console.log("[useContractorProfile] Save successful, updating cache:", newProfile.user_id);
       // Update the cache with new data immediately
       queryClient.setQueryData(
-        [CONTRACTOR_PROFILE_QUERY_KEY, userId],
+        [QUERY_KEYS.CONTRACTOR_PROFILE, userId],
         (old: { profile: ContractorProfileData; contract: ContractInfo | null } | undefined) => ({
           profile: newProfile,
           contract: old?.contract || null,
         })
       );
       // Also invalidate to ensure consistency on next visit
-      queryClient.invalidateQueries({ queryKey: [CONTRACTOR_PROFILE_QUERY_KEY, userId] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CONTRACTOR_PROFILE, userId] });
     },
     onError: (error) => {
       console.error("[useContractorProfile] Save failed:", error);

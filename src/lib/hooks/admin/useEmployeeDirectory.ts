@@ -9,6 +9,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listEmployees } from "../../supabase/repos/employeeDirectory.repo";
 import type { EmployeeDirectoryRow } from "../../types";
+import { QUERY_KEYS } from "../queryKeys";
 
 interface UseEmployeeDirectoryResult {
   data: EmployeeDirectoryRow[] | undefined;
@@ -68,7 +69,7 @@ export function useEmployeeDirectory(): UseEmployeeDirectoryResult {
   }, [search, page]);
 
   const query = useQuery({
-    queryKey: ["employeeDirectory", debouncedSearch, page, sortBy, sortDir],
+    queryKey: [QUERY_KEYS.EMPLOYEE_DIRECTORY, debouncedSearch, page, sortBy, sortDir],
     queryFn: () =>
       listEmployees({
         search: debouncedSearch,

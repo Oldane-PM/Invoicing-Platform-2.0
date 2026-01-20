@@ -152,19 +152,22 @@ export async function listEmployees({
     (contractors || []).map((c) => [c.contractor_id, c])
   );
   
-  // Map contractor_id -> manager_name
-  const managerMap = new Map();
+  // Map contractor_id -> { manager_id, manager_name }
+  const managerMap = new Map<string, { managerId: string; managerName: string }>();
   (managerTeams || []).forEach((item: any) => {
     const managerName = managerProfilesMap.get(item.manager_id);
     if (managerName) {
-      managerMap.set(item.contractor_id, managerName);
+      managerMap.set(item.contractor_id, {
+        managerId: item.manager_id,
+        managerName: managerName,
+      });
     }
   });
 
   // Step 4: Merge data
   let rows: EmployeeDirectoryRow[] = profiles.map((profile) => {
     const contractor = contractorMap.get(profile.id);
-    const managerName = managerMap.get(profile.id);
+    const managerData = managerMap.get(profile.id);
 
     return {
       contractor_id: profile.id, // ID is used as contractor_id in UI
@@ -173,15 +176,16 @@ export async function listEmployees({
       role: profile.role,
       status: contractor?.is_active === false ? "Inactive" : "Active",
       joined_at: profile.created_at,
-      reporting_manager_name: managerName,
+      reporting_manager_id: managerData?.managerId,
+      reporting_manager_name: managerData?.managerName,
       contract_start: contractor?.contract_start,
       contract_end: contractor?.contract_end,
       hourly_rate: contractor?.hourly_rate,
-      fixed_rate: undefined, // Schema doesn't seem to have fixed_rate on contractors table provided in previous context but UI expects it. keeping undefined for now.
-      rate_type: contractor?.hourly_rate ? "Hourly" : "Fixed", // Basic inference
+      fixed_rate: undefined, // Not currently stored in contractors table
+      rate_type: contractor?.hourly_rate ? "Hourly" : undefined, // Inferred from hourly_rate presence
       contract_type: "Contractor",
-      position: "Contractor", // Placeholder as not in schema
-      department: "Engineering", // Placeholder as not in schema
+      position: undefined, // Not currently stored in contractors table
+      department: undefined, // Not currently stored in contractors table
     };
   });
 

@@ -14,8 +14,11 @@ import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import { Pencil, Calendar, DollarSign, Clock } from "lucide-react";
+import { Pencil, Calendar, DollarSign, Clock, User } from "lucide-react";
 import { useContractorSubmissions } from "../../lib/hooks/admin/useContractorSubmissions";
+import { useManagerOptions } from "../../lib/hooks/admin/useManagerOptions";
+import { useUpdateManagerAssignment } from "../../lib/hooks/admin/useUpdateManagerAssignment";
+import { useUpdateContractInfo } from "../../lib/hooks/admin/useUpdateContractInfo";
 import { groupSubmissionsByWorkPeriod } from "../../lib/utils";
 
 interface ContractorDetailDrawerProps {
@@ -67,6 +70,15 @@ export function ContractorDetailDrawer({
     employee?.contractor_id // Use the correct ID field from EmployeeDirectoryRow
   );
 
+  // Fetch manager options for combobox
+  const { data: managerOptions = [], isLoading: isLoadingManagers } = useManagerOptions();
+
+  // Mutation to update manager assignment
+  const updateManagerAssignment = useUpdateManagerAssignment();
+
+  // Mutation to update contract info (rates, dates, etc.)
+  const updateContractInfo = useUpdateContractInfo();
+
   // Group submissions by Work Period
   const groupedSubmissions = React.useMemo(
     () => groupSubmissionsByWorkPeriod(realSubmissions ?? []),
@@ -81,8 +93,8 @@ export function ContractorDetailDrawer({
     }
   }, [employee]);
 
-  const handleSave = () => {
-    if (!formData) return;
+  const handleSave = async () => {
+    if (!formData || !employee) return;
 
     // Validation
     if (!formData.contract_start || !formData.contract_end) {
@@ -100,9 +112,46 @@ export function ContractorDetailDrawer({
       return;
     }
 
-    onSave(formData);
-    setIsEditing(false);
-    toast.success("Contract information updated successfully");
+    try {
+      // Update contract info in Supabase (rates, dates)
+      await updateContractInfo.mutateAsync({
+        contractor_id: employee.contractor_id,
+        contract_start: formData.contract_start,
+        contract_end: formData.contract_end,
+        hourly_rate: formData.rate_type === "Hourly" ? formData.hourly_rate : null,
+        overtime_rate: formData.rate_type === "Hourly" && formData.hourly_rate
+          ? formData.hourly_rate * 1.5
+          : null,
+        rate_type: formData.rate_type as "Hourly" | "Fixed" | null,
+        fixed_rate: formData.rate_type === "Fixed" ? formData.fixed_rate : null,
+        position: formData.position,
+        department: formData.department,
+      });
+
+      // Check if manager assignment changed
+      const oldManagerId = employee.reporting_manager_id;
+      const newManagerId = formData.reporting_manager_id;
+
+      if (oldManagerId !== newManagerId) {
+        await updateManagerAssignment.mutateAsync({
+          contractorId: employee.contractor_id,
+          newManagerId: newManagerId || null,
+          oldManagerId: oldManagerId || null,
+        });
+      }
+
+      // Notify parent of the update (for local state sync if needed)
+      onSave(formData);
+      setIsEditing(false);
+      toast.success("Contract information updated successfully");
+    } catch (error) {
+      console.error("[ContractorDetailDrawer] Save failed:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to update contract information"
+      );
+    }
   };
 
   const handleCancel = () => {
@@ -376,9 +425,12 @@ export function ContractorDetailDrawer({
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">Reporting Manager</div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Reporting Manager</span>
+                      </div>
                       <div className="font-medium text-sm text-gray-900">
-                        {formData.reporting_manager_name}
+                        {formData.reporting_manager_name || "-"}
                       </div>
                     </div>
                   </div>
@@ -504,6 +556,25 @@ export function ContractorDetailDrawer({
                         setFormData({ ...formData, department: e.target.value })
                       }
                       className="bg-gray-50 border-gray-200 rounded-lg h-10 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="manager" className="text-xs text-gray-700 mb-1.5 block">
+                      Reporting Manager
+                    </Label>
+                    <Combobox
+                      value={formData.reporting_manager_id || ""}
+                      onValueChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          reporting_manager_id: value || undefined,
+                          reporting_manager_name: managerOptions.find((m) => m.id === value)?.label,
+                        })
+                      }
+                      options={managerOptions.map((m) => ({ value: m.id, label: m.label }))}
+                      placeholder={isLoadingManagers ? "Loading managers..." : "Select a manager"}
+                      searchPlaceholder="Search managers..."
+                      emptyText="No managers found."
                     />
                   </div>
                 </div>

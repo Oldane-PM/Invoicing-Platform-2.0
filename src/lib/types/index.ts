@@ -279,6 +279,7 @@ export interface EmployeeDirectoryRow {
   role: string;
   status: "Active" | "Inactive";
   joined_at: string;
+  reporting_manager_id?: string; // manager's user ID for updating assignments
   reporting_manager_name?: string; // matched to reporting_manager_name
   contract_start?: string;
   contract_end?: string;
