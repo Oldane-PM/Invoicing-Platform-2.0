@@ -1,14 +1,17 @@
 import { Card } from "../ui/card";
+import { Button } from "../ui/button";
 import { SubmissionStatusPill } from "./SubmissionStatusPill";
 import { InvoiceButton } from "./InvoiceButton";
 import { formatDate, formatCurrency } from "../../lib/utils";
+import { Edit } from "lucide-react";
 import type { ContractorSubmission } from "../../lib/types";
 
 interface SubmissionCardProps {
   submission: ContractorSubmission;
+  onEdit?: (submission: ContractorSubmission) => void;
 }
 
-export function SubmissionCard({ submission }: SubmissionCardProps) {
+export function SubmissionCard({ submission, onEdit }: SubmissionCardProps) {
   // Debug logging
   console.log('[SubmissionCard] Rendering submission:', {
     id: submission.id,
@@ -17,6 +20,9 @@ export function SubmissionCard({ submission }: SubmissionCardProps) {
     hasRejectionReason: !!submission.rejectionReason,
     isRejected: submission.status === "REJECTED_CONTRACTOR"
   });
+
+  // Check if submission can be edited
+  const isEditable = submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR";
 
   return (
     <Card className="bg-white rounded-[14px] border border-[#EFEFEF] p-5 transition-all hover:shadow-md">
@@ -75,9 +81,24 @@ export function SubmissionCard({ submission }: SubmissionCardProps) {
         </div>
       )}
 
-      {/* View Invoice Button */}
-      <div className="mt-4">
-        <InvoiceButton invoiceUrl={submission.invoiceUrl} />
+      {/* Action Buttons */}
+      <div className="mt-4 flex gap-2">
+        {/* Edit Button - only for editable submissions */}
+        {isEditable && onEdit && (
+          <Button
+            onClick={() => onEdit(submission)}
+            variant="outline"
+            className="flex-1 h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50"
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Submission
+          </Button>
+        )}
+        
+        {/* View Invoice Button */}
+        <div className={isEditable && onEdit ? "flex-1" : "w-full"}>
+          <InvoiceButton invoiceUrl={submission.invoiceUrl} />
+        </div>
       </div>
     </Card>
   );

@@ -4,15 +4,18 @@ import { SubmissionCard } from "../../components/shared/SubmissionCard";
 import { Clock, Plus, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useSubmissions } from "../../lib/hooks/contractor/useSubmissions";
 import { groupSubmissionsByWorkPeriod } from "../../lib/utils";
+import type { ContractorSubmission } from "../../lib/types";
 
 interface ContractorSubmissionsProps {
   onSubmitHours?: () => void;
   onBack?: () => void;
+  onEditSubmission?: (submission: ContractorSubmission) => void;
 }
 
 export function ContractorSubmissions({
   onSubmitHours,
   onBack,
+  onEditSubmission,
 }: ContractorSubmissionsProps) {
   const { submissions, loading, error, refetch } = useSubmissions();
 
@@ -122,7 +125,11 @@ export function ContractorSubmissions({
                 {/* Submissions for this Work Period */}
                 <div className="space-y-4">
                   {group.rows.map((submission) => (
-                    <SubmissionCard key={submission.id} submission={submission} />
+                    <SubmissionCard 
+                      key={submission.id} 
+                      submission={submission}
+                      onEdit={onEditSubmission}
+                    />
                   ))}
                 </div>
               </div>

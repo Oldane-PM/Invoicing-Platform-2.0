@@ -30,11 +30,12 @@ import { useCreateSubmission } from "../../lib/hooks/contractor/useCreateSubmiss
 import { useSubmittedPeriods } from "../../lib/hooks/contractor/useSubmittedPeriods";
 import { useContractorProfile } from "../../lib/hooks/contractor/useContractorProfile";
 import { useNonWorkingDays } from "../../lib/hooks/adminCalendar";
-import type { SubmissionDraft } from "../../lib/types";
+import type { SubmissionDraft, ContractorSubmission } from "../../lib/types";
 
 interface SubmitHoursPageProps {
   onCancel: () => void;
   onSuccess?: () => void;
+  editingSubmission?: ContractorSubmission | null;
 }
 
 type DayState = "working" | "excluded" | "weekend" | "holiday";
@@ -60,7 +61,8 @@ const MONTHS = [
   "December",
 ];
 
-export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
+export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: SubmitHoursPageProps) {
+  const isEditMode = !!editingSubmission;
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = React.useState<number | null>(null);
   const [selectedYear, setSelectedYear] = React.useState<number>(
@@ -308,10 +310,13 @@ export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
         {/* Page Header */}
         <div className="mb-6 md:mb-8">
           <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-2">
-            Submit Hours
+            {isEditMode ? "Edit Submission" : "Submit Hours"}
           </h1>
           <p className="text-sm md:text-base text-gray-600">
-            Submit your work hours for a selected time period
+            {isEditMode 
+              ? "Update your work hours for the selected time period"
+              : "Submit your work hours for a selected time period"
+            }
           </p>
         </div>
 
@@ -683,10 +688,10 @@ export function SubmitHoursPage({ onCancel, onSuccess }: SubmitHoursPageProps) {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
+                  {isEditMode ? "Updating..." : "Submitting..."}
                 </>
               ) : (
-                "Submit Hours"
+                isEditMode ? "Update Submission" : "Submit Hours"
               )}
             </Button>
           </div>
