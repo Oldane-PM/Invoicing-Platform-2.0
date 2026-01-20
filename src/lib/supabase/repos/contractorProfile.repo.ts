@@ -29,10 +29,10 @@ export interface ContractorProfileData {
   bank_address: string | null;
   bank_account_name: string | null;
   swift_code: string | null;
-  routing_number: string | null;
+  bank_routing_number: string | null;
   account_type: string | null;
   currency: string | null;
-  account_number: string | null;
+  bank_account_number: string | null;
   
   // Metadata
   created_at?: string;
@@ -195,10 +195,10 @@ export async function getFullContractorProfile(userId: string): Promise<FullCont
     bank_address: null,
     bank_account_name: null,
     swift_code: null,
-    routing_number: null,
+    bank_routing_number: null,
     account_type: "Checking",
     currency: "USD",
-    account_number: null,
+    bank_account_number: null,
   };
   
   return {
