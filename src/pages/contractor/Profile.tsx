@@ -43,7 +43,17 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
 
   // Initialize form from profile data when it loads (only once)
   React.useEffect(() => {
+    console.log('[Profile] useEffect triggered', { 
+      hasProfile: !!profile, 
+      isInitialized,
+      bankName: profile?.bank_name,
+      accountNumber: profile?.bank_account_number,
+      fullProfile: profile
+    });
+    
     if (profile && !isInitialized) {
+      console.log('[Profile] Initializing form with profile data:', profile);
+      
       // Personal
       setFullName(profile.full_name || "");
       setAddressLine1(profile.address_line1 || "");
@@ -55,15 +65,21 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
       setPhone(profile.phone || "");
       
       // Banking
+      console.log('[Profile] Setting banking fields:', {
+        bank_name: profile.bank_name,
+        bank_address: profile.bank_address,
+        bank_account_number: profile.bank_account_number,
+      });
       setBankName(profile.bank_name || "");
       setBankAddress(profile.bank_address || "");
       setSwiftCode(profile.swift_code || "");
-      setRoutingNumber(profile.routing_number || "");
+      setRoutingNumber(profile.bank_routing_number || "");
       setAccountType(profile.account_type || "Checking");
       setCurrency(profile.currency || "USD");
-      setAccountNumber(profile.account_number || "");
+      setAccountNumber(profile.bank_account_number || "");
       
       setIsInitialized(true);
+      console.log('[Profile] Form initialized');
     }
   }, [profile, isInitialized]);
 
@@ -137,10 +153,10 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
       bank_name: bankName.trim(),
       bank_address: bankAddress.trim() || null,
       swift_code: swiftCode.trim() || null,
-      routing_number: routingNumber.trim() || null,
+      bank_routing_number: routingNumber.trim() || null,
       account_type: accountType,
       currency: currency,
-      account_number: accountNumber.trim(),
+      bank_account_number: accountNumber.trim(),
     });
 
     if (result.ok) {
@@ -150,10 +166,10 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
         setBankName(result.profile.bank_name || "");
         setBankAddress(result.profile.bank_address || "");
         setSwiftCode(result.profile.swift_code || "");
-        setRoutingNumber(result.profile.routing_number || "");
+        setRoutingNumber(result.profile.bank_routing_number || "");
         setAccountType(result.profile.account_type || "Checking");
         setCurrency(result.profile.currency || "USD");
-        setAccountNumber(result.profile.account_number || "");
+        setAccountNumber(result.profile.bank_account_number || "");
       }
       // Stay on banking tab - don't navigate away
     } else {
@@ -175,10 +191,10 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
       setBankName(profile.bank_name || "");
       setBankAddress(profile.bank_address || "");
       setSwiftCode(profile.swift_code || "");
-      setRoutingNumber(profile.routing_number || "");
+      setRoutingNumber(profile.bank_routing_number || "");
       setAccountType(profile.account_type || "Checking");
       setCurrency(profile.currency || "USD");
-      setAccountNumber(profile.account_number || "");
+      setAccountNumber(profile.bank_account_number || "");
     }
     onCancel();
   };
