@@ -38,3 +38,10 @@ export interface CreateTimeOffEntryParams {
 export interface UpdateTimeOffEntryParams extends Partial<CreateTimeOffEntryParams> {
   id: string;
 }
+
+/**
+ * Extended time-off entry for upcoming panel with computed affected count
+ */
+export interface UpcomingTimeOffItem extends TimeOffEntry {
+  affectedContractorCount: number;
+}

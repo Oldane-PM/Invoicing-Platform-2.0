@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../../supabase/client';
-import { TimeOffEntry, CreateTimeOffEntryParams, UpdateTimeOffEntryParams } from './adminCalendar.types';
+import { TimeOffEntry, CreateTimeOffEntryParams, UpdateTimeOffEntryParams, UpcomingTimeOffItem, TimeOffScopeType } from './adminCalendar.types';
 import { mapCalendarEntryToDomain } from './adminCalendar.mappers';
 
 /**
@@ -128,26 +128,115 @@ export async function deleteCalendarEntry(id: string): Promise<void> {
  *   - Today's holidays
  *   - Ongoing multi-day time off (started in past, continues into future)
  *   - All future time off within range
+ * 
+ * Returns UpcomingTimeOffItem with computed affected contractor count.
  */
-export async function getUpcomingCalendarEntries(startDate: Date, endDate: Date): Promise<TimeOffEntry[]> {
+export async function getUpcomingCalendarEntries(startDate: Date, endDate: Date): Promise<UpcomingTimeOffItem[]> {
   const supabase = getSupabaseClient();
   
   const startStr = startDate.toISOString().split('T')[0];
   const endStr = endDate.toISOString().split('T')[0];
 
-  // Use raw SQL filter for proper OR logic with NULL handling
-  // WHERE start_date <= endDate AND (end_date IS NULL OR end_date >= startDate)
-  const { data, error } = await supabase
-    .from('holidays')
+  // Try to use the view with computed affected count first
+  // Fall back to regular holidays table if view doesn't exist
+  let data: any[] | null = null;
+  let error: any = null;
+
+  // Attempt to query from the view with affected count
+  const viewResult = await supabase
+    .from('holidays_with_affected_count')
     .select('*')
     .lte('start_date', endStr)
     .or(`end_date.is.null,end_date.gte.${startStr}`)
     .order('start_date', { ascending: true });
+
+  if (viewResult.error) {
+    // View might not exist yet, fall back to regular table
+    console.warn('[AdminCalendar] View not available, falling back to holidays table:', viewResult.error.message);
+    
+    const fallbackResult = await supabase
+      .from('holidays')
+      .select('*')
+      .lte('start_date', endStr)
+      .or(`end_date.is.null,end_date.gte.${startStr}`)
+      .order('start_date', { ascending: true });
+    
+    data = fallbackResult.data;
+    error = fallbackResult.error;
+  } else {
+    data = viewResult.data;
+  }
 
   if (error) {
     console.error('[AdminCalendar] Error fetching upcoming entries:', error);
     throw error;
   }
 
-  return (data || []).map(mapCalendarEntryToDomain);
+  return (data || []).map((row): UpcomingTimeOffItem => {
+    const entry = mapCalendarEntryToDomain(row);
+    return {
+      ...entry,
+      // Use computed count from view, or fall back to stored affected_count
+      affectedContractorCount: row.computed_affected_count ?? row.affected_count ?? 0,
+    };
+  });
 }
+
+/**
+ * Get the affected contractor count for a specific scope configuration.
+ * Calls the Supabase RPC function to compute the count.
+ */
+export async function getAffectedContractorCount(
+  scopeType: TimeOffScopeType,
+  scopeRoles: string[]
+): Promise<number> {
+  const supabase = getSupabaseClient();
+
+  try {
+    const { data, error } = await supabase.rpc('get_time_off_affected_count', {
+      p_scope_type: scopeType,
+      p_scope_roles: scopeRoles,
+    });
+
+    if (error) {
+      console.error('[AdminCalendar] Error getting affected count:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      // Return 0 on error to not block the UI
+      return 0;
+    }
+
+    return data || 0;
+  } catch (err) {
+    console.error('[AdminCalendar] Exception getting affected count:', err);
+    return 0;
+  }
+}
+
+/**
+ * Get total contractor count (for ALL scope estimation)
+ */
+export async function getTotalContractorCount(): Promise<number> {
+  const supabase = getSupabaseClient();
+
+  try {
+    const { count, error } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'CONTRACTOR');
+
+    if (error) {
+      console.error('[AdminCalendar] Error getting total contractor count:', error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (err) {
+    console.error('[AdminCalendar] Exception getting total contractor count:', err);
+    return 0;
+  }
+}
+
