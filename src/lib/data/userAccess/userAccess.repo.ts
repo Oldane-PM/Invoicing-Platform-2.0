@@ -10,14 +10,14 @@ import { mapDbUserToUserAccessUser } from './userAccess.mappers';
 import type { UserAccessUser, UserRole } from './userAccess.types';
 
 /**
- * Fetch all users from app_users table
+ * Fetch all users from profiles table
  * Sorted by role (admin first) then by name
  */
 export async function getUsers(): Promise<UserAccessUser[]> {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
-    .from('app_users')
+    .from('profiles')
     .select('id, full_name, email, role, is_active')
     .order('role', { ascending: true })
     .order('full_name', { ascending: true });
@@ -35,13 +35,13 @@ export async function getUsers(): Promise<UserAccessUser[]> {
 }
 
 /**
- * Update user role in app_users table
+ * Update user role in profiles table
  */
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
   const supabase = getSupabaseClient();
 
   const { error } = await supabase
-    .from('app_users')
+    .from('profiles')
     .update({ role })
     .eq('id', userId);
 
@@ -52,13 +52,13 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
 }
 
 /**
- * Enable or disable user in app_users table
+ * Enable or disable user in profiles table
  */
 export async function setUserEnabled(userId: string, isActive: boolean): Promise<void> {
   const supabase = getSupabaseClient();
 
   const { error } = await supabase
-    .from('app_users')
+    .from('profiles')
     .update({ is_active: isActive })
     .eq('id', userId);
 

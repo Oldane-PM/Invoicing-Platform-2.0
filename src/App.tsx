@@ -69,13 +69,13 @@ function App() {
   React.useEffect(() => {
     async function fetchUserRole() {
       if (isAuthenticated && user) {
-        // User is authenticated via Supabase - fetch their role from app_users table
+        // User is authenticated via Supabase - fetch their role and is_active status from profiles table
         const { getSupabaseClient } = await import('./lib/supabase/client');
         const supabase = getSupabaseClient();
         
         const { data: appUser, error } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, is_active')
           .eq('id', user.id)
           .single();
 
@@ -85,6 +85,15 @@ function App() {
           await signOut();
           alert('Unable to fetch user role. Please try again.');
         } else if (appUser) {
+          // Double-check is_active status (belt and suspenders approach)
+          // This catches any disabled users who briefly got authenticated
+          if (appUser.is_active === false) {
+            console.log('[App] Disabled user detected, signing out');
+            await signOut();
+            // Don't set currentUser - keep them on login page
+            return;
+          }
+          
           // Map database role to app role
           const roleMap: Record<string, UserRole> = {
             'admin': 'Admin',

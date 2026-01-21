@@ -121,6 +121,7 @@ export function useAuth(): UseAuthResult {
       }
 
       try {
+        // First, sign in to get the user ID
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -135,13 +136,41 @@ export function useAuth(): UseAuthResult {
           return { success: false, error: "Failed to authenticate" };
         }
 
-        // Fetch user profile to get role
-        const profile = await getUserProfile(data.user.id);
+        // Immediately fetch user profile to check active status BEFORE auth state propagates
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, is_active')
+          .eq('id', data.user.id)
+          .single();
 
-        // State will be updated by onAuthStateChange listener
-        return { success: true, role: profile?.role };
+        if (profileError) {
+          console.error("[useAuth] Profile fetch error:", profileError);
+          await supabase.auth.signOut();
+          return { success: false, error: "Unable to fetch user profile" };
+        }
+
+        // Check if user account is active
+        if (profileData && profileData.is_active === false) {
+          // Sign out immediately - user is disabled
+          await supabase.auth.signOut();
+          // Wait to ensure session is fully cleared
+          await new Promise(resolve => setTimeout(resolve, 150));
+          return { 
+            success: false, 
+            error: "Your account has been disabled. Please contact an administrator for assistance." 
+          };
+        }
+
+        // User is active, return success
+        return { success: true, role: profileData?.role as UserRole };
       } catch (err) {
         console.error("[useAuth] Sign in exception:", err);
+        // Make sure to sign out if there was an exception
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // Ignore signOut errors
+        }
         return {
           success: false,
           error: err instanceof Error ? err.message : "An unexpected error occurred",
