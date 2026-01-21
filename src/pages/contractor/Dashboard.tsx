@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { ContractorSubmissionDrawer } from "../../components/drawers/ContractorSubmissionDrawer";
 import { PDFInvoiceViewer } from "../../components/pdf/PDFInvoiceViewer";
-import { Plus, Clock, FileText, Loader2, RefreshCw } from "lucide-react";
+import { Plus, Clock, FileText, Loader2, RefreshCw, Edit } from "lucide-react";
 import { format, parse } from "date-fns";
 import { toast } from "sonner";
 import { useSubmissions } from "../../lib/hooks/contractor/useSubmissions";
@@ -57,10 +57,12 @@ const statusStyles: Record<DisplayStatus, string> = {
 
 interface ContractorDashboardProps {
   onNavigateToSubmit?: () => void;
+  onEditSubmission?: (submission: ContractorSubmission) => void;
 }
 
 export function ContractorDashboard({
   onNavigateToSubmit,
+  onEditSubmission,
 }: ContractorDashboardProps) {
   // Use the Supabase-backed submissions hook
   const { submissions, loading, error, refetch } = useSubmissions();
@@ -331,12 +333,29 @@ export function ContractorDashboard({
                           </div>
                         )}
 
-                        {/* Row 5: View Invoice Button */}
-                        <div className="mt-4">
+                        {/* Action Buttons */}
+                        <div className="mt-4 flex gap-2">
+                          {/* Edit Button - only for editable submissions */}
+                          {(submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR") && onEditSubmission && (
+                            <Button
+                              onClick={() => onEditSubmission(submission)}
+                              variant="outline"
+                              className="flex-1 h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50"
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </Button>
+                          )}
+                          
+                          {/* View Invoice Button */}
                           <Button
                             onClick={(e) => handleViewPDF(e, submission)}
                             disabled={!submission.invoiceUrl}
-                            className={`h-10 rounded-[10px] px-4 ${
+                            className={`${
+                              (submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR") && onEditSubmission
+                                ? "flex-1"
+                                : "w-full"
+                            } h-10 rounded-[10px] px-4 ${
                               submission.invoiceUrl
                                 ? "bg-blue-600 hover:bg-blue-700"
                                 : "bg-gray-300 cursor-not-allowed"

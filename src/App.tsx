@@ -32,7 +32,7 @@ import { NotificationDrawer } from "./components/shared/NotificationDrawer";
 import { ContractorDetailDrawer } from "./components/drawers/ContractorDetailDrawer";
 import { useAuth } from "./lib/hooks/useAuth";
 import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
-import type { EmployeeDirectoryRow } from "./lib/types";
+import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 
 type Screen = "dashboard" | "directory" | "access" | "calendar";
 type ManagerScreen = "dashboard" | "team";
@@ -52,6 +52,8 @@ function App() {
     React.useState<ManagerScreen>("dashboard");
   const [contractorScreen, setContractorScreen] =
     React.useState<ContractorScreen>("dashboard");
+  const [editingSubmission, setEditingSubmission] =
+    React.useState<ContractorSubmission | null>(null);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const [contractorDrawerOpen, setContractorDrawerOpen] = React.useState(false);
   const [selectedEmployee, setSelectedEmployee] =
@@ -384,7 +386,14 @@ function App() {
         <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
           {contractorScreen === "dashboard" && (
             <ContractorDashboard
-              onNavigateToSubmit={() => setContractorScreen("submit-hours")}
+              onNavigateToSubmit={() => {
+                setEditingSubmission(null); // Clear any existing submission
+                setContractorScreen("submit-hours");
+              }}
+              onEditSubmission={(submission) => {
+                setEditingSubmission(submission);
+                setContractorScreen("submit-hours");
+              }}
             />
           )}
           {contractorScreen === "profile" && (
@@ -394,8 +403,15 @@ function App() {
           )}
           {contractorScreen === "submit-hours" && (
             <SubmitHoursPage
-              onCancel={() => setContractorScreen("dashboard")}
-              onSuccess={() => setContractorScreen("dashboard")}
+              editingSubmission={editingSubmission}
+              onCancel={() => {
+                setEditingSubmission(null);
+                setContractorScreen("dashboard");
+              }}
+              onSuccess={() => {
+                setEditingSubmission(null);
+                setContractorScreen("dashboard");
+              }}
             />
           )}
         </main>
