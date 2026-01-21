@@ -132,14 +132,6 @@ export function ManagerTeamView() {
               />
               Refresh
             </Button>
-            <Button
-              size="sm"
-              onClick={() => setAddDialogOpen(true)}
-              className="h-9 bg-blue-600 hover:bg-blue-700"
-            >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Add Contractor
-            </Button>
           </div>
         </div>
 
