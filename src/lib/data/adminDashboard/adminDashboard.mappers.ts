@@ -65,7 +65,7 @@ export function mapDbSubmissionToAdminSubmission(dbRow: any): AdminSubmission {
   return {
     id: dbRow.id,
     contractorName,
-    contractorType: contractType,
+    contractorType: contractType as 'Hourly' | 'Fixed',
     projectName,
     managerName,
     regularHours,
@@ -73,8 +73,11 @@ export function mapDbSubmissionToAdminSubmission(dbRow: any): AdminSubmission {
     totalAmount,
     status: dbRow.status,
     submittedAt: dbRow.submitted_at || dbRow.created_at,
-    periodStart: dbRow.period_start,
-    periodEnd: dbRow.period_end,
+    periodStart: dbRow.period_start || '',
+    periodEnd: dbRow.period_end || '',
+    workPeriod: dbRow.work_period || '',
+    paidAt: dbRow.paid_at,
+    approvedAt: dbRow.approved_at,
   };
 }
 
@@ -107,5 +110,8 @@ export function mapDbSubmissionToDetails(dbRow: any): SubmissionDetails {
     notes,
     rejectionReason,
     clarificationMessage,
+    overtimeDescription: dbRow.overtime_description || undefined,
+    adminNote: dbRow.admin_note || undefined,
+    managerNote: dbRow.manager_note || undefined,
   };
 }
