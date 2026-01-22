@@ -314,3 +314,13 @@ export interface CreateProjectInput {
   startDate: string;
   endDate?: string | null;
 }
+
+export interface UpdateProjectInput {
+  id: string;
+  name: string;
+  client: string;
+  description?: string | null;
+  resourceCount: number;
+  startDate: string;
+  endDate?: string | null;
+}

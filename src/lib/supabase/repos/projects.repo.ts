@@ -6,7 +6,7 @@
  */
 
 import { getSupabaseClient } from "../client";
-import type { ProjectRow, CreateProjectInput } from "../../types";
+import type { ProjectRow, CreateProjectInput, UpdateProjectInput } from "../../types";
 
 interface ListProjectsParams {
   search?: string;
@@ -117,6 +117,59 @@ export async function createProject(
 
   if (!data) {
     throw new Error("Failed to create project: No data returned");
+  }
+
+  // Map response to TypeScript interface
+  return {
+    id: data.id,
+    name: data.name,
+    client: data.client,
+    description: data.description,
+    resourceCount: data.resource_count,
+    startDate: data.start_date,
+    endDate: data.end_date,
+    createdAt: data.created_at,
+  };
+}
+
+/**
+ * Update an existing project
+ */
+export async function updateProject(
+  input: UpdateProjectInput
+): Promise<ProjectRow> {
+  const supabase = getSupabaseClient();
+
+  // Map TypeScript interface (camelCase) to database columns (snake_case)
+  const updateData = {
+    name: input.name,
+    client: input.client,
+    description: input.description ?? null,
+    resource_count: input.resourceCount,
+    start_date: input.startDate,
+    end_date: input.endDate ?? null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from("projects")
+    .update(updateData)
+    .eq("id", input.id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[projects.repo] updateProject error:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    throw new Error(`Failed to update project: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Failed to update project: No data returned");
   }
 
   // Map response to TypeScript interface

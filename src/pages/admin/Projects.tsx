@@ -10,14 +10,15 @@ import {
   TableHeader,
   TableRow,
 } from "../../components/ui/table";
-import { AddProjectDialog } from "../../components/modals/AddProjectDialog";
+import { ProjectDialog } from "../../components/modals/ProjectDialog";
 import { useProjects } from "../../lib/hooks/admin/useProjects";
 import { format } from "date-fns";
-import { Search, FolderPlus, AlertCircle, FolderOpen } from "lucide-react";
+import { Search, FolderPlus, AlertCircle, FolderOpen, Pencil } from "lucide-react";
 import { Alert, AlertDescription } from "../../components/ui/alert";
-import type { CreateProjectInput } from "../../lib/types";
+import type { ProjectRow, CreateProjectInput, UpdateProjectInput } from "../../lib/types";
 
 type SortField = "name" | "client" | "start_date" | "created_at";
+type DialogMode = "create" | "edit";
 
 export function AdminProjects() {
   const {
@@ -33,9 +34,13 @@ export function AdminProjects() {
     refetch,
     createProject,
     creating,
+    updateProject,
+    updating,
   } = useProjects();
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [dialogMode, setDialogMode] = React.useState<DialogMode>("create");
+  const [editingProject, setEditingProject] = React.useState<ProjectRow | null>(null);
 
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
@@ -46,8 +51,24 @@ export function AdminProjects() {
     }
   };
 
-  const handleCreateProject = async (input: CreateProjectInput) => {
-    await createProject(input);
+  const handleOpenCreateDialog = () => {
+    setDialogMode("create");
+    setEditingProject(null);
+    setDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (project: ProjectRow) => {
+    setDialogMode("edit");
+    setEditingProject(project);
+    setDialogOpen(true);
+  };
+
+  const handleDialogSubmit = async (input: CreateProjectInput | UpdateProjectInput) => {
+    if (dialogMode === "edit" && "id" in input) {
+      await updateProject(input as UpdateProjectInput);
+    } else {
+      await createProject(input as CreateProjectInput);
+    }
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -96,7 +117,7 @@ export function AdminProjects() {
             />
           </div>
           <Button
-            onClick={() => setDialogOpen(true)}
+            onClick={handleOpenCreateDialog}
             className="bg-purple-600 hover:bg-purple-700 h-11"
           >
             <FolderPlus className="w-4 h-4 mr-2" />
@@ -153,12 +174,15 @@ export function AdminProjects() {
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
                   End Date
                 </TableHead>
+                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium text-center">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
+                  <TableCell colSpan={7} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
                       <div className="text-gray-600 font-medium mt-3">
@@ -169,7 +193,7 @@ export function AdminProjects() {
                 </TableRow>
               ) : projects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
+                  <TableCell colSpan={7} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <FolderOpen className="w-16 h-16 mb-3" strokeWidth={1.5} />
                       <div className="text-gray-600 font-medium">
@@ -182,7 +206,7 @@ export function AdminProjects() {
                       </div>
                       {!search && (
                         <Button
-                          onClick={() => setDialogOpen(true)}
+                          onClick={handleOpenCreateDialog}
                           className="mt-4 bg-purple-600 hover:bg-purple-700"
                         >
                           <FolderPlus className="w-4 h-4 mr-2" />
@@ -220,6 +244,17 @@ export function AdminProjects() {
                     <TableCell className="text-gray-700">
                       {formatDate(project.endDate)}
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenEditDialog(project)}
+                        className="text-gray-600 hover:text-purple-600 hover:bg-purple-50"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        <span className="sr-only">Edit {project.name}</span>
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -228,12 +263,14 @@ export function AdminProjects() {
         </div>
       </Card>
 
-      {/* Add Project Dialog */}
-      <AddProjectDialog
+      {/* Project Dialog (Create/Edit) */}
+      <ProjectDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onSubmit={handleCreateProject}
-        submitting={creating}
+        mode={dialogMode}
+        initialValues={editingProject}
+        onSubmit={handleDialogSubmit}
+        submitting={dialogMode === "edit" ? updating : creating}
       />
     </div>
   );

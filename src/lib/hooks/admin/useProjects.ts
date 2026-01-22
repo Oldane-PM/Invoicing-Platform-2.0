@@ -7,8 +7,8 @@
 
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listProjects, createProject } from "../../supabase/repos/projects.repo";
-import type { ProjectRow, CreateProjectInput } from "../../types";
+import { listProjects, createProject, updateProject } from "../../supabase/repos/projects.repo";
+import type { ProjectRow, CreateProjectInput, UpdateProjectInput } from "../../types";
 import { QUERY_KEYS } from "../queryKeys";
 
 type SortField = "name" | "client" | "start_date" | "created_at";
@@ -30,6 +30,9 @@ interface UseProjectsResult {
   createProject: (input: CreateProjectInput) => Promise<ProjectRow>;
   creating: boolean;
   createError: Error | null;
+  updateProject: (input: UpdateProjectInput) => Promise<ProjectRow>;
+  updating: boolean;
+  updateError: Error | null;
 }
 
 export function useProjects(): UseProjectsResult {
@@ -80,6 +83,18 @@ export function useProjects(): UseProjectsResult {
     },
   });
 
+  // Update project mutation
+  const updateMutation = useMutation({
+    mutationFn: updateProject,
+    onSuccess: () => {
+      // Invalidate and refetch projects list
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.ADMIN_PROJECTS] });
+    },
+    onError: (error: Error) => {
+      console.error("[useProjects] updateProject error:", error.message);
+    },
+  });
+
   return {
     rows: query.data?.rows || [],
     total: query.data?.total || 0,
@@ -97,5 +112,8 @@ export function useProjects(): UseProjectsResult {
     createProject: createMutation.mutateAsync,
     creating: createMutation.isPending,
     createError: createMutation.error as Error | null,
+    updateProject: updateMutation.mutateAsync,
+    updating: updateMutation.isPending,
+    updateError: updateMutation.error as Error | null,
   };
 }
