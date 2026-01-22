@@ -334,28 +334,12 @@ export function ContractorDashboard({
                         )}
 
                         {/* Action Buttons */}
-                        <div className="mt-4 flex gap-2">
-                          {/* Edit Button - only for editable submissions */}
-                          {(submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR") && onEditSubmission && (
-                            <Button
-                              onClick={() => onEditSubmission(submission)}
-                              variant="outline"
-                              className="flex-1 h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50"
-                            >
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </Button>
-                          )}
-                          
-                          {/* View Invoice Button */}
+                        <div className="mt-4 flex justify-between gap-2">
+                          {/* View Invoice Button - LEFT */}
                           <Button
                             onClick={(e) => handleViewPDF(e, submission)}
                             disabled={!submission.invoiceUrl}
-                            className={`${
-                              (submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR") && onEditSubmission
-                                ? "flex-1"
-                                : "w-full"
-                            } h-10 rounded-[10px] px-4 ${
+                            className={`h-10 rounded-[10px] px-4 ${
                               submission.invoiceUrl
                                 ? "bg-blue-600 hover:bg-blue-700"
                                 : "bg-gray-300 cursor-not-allowed"
@@ -366,6 +350,18 @@ export function ContractorDashboard({
                               ? "View Invoice"
                               : "Invoice Pending"}
                           </Button>
+                          
+                          {/* Edit Button - RIGHT - only for editable submissions */}
+                          {(submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR") && onEditSubmission && (
+                            <Button
+                              onClick={() => onEditSubmission(submission)}
+                              variant="outline"
+                              className="h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50 px-4"
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </Button>
+                          )}
                         </div>
                       </div>
                     );

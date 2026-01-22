@@ -23,6 +23,8 @@ export function SubmissionCard({ submission, onEdit }: SubmissionCardProps) {
 
   // Check if submission can be edited
   const isEditable = submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR";
+  
+  console.log('[SubmissionCard] BUTTON ORDER: Invoice LEFT, Edit RIGHT - Build timestamp:', new Date().toISOString());
 
   return (
     <Card className="bg-white rounded-[14px] border border-[#EFEFEF] p-5 transition-all hover:shadow-md">
@@ -81,24 +83,22 @@ export function SubmissionCard({ submission, onEdit }: SubmissionCardProps) {
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="mt-4 flex gap-2">
-        {/* Edit Button - only for editable submissions */}
+      {/* Action Buttons Row */}
+      <div className="mt-4 flex flex-row justify-between gap-2">
+        {/* LEFT: Invoice/View Invoice Button */}
+        <InvoiceButton invoiceUrl={submission.invoiceUrl} />
+        
+        {/* RIGHT: Edit Button (conditional) */}
         {isEditable && onEdit && (
           <Button
             onClick={() => onEdit(submission)}
             variant="outline"
-            className="flex-1 h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50"
+            className="h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50 px-4"
           >
             <Edit className="w-4 h-4 mr-2" />
             Edit Submission
           </Button>
         )}
-        
-        {/* View Invoice Button */}
-        <div className={isEditable && onEdit ? "flex-1" : "w-full"}>
-          <InvoiceButton invoiceUrl={submission.invoiceUrl} />
-        </div>
       </div>
     </Card>
   );

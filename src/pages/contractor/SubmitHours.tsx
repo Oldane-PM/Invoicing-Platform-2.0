@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   format,
+  parse,
   eachDayOfInterval,
   isWeekend,
   isSameDay,
@@ -76,6 +77,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   const [description, setDescription] = React.useState("");
   const [overtimeHours, setOvertimeHours] = React.useState("");
   const [overtimeDescription, setOvertimeDescription] = React.useState("");
+  const isPrePopulatingRef = React.useRef(false);
 
   // Use the create submission hook
   const { create, loading: isSubmitting } = useCreateSubmission();
@@ -118,9 +120,46 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     return !isNaN(hours) && hours > 0;
   }, [overtimeHours]);
 
-  // Clear overtime description when overtime hours is cleared or set to 0
+  // Pre-populate form when editing a submission
   React.useEffect(() => {
-    if (!isOvertimeDescriptionRequired) {
+    if (editingSubmission && editingSubmission.workPeriod) {
+      // Parse work period (format: "YYYY-MM" e.g., "2026-11")
+      try {
+        isPrePopulatingRef.current = true;
+        const workPeriodDate = parse(editingSubmission.workPeriod, "yyyy-MM", new Date());
+        
+        // Validate the parsed date
+        if (isNaN(workPeriodDate.getTime())) {
+          throw new Error("Invalid date parsed from work period");
+        }
+        
+        const month = workPeriodDate.getMonth();
+        const year = workPeriodDate.getFullYear();
+        
+        setSelectedMonth(month);
+        setSelectedYear(year);
+        setHoursSubmitted(editingSubmission.regularHours.toString());
+        setDescription(editingSubmission.description || "");
+        setOvertimeHours(editingSubmission.overtimeHours?.toString() || "");
+        setOvertimeDescription(editingSubmission.overtimeDescription || "");
+        setIsHoursManuallyEdited(true); // Prevent auto-calculation from overwriting
+        
+        // Allow clear effect to run after pre-population is complete
+        setTimeout(() => {
+          isPrePopulatingRef.current = false;
+        }, 100);
+      } catch (error) {
+        console.error("Error parsing work period:", error);
+        toast.error("Failed to load submission data");
+        isPrePopulatingRef.current = false;
+      }
+    }
+  }, [editingSubmission]);
+
+  // Clear overtime description when overtime hours is cleared or set to 0
+  // Don't clear during initial pre-population
+  React.useEffect(() => {
+    if (!isOvertimeDescriptionRequired && !isPrePopulatingRef.current) {
       setOvertimeDescription("");
     }
   }, [isOvertimeDescriptionRequired]);
@@ -244,9 +283,20 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       projectName: "General Work", // Could be enhanced with project selection later
     };
 
+
     // Create submission via hook
     try {
-      const result = await create(draft);
+      let result;
+      
+      // If editing, update the existing submission
+      if (isEditMode && editingSubmission) {
+        const { getSubmissionsDataSource } = await import('../../lib/data/submissionsDataSource');
+        const dataSource = getSubmissionsDataSource();
+        result = await dataSource.resubmitAfterRejection(editingSubmission.id, draft);
+      } else {
+        // Otherwise, create a new submission
+        result = await create(draft);
+      }
 
       if (result) {
         // Format work period for toast message (e.g., "Jan 2026")
@@ -255,8 +305,10 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
           "MMM yyyy"
         );
         
-        toast.success(`Hours submitted for ${workPeriodDisplay}`, {
-          description: "Your submission has been sent for review",
+        toast.success(`Hours ${isEditMode ? 'updated' : 'submitted'} for ${workPeriodDisplay}`, {
+          description: isEditMode 
+            ? "Your submission has been updated" 
+            : "Your submission has been sent for review",
         });
 
         // Navigate to dashboard on success
@@ -266,14 +318,14 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
           onCancel();
         }
       } else {
-        toast.error("Failed to submit hours", {
+        toast.error(`Failed to ${isEditMode ? 'update' : 'submit'} hours`, {
           description: "Please try again later",
         });
       }
     } catch (err) {
       // Handle specific errors (e.g., duplicate work period)
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      toast.error("Submission failed", {
+      toast.error(`${isEditMode ? 'Update' : 'Submission'} failed`, {
         description: errorMessage,
       });
     }
