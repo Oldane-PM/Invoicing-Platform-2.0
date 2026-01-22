@@ -14,6 +14,7 @@ export interface UserProfile {
   role: UserRole;
   fullName: string;
   email: string;
+  is_active: boolean;
 }
 
 export interface AuthSession {
@@ -99,7 +100,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
   const { data, error } = await supabaseClient
     .from("profiles")
-    .select("id, role, full_name, email")
+    .select("id, role, full_name, email, is_active")
     .eq("id", userId)
     .maybeSingle();
 
@@ -128,6 +129,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     role: data.role as UserRole,
     fullName: data.full_name || "",
     email: data.email || "",
+    is_active: data.is_active ?? true,
   };
 }
 

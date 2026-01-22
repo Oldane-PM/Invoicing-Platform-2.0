@@ -19,9 +19,22 @@ export function Login({ onSupabaseLogin, signIn, authLoading }: LoginProps) {
   const [selectedRole, setSelectedRole] = React.useState<RoleOption | null>(null);
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(false);
+  const hasDisabledErrorRef = React.useRef(false);
+
+  // Debug: Log when error changes
+  React.useEffect(() => {
+    console.log('[Login] Error state changed to:', error);
+    // If error contains "disabled", mark it so we don't clear it
+    if (error.includes('disabled')) {
+      hasDisabledErrorRef.current = true;
+    }
+  }, [error]);
 
   const handleLogin = async () => {
-    setError("");
+    // Don't clear error if it's a disabled account error
+    if (!hasDisabledErrorRef.current) {
+      // Error will be set/cleared as needed below
+    }
 
     if (!email.trim()) {
       setError("Please enter your email");
@@ -34,6 +47,9 @@ export function Login({ onSupabaseLogin, signIn, authLoading }: LoginProps) {
     }
 
     setLoading(true);
+    if (!hasDisabledErrorRef.current) {
+      setError(""); // Clear error only when starting actual login attempt
+    }
 
     // Store login intent in sessionStorage so App.tsx can validate it
     if (selectedRole) {
@@ -42,6 +58,7 @@ export function Login({ onSupabaseLogin, signIn, authLoading }: LoginProps) {
 
     try {
       const result = await signIn(email, password);
+      console.log('[Login] signIn result:', result);
 
       if (result.success && result.role) {
         // Route based on profile role from Supabase
@@ -49,14 +66,17 @@ export function Login({ onSupabaseLogin, signIn, authLoading }: LoginProps) {
       } else if (result.success && !result.role) {
         // Logged in but no profile - this shouldn't happen in production
         setError("Account found but no role assigned. Please contact an administrator.");
+        setLoading(false);
       } else {
+        console.log('[Login] Setting error:', result.error);
         setError(result.error || "Login failed. Please check your credentials.");
         sessionStorage.removeItem('loginIntent');
+        setLoading(false);
       }
     } catch (err) {
+      console.error('[Login] Exception:', err);
       setError("An unexpected error occurred. Please try again.");
       sessionStorage.removeItem('loginIntent');
-    } finally {
       setLoading(false);
     }
   };
