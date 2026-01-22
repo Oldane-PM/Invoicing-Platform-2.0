@@ -49,15 +49,14 @@ function logSupabaseError(context: string, error: any): void {
 
 /**
  * List all submissions for a specific contractor
+ * Uses direct columns from submissions table (regular_hours, overtime_hours, total_amount, etc.)
  */
 export async function listContractorSubmissions(contractorId: string): Promise<ContractorSubmission[]> {
   const supabase = getSupabaseClient();
 
   console.log(`[submissions.repo] Fetching submissions for contractor: ${contractorId}`);
 
-  // Query submissions with related data
-  // Note: 'total_amount', 'regular_hours' etc are not on the submissions table,
-  // we must calculate them or fetch from related tables.
+  // Query submissions with direct columns - aligned with admin dashboard approach
   const { data: submissions, error } = await supabase
     .from("submissions")
     .select(`
@@ -66,54 +65,54 @@ export async function listContractorSubmissions(contractorId: string): Promise<C
       submitted_at,
       created_at,
       contractor_user_id,
-      rejection_reason
+      project_name,
+      description,
+      work_period,
+      period_start,
+      period_end,
+      regular_hours,
+      overtime_hours,
+      overtime_description,
+      total_amount,
+      rejection_reason,
+      paid_at
     `)
     .eq("contractor_user_id", contractorId)
-    .order("created_at", { ascending: false });
+    .order("submitted_at", { ascending: false });
 
   if (error) {
     logSupabaseError("listContractorSubmissions", error);
-    // Return empty array instead of throwing to avoid crashing UI, but log error
     console.error("Supabase error details:", error);
     throw new Error(`Failed to fetch submissions: ${error.message}`);
   }
 
   return (submissions || []).map((sub: any) => {
-    // Determine status
-    const status = mapDbStatusToFrontend(sub.status);
+    // Determine status - pass paid_at for correct status resolution
+    const status = mapDbStatusToFrontend(sub.status, sub.paid_at);
 
-    // Calculate totals
-    const regularHours = sub.submission_line_items?.reduce((sum: number, item: any) => sum + (item.hours || 0), 0) || 0;
-    const overtimeHours = sub.overtime_entries?.reduce((sum: number, item: any) => sum + (item.overtime_hours || 0), 0) || 0;
-    
-    // Get total amount from invoice if exists, otherwise 0 (or could estimate)
-    // The invoices relation returns an array
-    const invoice = sub.invoices?.[0];
-    const totalAmount = invoice?.total || 0;
+    // Use direct columns from submissions table
+    const regularHours = sub.regular_hours || 0;
+    const overtimeHours = sub.overtime_hours || 0;
+    const totalAmount = sub.total_amount || 0;
 
-    // Format work period as "YYYY-MM" if not present
-    const workPeriod = sub.period_start ? format(new Date(sub.period_start), "yyyy-MM") : "";
+    // Work period from direct column or derived from period_start
+    const workPeriod = sub.work_period || (sub.period_start ? format(new Date(sub.period_start), "yyyy-MM") : "");
 
     return {
       id: sub.id,
       submissionDate: sub.submitted_at || sub.created_at,
-      projectName: sub.contracts?.project_name || "General Work",
-      description: "", // Description not on submission table, could derive from line items notes if needed
+      projectName: sub.project_name || "General Work",
+      description: sub.description || "",
       regularHours,
       overtimeHours,
       totalAmount,
       status,
-      invoiceUrl: invoice?.pdf_url || null,
+      invoiceUrl: null, // Could be enhanced with invoice lookup if needed
       workPeriod,
       excludedDates: [],
-      overtimeDescription: sub.overtime_entries?.[0]?.description || null,
+      overtimeDescription: sub.overtime_description || null,
       rejectionReason: sub.rejection_reason || null,
     };
   });
 }
-
-/**
- * Alias for listContractorSubmissions to be used by Admin/Manager logic
- */
-export const listSubmissionsByContractorId = listContractorSubmissions;
 
