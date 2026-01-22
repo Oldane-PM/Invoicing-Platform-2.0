@@ -10,6 +10,7 @@ export const QUERY_KEYS = {
   EMPLOYEE_DIRECTORY: "employeeDirectory",
   ADMIN_DASHBOARD: "adminDashboard",
   ADMIN_SUBMISSIONS: "adminSubmissions",
+  ADMIN_PROJECTS: "adminProjects",
   
   // Contractor views
   CONTRACTOR_PROFILE: "contractorProfile",
