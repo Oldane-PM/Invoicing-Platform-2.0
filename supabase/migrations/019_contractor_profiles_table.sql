@@ -24,10 +24,10 @@ CREATE TABLE IF NOT EXISTS public.contractor_profiles (
   bank_address TEXT,
   bank_account_name TEXT,
   swift_code TEXT,
-  routing_number TEXT,
+  bank_routing_number TEXT,
   account_type TEXT DEFAULT 'Checking',
   currency TEXT DEFAULT 'USD',
-  account_number TEXT,
+  bank_account_number TEXT,
   
   -- Metadata
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -67,8 +67,8 @@ BEGIN
     ALTER TABLE public.contractor_profiles ADD COLUMN swift_code TEXT;
   END IF;
   
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'contractor_profiles' AND column_name = 'routing_number') THEN
-    ALTER TABLE public.contractor_profiles ADD COLUMN routing_number TEXT;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'contractor_profiles' AND column_name = 'bank_routing_number') THEN
+    ALTER TABLE public.contractor_profiles ADD COLUMN bank_routing_number TEXT;
   END IF;
   
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'contractor_profiles' AND column_name = 'account_type') THEN
