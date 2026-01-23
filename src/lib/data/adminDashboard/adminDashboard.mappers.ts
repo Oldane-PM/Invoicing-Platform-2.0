@@ -6,23 +6,47 @@
  */
 
 import type { AdminSubmission, SubmissionDetails } from './adminDashboard.types';
-
-// Rate constants - fallback if rates not found
-const DEFAULT_HOURLY_RATE = 75;
-const DEFAULT_OT_MULTIPLIER = 1.5;
+import {
+  calculateHourlyTotal,
+  calculateFixedTotal,
+  toSafeNumber,
+  normalizePayType,
+  DEFAULT_HOURLY_RATE,
+  DEFAULT_OT_MULTIPLIER,
+} from '../../calculations';
 
 /**
  * Calculate total amount based on hours and rates
+ * 
+ * Uses the centralized calculation utility.
+ * For hourly: (regularRate × regularHours) + (overtimeRate × overtimeHours)
+ * For fixed: uses monthlyRate directly
  */
 export function calculateTotalAmount(
   regularHours: number,
   overtimeHours: number,
   hourlyRate: number = DEFAULT_HOURLY_RATE,
-  otMultiplier: number = DEFAULT_OT_MULTIPLIER
+  otMultiplier: number = DEFAULT_OT_MULTIPLIER,
+  contractType?: 'hourly' | 'fixed' | string,
+  monthlyRate?: number
 ): number {
-  const regularAmount = regularHours * hourlyRate;
-  const overtimeAmount = overtimeHours * hourlyRate * otMultiplier;
-  return regularAmount + overtimeAmount;
+  const payType = normalizePayType(contractType);
+  
+  if (payType === 'fixed' && monthlyRate !== undefined) {
+    return calculateFixedTotal({ monthlyRate });
+  }
+  
+  // Calculate overtime rate from multiplier
+  const overtimeRate = toSafeNumber(hourlyRate) * toSafeNumber(otMultiplier);
+  
+  const { totalAmount } = calculateHourlyTotal({
+    regularRate: hourlyRate,
+    regularHours,
+    overtimeRate,
+    overtimeHours,
+  });
+  
+  return totalAmount;
 }
 
 /**
@@ -65,7 +89,7 @@ export function mapDbSubmissionToAdminSubmission(dbRow: any): AdminSubmission {
   return {
     id: dbRow.id,
     contractorName,
-    contractorType: contractType,
+    contractorType: contractType as 'Hourly' | 'Fixed',
     projectName,
     managerName,
     regularHours,
@@ -73,8 +97,11 @@ export function mapDbSubmissionToAdminSubmission(dbRow: any): AdminSubmission {
     totalAmount,
     status: dbRow.status,
     submittedAt: dbRow.submitted_at || dbRow.created_at,
-    periodStart: dbRow.period_start,
-    periodEnd: dbRow.period_end,
+    periodStart: dbRow.period_start || '',
+    periodEnd: dbRow.period_end || '',
+    workPeriod: dbRow.work_period || '',
+    paidAt: dbRow.paid_at,
+    approvedAt: dbRow.approved_at,
   };
 }
 
@@ -107,5 +134,8 @@ export function mapDbSubmissionToDetails(dbRow: any): SubmissionDetails {
     notes,
     rejectionReason,
     clarificationMessage,
+    overtimeDescription: dbRow.overtime_description || undefined,
+    adminNote: dbRow.admin_note || undefined,
+    managerNote: dbRow.manager_note || undefined,
   };
 }

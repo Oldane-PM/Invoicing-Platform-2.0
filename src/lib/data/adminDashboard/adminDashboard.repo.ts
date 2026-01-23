@@ -14,8 +14,6 @@ import type {
   AdminSubmission,
   SubmissionDetails,
   SubmissionFilters,
-  ApproveSubmissionParams,
-  RejectSubmissionParams,
   RequestClarificationParams,
 } from './adminDashboard.types';
 import {
@@ -101,34 +99,48 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
 
 /**
  * Get submissions with optional filters
+ * Uses direct columns (regular_hours, overtime_hours, work_period) - same as Manager repo
  */
 export async function getSubmissions(filters: SubmissionFilters = {}): Promise<AdminSubmission[]> {
   const supabase = getSupabaseClient();
 
+  // Query using direct columns - aligned with Manager repo approach
   let query = supabase
     .from('submissions')
     .select(`
       id,
+      contractor_user_id,
+      project_name,
+      description,
+      work_period,
       period_start,
       period_end,
+      regular_hours,
+      overtime_hours,
+      overtime_description,
+      total_amount,
       status,
       submitted_at,
+      approved_at,
+      paid_at,
       created_at,
-      total_amount,
-      contractor_user_id,
-      contract_id,
-      submission_line_items (
-        hours
-      ),
-      overtime_entries (
-        overtime_hours
+      rejection_reason,
+      profiles: contractor_user_id (
+        full_name,
+        email
       )
     `)
     .order('submitted_at', { ascending: false });
 
   // Apply status filter
   if (filters.status) {
-    query = query.eq('status', filters.status.toLowerCase());
+    const dbStatus = filters.status.toLowerCase();
+    if (dbStatus === 'paid') {
+      // PAID filter: approved submissions with paid_at
+      query = query.eq('status', 'approved').not('paid_at', 'is', null);
+    } else {
+      query = query.eq('status', dbStatus);
+    }
   }
 
   const { data, error } = await query;
@@ -143,84 +155,38 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
     return [];
   }
 
-  // Fetch contractors data
-  const contractorIds = [...new Set(data.map(s => s.contractor_user_id).filter(Boolean))];
-  const { data: contractors } = await supabase
-    .from('app_users')
-    .select('id, full_name, email')
-    .in('id', contractorIds);
+  // Map to domain type - using direct columns like Manager repo
+  let submissions: AdminSubmission[] = data.map((sub: any) => {
+    // Handle potential array or object return from joins
+    const profile = Array.isArray(sub.profiles) ? sub.profiles[0] : sub.profiles;
 
-  // Fetch contracts data
-  const contractIds = [...new Set(data.map(s => s.contract_id).filter(Boolean))];
-  const { data: contracts } = await supabase
-    .from('contracts')
-    .select('id, project_name, contract_type, manager_user_id')
-    .in('id', contractIds);
+    // Use direct columns - same as Manager repo
+    const regularHours = sub.regular_hours || 0;
+    const overtimeHours = sub.overtime_hours || 0;
+    const totalAmount = sub.total_amount || 0;
 
-  // Fetch managers data
-  const managerIds = [...new Set((contracts || []).map(c => c.manager_user_id).filter(Boolean))];
-  const { data: managers } = managerIds.length > 0 ? await supabase
-    .from('app_users')
-    .select('id, full_name')
-    .in('id', managerIds) : { data: [] };
-
-  // Fetch rates data
-  const { data: rates } = await supabase
-    .from('rates')
-    .select('contract_id, hourly_rate, overtime_multiplier, effective_from, effective_to')
-    .in('contract_id', contractIds);
-
-  // Create lookup maps
-  const contractorMap = new Map((contractors || []).map(c => [c.id, c]));
-  const contractMap = new Map((contracts || []).map(c => [c.id, c]));
-  const managerMap = new Map((managers || []).map(m => [m.id, m]));
-  const ratesMap = new Map<string, any[]>();
-  (rates || []).forEach(r => {
-    if (!ratesMap.has(r.contract_id)) {
-      ratesMap.set(r.contract_id, []);
+    // Determine display status (paid if approved + has paid_at)
+    let displayStatus = sub.status;
+    if (sub.status === 'approved' && sub.paid_at) {
+      displayStatus = 'paid';
     }
-    ratesMap.get(r.contract_id)!.push(r);
-  });
-
-  // Map to domain type with merged data
-  let submissions = data.map(sub => {
-    const contractor = contractorMap.get(sub.contractor_user_id);
-    const contract = contractMap.get(sub.contract_id);
-    const manager = contract?.manager_user_id ? managerMap.get(contract.manager_user_id) : null;
-    const contractRates = ratesMap.get(sub.contract_id) || [];
-
-    // Calculate hours
-    const lineItems = Array.isArray(sub.submission_line_items) ? sub.submission_line_items : [];
-    const overtimeEntries = Array.isArray(sub.overtime_entries) ? sub.overtime_entries : [];
-    const regularHours = lineItems.reduce((sum: number, li: any) => sum + (li.hours || 0), 0);
-    const overtimeHours = overtimeEntries.reduce((sum: number, ot: any) => sum + (ot.overtime_hours || 0), 0);
-
-    // Find current rate
-    const today = new Date().toISOString().split('T')[0];
-    const currentRate = contractRates.find(r =>
-      r.effective_from <= today && (!r.effective_to || r.effective_to >= today)
-    );
-
-    const totalAmount = sub.total_amount || calculateTotalAmount(
-      regularHours,
-      overtimeHours,
-      currentRate?.hourly_rate,
-      currentRate?.overtime_multiplier
-    );
 
     return {
       id: sub.id,
-      contractorName: contractor?.full_name || 'Unknown Contractor',
-      contractorType: contract?.contract_type === 'hourly' ? 'Hourly' as const : 'Fixed' as const,
-      projectName: contract?.project_name || 'Unknown Project',
-      managerName: manager?.full_name || 'Unknown Manager',
+      contractorName: profile?.full_name || 'Unknown Contractor',
+      contractorType: 'Hourly' as const, // Default, could be enhanced with contract lookup
+      projectName: sub.project_name || 'Unknown Project',
+      managerName: 'Unknown Manager', // Would need contract join to get manager
       regularHours,
       overtimeHours,
       totalAmount,
-      status: sub.status,
+      status: displayStatus,
       submittedAt: sub.submitted_at || sub.created_at,
-      periodStart: sub.period_start,
-      periodEnd: sub.period_end,
+      periodStart: sub.period_start || '',
+      periodEnd: sub.period_end || '',
+      workPeriod: sub.work_period || '',
+      paidAt: sub.paid_at,
+      approvedAt: sub.approved_at,
     };
   });
 
@@ -248,11 +214,26 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
   }
 
   if (filters.month) {
-    // Filter by period_start month (format: "January 2026")
+    // Filter by work_period or period_start month (format: "January 2026")
     submissions = submissions.filter((sub) => {
-      const date = new Date(sub.periodStart);
-      const monthYear = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      return monthYear === filters.month;
+      // Try work_period first
+      if (sub.workPeriod) {
+        // If format is YYYY-MM, convert to "Month YYYY"
+        if (/^\d{4}-\d{2}$/.test(sub.workPeriod)) {
+          const [year, month] = sub.workPeriod.split('-').map(Number);
+          const date = new Date(year, month - 1, 1);
+          const monthYear = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          return monthYear === filters.month;
+        }
+        return sub.workPeriod === filters.month;
+      }
+      // Fallback to period_start
+      if (sub.periodStart) {
+        const date = new Date(sub.periodStart);
+        const monthYear = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        return monthYear === filters.month;
+      }
+      return false;
     });
   }
 
@@ -261,29 +242,35 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
 
 /**
  * Get detailed submission information
+ * Uses direct columns - aligned with Manager repo approach
  */
 export async function getSubmissionDetails(submissionId: string): Promise<SubmissionDetails> {
   const supabase = getSupabaseClient();
 
+  // Query using direct columns - same as Manager repo
   const { data, error } = await supabase
     .from('submissions')
     .select(`
       id,
+      contractor_user_id,
+      project_name,
+      description,
+      work_period,
       period_start,
       period_end,
+      regular_hours,
+      overtime_hours,
+      overtime_description,
+      total_amount,
       status,
       submitted_at,
-      created_at,
-      total_amount,
-      contractor_user_id,
-      contract_id,
+      approved_at,
       paid_at,
-      submission_line_items (
-        hours,
-        note
-      ),
-      overtime_entries (
-        overtime_hours
+      created_at,
+      rejection_reason,
+      profiles: contractor_user_id (
+        full_name,
+        email
       )
     `)
     .eq('id', submissionId)
@@ -300,126 +287,45 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
     throw new Error('Submission not found');
   }
 
-  // Fetch contractor
-  const { data: contractor } = await supabase
-    .from('app_users')
-    .select('full_name, email')
-    .eq('id', data.contractor_user_id)
-    .single();
+  // Handle potential array or object return from joins
+  const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
 
-  // Fetch contract
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('project_name, contract_type, manager_user_id')
-    .eq('id', data.contract_id)
-    .single();
+  // Use direct columns - same as Manager repo
+  const regularHours = data.regular_hours || 0;
+  const overtimeHours = data.overtime_hours || 0;
+  const totalAmount = data.total_amount || 0;
 
-  // Fetch manager
-  const { data: manager } = contract?.manager_user_id ? await supabase
-    .from('app_users')
-    .select('full_name')
-    .eq('id', contract.manager_user_id)
-    .single() : { data: null };
-
-  // Fetch rates
-  const { data: rates } = await supabase
-    .from('rates')
-    .select('hourly_rate, overtime_multiplier, effective_from, effective_to')
-    .eq('contract_id', data.contract_id);
-
-  // Calculate hours
-  const lineItems = Array.isArray(data.submission_line_items) ? data.submission_line_items : [];
-  const overtimeEntries = Array.isArray(data.overtime_entries) ? data.overtime_entries : [];
-  const regularHours = lineItems.reduce((sum: number, li: any) => sum + (li.hours || 0), 0);
-  const overtimeHours = overtimeEntries.reduce((sum: number, ot: any) => sum + (ot.overtime_hours || 0), 0);
-
-  // Find current rate
-  const today = new Date().toISOString().split('T')[0];
-  const currentRate = (rates || []).find(r =>
-    r.effective_from <= today && (!r.effective_to || r.effective_to >= today)
-  );
-
-  const totalAmount = data.total_amount || calculateTotalAmount(
-    regularHours,
-    overtimeHours,
-    currentRate?.hourly_rate,
-    currentRate?.overtime_multiplier
-  );
-
-  // Extract description from line items
-  const description = lineItems
-    .filter((li: any) => li.note)
-    .map((li: any) => li.note)
-    .join(' ') || 'No description provided';
+  // Determine display status (paid if approved + has paid_at)
+  let displayStatus = data.status;
+  if (data.status === 'approved' && data.paid_at) {
+    displayStatus = 'paid';
+  }
 
   return {
     id: data.id,
-    contractorName: contractor?.full_name || 'Unknown Contractor',
-    contractorEmail: contractor?.email || '',
-    contractorType: contract?.contract_type === 'hourly' ? 'Hourly' as const : 'Fixed' as const,
-    projectName: contract?.project_name || 'Unknown Project',
-    managerName: manager?.full_name || 'Unknown Manager',
+    contractorName: profile?.full_name || 'Unknown Contractor',
+    contractorEmail: profile?.email || '',
+    contractorType: 'Hourly' as const, // Default, could be enhanced with contract lookup
+    projectName: data.project_name || 'Unknown Project',
+    managerName: 'Unknown Manager', // Would need contract join to get manager
     regularHours,
     overtimeHours,
     totalAmount,
-    status: data.status,
+    status: displayStatus,
     submittedAt: data.submitted_at || data.created_at,
-    periodStart: data.period_start,
-    periodEnd: data.period_end,
+    periodStart: data.period_start || '',
+    periodEnd: data.period_end || '',
+    workPeriod: data.work_period || '',
     paidAt: data.paid_at,
-    description,
+    approvedAt: data.approved_at,
+    description: data.description || 'No description provided',
+    overtimeDescription: data.overtime_description,
     notes: undefined,
-    // NOTE: These columns may not exist in all schemas
-    rejectionReason: (data as any).rejection_reason ?? undefined,
+    rejectionReason: data.rejection_reason ?? undefined,
     clarificationMessage: undefined, // Legacy field
-    adminNote: (data as any).admin_note ?? undefined,
-    managerNote: (data as any).manager_note ?? undefined,
+    adminNote: undefined, // Could be added if column exists
+    managerNote: undefined, // Could be added if column exists
   };
-}
-
-/**
- * Approve a submission
- */
-export async function approveSubmission(params: ApproveSubmissionParams): Promise<void> {
-  const supabase = getSupabaseClient();
-
-  const { error } = await supabase
-    .from('submissions')
-    .update({
-      status: 'approved',
-      approved_at: new Date().toISOString(),
-      approved_by: params.adminUserId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', params.submissionId);
-
-  if (error) {
-    console.error('[AdminDashboard] Error approving submission:', error);
-    throw error;
-  }
-}
-
-/**
- * Reject a submission with reason
- */
-export async function rejectSubmission(params: RejectSubmissionParams): Promise<void> {
-  const supabase = getSupabaseClient();
-
-  // NOTE: rejection_reason column may not exist in all schemas - only update core fields
-  const { error } = await supabase
-    .from('submissions')
-    .update({
-      status: 'rejected',
-      rejected_at: new Date().toISOString(),
-      rejected_by: params.adminUserId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', params.submissionId);
-
-  if (error) {
-    console.error('[AdminDashboard] Error rejecting submission:', error);
-    throw new Error(error.message || 'Failed to reject submission');
-  }
 }
 
 /**

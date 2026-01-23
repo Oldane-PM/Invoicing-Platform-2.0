@@ -15,12 +15,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "../ui/dialog";
-import { CheckCircle, XCircle, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import {
   useSubmissionDetails,
-  useApproveSubmission,
-  useRejectSubmission,
   useRequestClarification,
   useMarkPaid,
 } from "../../lib/hooks/adminDashboard";
@@ -32,14 +30,40 @@ interface SubmissionReviewDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Format work period for display (null-safe with fallback)
+ */
+function formatWorkPeriodDisplay(workPeriod?: string, periodStart?: string): string {
+  if (workPeriod) {
+    // If it's "YYYY-MM" format, convert to "MMM yyyy"
+    if (/^\d{4}-\d{2}$/.test(workPeriod)) {
+      try {
+        const [year, month] = workPeriod.split("-").map(Number);
+        return format(new Date(year, month - 1, 1), "MMMM yyyy");
+      } catch {
+        return workPeriod;
+      }
+    }
+    // Already formatted or other format
+    return workPeriod;
+  }
+  // Fallback to periodStart
+  if (periodStart) {
+    try {
+      return format(new Date(periodStart), "MMMM yyyy");
+    } catch {
+      return "—";
+    }
+  }
+  return "—";
+}
+
 export function SubmissionReviewDrawer({
   submissionId,
   open,
   onOpenChange,
 }: SubmissionReviewDrawerProps) {
-  const [rejectModalOpen, setRejectModalOpen] = React.useState(false);
   const [clarificationModalOpen, setClarificationModalOpen] = React.useState(false);
-  const [rejectReason, setRejectReason] = React.useState("");
   const [clarificationMessage, setClarificationMessage] = React.useState("");
 
   // Get current user ID from auth
@@ -49,9 +73,7 @@ export function SubmissionReviewDrawer({
   // Fetch submission details
   const { data: submission, isLoading, error } = useSubmissionDetails(submissionId);
 
-  // Mutations
-  const approveMutation = useApproveSubmission();
-  const rejectMutation = useRejectSubmission();
+  // Mutations - Admin only uses markPaid and requestClarification (after Manager approval)
   const clarifyMutation = useRequestClarification();
   const markPaidMutation = useMarkPaid();
 
@@ -92,21 +114,15 @@ export function SubmissionReviewDrawer({
     return statusMap[status] || status;
   };
 
-  // Check if admin can take action (only on approved/awaiting payment submissions)
-  const canAdminAct = submission?.status === "approved" && !submission?.paidAt;
-
-  const handleApprove = () => {
-    if (!submissionId) return;
-    
-    approveMutation.mutate(
-      { submissionId, adminUserId },
-      {
-        onSuccess: () => {
-          onOpenChange(false);
-        },
-      }
-    );
-  };
+  /**
+   * Admin can ONLY take action (Mark as Paid, Request Clarification) when:
+   * - Submission is manager-approved (status === 'approved')
+   * - Submission is NOT already paid (no paidAt)
+   * 
+   * This enforces the rule: "No Admin actions unless Manager approved"
+   */
+  const isManagerApproved = submission?.status === "approved";
+  const canAdminAct = isManagerApproved && !submission?.paidAt;
 
   const handleMarkPaid = () => {
     if (!submissionId) return;
@@ -115,21 +131,6 @@ export function SubmissionReviewDrawer({
       { submissionId, adminUserId },
       {
         onSuccess: () => {
-          onOpenChange(false);
-        },
-      }
-    );
-  };
-
-  const handleReject = () => {
-    if (!submissionId || !rejectReason.trim()) return;
-
-    rejectMutation.mutate(
-      { submissionId, reason: rejectReason, adminUserId },
-      {
-        onSuccess: () => {
-          setRejectModalOpen(false);
-          setRejectReason("");
           onOpenChange(false);
         },
       }
@@ -197,6 +198,12 @@ export function SubmissionReviewDrawer({
                   <h3 className="text-sm font-semibold text-gray-900">Submission Summary</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-xs text-gray-600">Work Period</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {formatWorkPeriodDisplay(submission.workPeriod, submission.periodStart)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
                       <span className="text-xs text-gray-600">Contractor</span>
                       <span className="text-sm font-medium text-gray-900">{submission.contractorName}</span>
                     </div>
@@ -205,9 +212,11 @@ export function SubmissionReviewDrawer({
                       <span className="text-sm font-medium text-gray-900">{submission.contractorEmail}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-xs text-gray-600">Submission Period</span>
+                      <span className="text-xs text-gray-600">Period Dates</span>
                       <span className="text-sm font-medium text-gray-900">
-                        {format(new Date(submission.periodStart), "MMM d")} - {format(new Date(submission.periodEnd), "MMM d, yyyy")}
+                        {submission.periodStart && submission.periodEnd 
+                          ? `${format(new Date(submission.periodStart), "MMM d")} - ${format(new Date(submission.periodEnd), "MMM d, yyyy")}`
+                          : "—"}
                       </span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-gray-100">
@@ -308,7 +317,7 @@ export function SubmissionReviewDrawer({
           {/* Sticky Footer with CTAs */}
           {submission && (
             <div className="px-6 py-4 border-t border-gray-200 bg-white">
-              {isPaid ? (
+              {isPaid || submission.status === "paid" ? (
                 <div className="text-center py-2">
                   <p className="text-sm text-gray-600">
                     This submission has been paid.
@@ -321,7 +330,7 @@ export function SubmissionReviewDrawer({
                   </p>
                 </div>
               ) : canAdminAct ? (
-                // Admin actions for AWAITING_ADMIN_PAYMENT (approved) submissions
+                // Admin actions ONLY available after Manager approval (status = approved)
                 <div className="space-y-2">
                   <Button
                     onClick={handleMarkPaid}
@@ -356,51 +365,25 @@ export function SubmissionReviewDrawer({
                     Awaiting response from manager for clarification request.
                   </p>
                 </div>
-              ) : submission.status === "submitted" ? (
+              ) : submission.status === "submitted" || submission.status === "pending_manager" ? (
+                // Submission is pending manager approval - Admin cannot act
                 <div className="text-center py-2">
-                  <p className="text-sm text-gray-600">
-                    This submission is pending manager approval.
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
+                    <p className="text-sm text-blue-700 font-medium">
+                      Actions available after Manager approval.
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    This submission is pending manager review.
                   </p>
                 </div>
               ) : (
-                // Fallback for other statuses (legacy)
-                <div className="space-y-2">
-                  <Button
-                    onClick={handleApprove}
-                    className="w-full bg-green-600 hover:bg-green-700 h-10 rounded-lg"
-                    disabled={approveMutation.isPending}
-                  >
-                    {approveMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Approving...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Approve
-                      </>
-                    )}
-                  </Button>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setRejectModalOpen(true)}
-                      className="h-10 rounded-lg border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 hover:border-red-400"
-                      disabled={rejectMutation.isPending}
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Reject
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setClarificationModalOpen(true)}
-                      className="h-10 rounded-lg border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-400"
-                      disabled={clarifyMutation.isPending}
-                    >
-                      <AlertCircle className="w-4 h-4 mr-2" />
-                      Clarify
-                    </Button>
+                // Fallback for any other status - still no Admin actions without Manager approval
+                <div className="text-center py-2">
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <p className="text-sm text-gray-600">
+                      Actions available after Manager approval.
+                    </p>
                   </div>
                 </div>
               )}
@@ -408,65 +391,6 @@ export function SubmissionReviewDrawer({
           )}
         </SheetContent>
       </Sheet>
-
-      {/* Reject Modal */}
-      <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
-        <DialogContent className="sm:max-w-[440px] bg-white p-0" aria-describedby="reject-description">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200">
-            <DialogTitle className="text-lg font-semibold text-gray-900">
-              Reject Submission
-            </DialogTitle>
-            <DialogDescription id="reject-description" className="sr-only">
-              Provide a reason for rejecting this submission
-            </DialogDescription>
-          </DialogHeader>
-          <div className="px-6 py-6 space-y-4">
-            <div>
-              <Label htmlFor="reject-reason" className="text-sm font-medium text-gray-900 mb-2 block">
-                Reason for Rejection <span className="text-red-600">*</span>
-              </Label>
-              <Textarea
-                id="reject-reason"
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Provide reason for rejection…"
-                rows={5}
-                className="bg-gray-50 border-gray-200 rounded-lg resize-none"
-              />
-              <p className="text-xs text-gray-500 mt-1.5">
-                This will be sent to the contractor and reporting manager.
-              </p>
-            </div>
-          </div>
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setRejectModalOpen(false);
-                setRejectReason("");
-              }}
-              className="flex-1 h-10 rounded-lg border-gray-200"
-              disabled={rejectMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleReject}
-              disabled={!rejectReason.trim() || rejectMutation.isPending}
-              className="flex-1 h-10 rounded-lg bg-red-600 hover:bg-red-700"
-            >
-              {rejectMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Rejecting...
-                </>
-              ) : (
-                "Confirm Rejection"
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Clarification Modal */}
       <Dialog open={clarificationModalOpen} onOpenChange={setClarificationModalOpen}>

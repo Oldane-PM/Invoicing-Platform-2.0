@@ -1,12 +1,11 @@
+// MUST be first import - loads environment variables before other modules
+import './env';
+
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
-import dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
@@ -33,12 +32,11 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 // Import routes here
 import exampleRoutes from './routes/example.routes';
+import invoiceRoutes from './routes/invoice.routes';
 
 // Register routes
 app.use('/api/example', exampleRoutes);
-// Add more routes:
-// app.use('/api/invoices', invoiceRoutes);
-// app.use('/api/users', userRoutes);
+app.use('/api/invoices', invoiceRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: any) => {

@@ -36,18 +36,30 @@ const statusStyles: Record<string, string> = {
 };
 
 /**
- * Normalize status from DB (uppercase) to display format (Title Case)
+ * Normalize status to display format (Title Case)
+ * Handles both legacy DB statuses and new workflow statuses
  */
 function normalizeStatus(status: string): "Pending" | "Approved" | "Rejected" | "Paid" {
-  switch (status?.toUpperCase()) {
+  const normalized = status?.toUpperCase();
+  switch (normalized) {
+    // New workflow statuses
+    case "AWAITING_ADMIN_PAYMENT":
+      return "Approved";
+    case "REJECTED_CONTRACTOR":
+      return "Rejected";
+    case "PAID":
+      return "Paid";
+    case "PENDING_MANAGER":
+    case "CLARIFICATION_REQUESTED":
+      return "Pending";
+    // Legacy statuses (for backwards compatibility)
     case "APPROVED":
       return "Approved";
     case "REJECTED":
       return "Rejected";
-    case "PAID":
-      return "Paid";
     case "PENDING":
     case "NEEDS_CLARIFICATION":
+    case "SUBMITTED":
     default:
       return "Pending";
   }
