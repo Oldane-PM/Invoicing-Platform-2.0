@@ -14,6 +14,7 @@ import {
   Users,
   Shield,
   Calendar,
+  Briefcase,
   LogOut,
   User as UserIcon,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { SubmitHoursPage } from "./pages/contractor/SubmitHours";
 import { EmployeeDirectory } from "./pages/admin/EmployeeDirectory";
 import { UserAccessManagement } from "./pages/admin/UserAccessManagement";
 import { AdminCalendar } from "./pages/admin/Calendar";
+import { AdminProjects } from "./pages/admin/Projects";
 import { NotificationBell } from "./components/shared/NotificationBell";
 import { NotificationDrawer } from "./components/shared/NotificationDrawer";
 import { ContractorDetailDrawer } from "./components/drawers/ContractorDetailDrawer";
@@ -34,7 +36,7 @@ import { useAuth } from "./lib/hooks/useAuth";
 import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
 import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 
-type Screen = "dashboard" | "directory" | "access" | "calendar";
+type Screen = "dashboard" | "directory" | "access" | "calendar" | "projects";
 type ManagerScreen = "dashboard" | "team";
 type ContractorScreen =
   | "dashboard"
@@ -187,6 +189,11 @@ function App() {
           title: "Calendar",
           subtitle:
             "Manage holidays and special time off that affect employee submissions",
+        };
+      case "projects":
+        return {
+          title: "Projects",
+          subtitle: "Manage projects and track resources",
         };
       default:
         return { title: "", subtitle: "" };
@@ -547,6 +554,17 @@ function App() {
               <Calendar className="w-4 h-4" />
               <span className="font-medium text-sm md:text-base">Calendar</span>
             </button>
+            <button
+              onClick={() => setCurrentScreen("projects")}
+              className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
+                currentScreen === "projects"
+                  ? "border-purple-600 text-purple-600"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+              }`}
+            >
+              <Briefcase className="w-4 h-4" />
+              <span className="font-medium text-sm md:text-base">Projects</span>
+            </button>
           </div>
         </div>
       </div>
@@ -561,6 +579,7 @@ function App() {
         )}
         {currentScreen === "access" && <UserAccessManagement />}
         {currentScreen === "calendar" && <AdminCalendar />}
+        {currentScreen === "projects" && <AdminProjects />}
       </main>
 
       {/* Drawers */}

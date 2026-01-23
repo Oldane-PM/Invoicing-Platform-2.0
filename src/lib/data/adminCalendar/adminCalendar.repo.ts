@@ -210,7 +210,7 @@ export async function getUpcomingCalendarEntries(startDate: Date, endDate: Date)
  */
 export async function getAffectedContractorCount(
   scopeType: TimeOffScopeType,
-  scopeRoles: string[]
+  _scopeRoles: string[]
 ): Promise<number> {
   const supabase = getSupabaseClient();
 

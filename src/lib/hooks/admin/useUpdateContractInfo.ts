@@ -17,7 +17,7 @@ export function useUpdateContractInfo() {
 
   return useMutation({
     mutationFn: (payload: ContractInfoUpdatePayload) => updateContractInfo(payload),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       console.log("[useUpdateContractInfo] Contract info updated, invalidating caches");
 
       // Invalidate Employee Directory cache (admin view)

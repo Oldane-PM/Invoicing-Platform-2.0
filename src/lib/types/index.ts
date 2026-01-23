@@ -290,3 +290,37 @@ export interface EmployeeDirectoryRow {
   position?: string;
   department?: string;
 }
+
+// ============================================
+// PROJECT TYPES
+// ============================================
+
+export interface ProjectRow {
+  id: string;
+  name: string;
+  client: string;
+  description: string | null;
+  resourceCount: number;
+  startDate: string;
+  endDate: string | null;
+  createdAt: string;
+}
+
+export interface CreateProjectInput {
+  name: string;
+  client: string;
+  description?: string | null;
+  resourceCount?: number;
+  startDate: string;
+  endDate?: string | null;
+}
+
+export interface UpdateProjectInput {
+  id: string;
+  name: string;
+  client: string;
+  description?: string | null;
+  resourceCount: number;
+  startDate: string;
+  endDate?: string | null;
+}
