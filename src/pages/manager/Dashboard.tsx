@@ -4,6 +4,7 @@ import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { MetricCard } from "../../components/shared/MetricCard";
 import { Combobox } from "../../components/shared/Combobox";
+import { MultiMonthSelector } from "../../components/shared/MultiMonthSelector";
 import { Badge } from "../../components/ui/badge";
 import {
   Table,
@@ -115,7 +116,7 @@ function formatWorkPeriod(submission: ManagerSubmission): string {
 export function ManagerDashboard() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("");
-  const [timeRangeFilter, setTimeRangeFilter] = React.useState("");
+  const [selectedMonths, setSelectedMonths] = React.useState<string[]>([]);
   const [selectedSubmission, setSelectedSubmission] =
     React.useState<ManagerSubmission | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -167,18 +168,66 @@ export function ManagerDashboard() {
     }
   };
 
-  // Filter submissions by search query (client-side)
+
+  // Filter submissions by search query and selected months (client-side)
   const filteredSubmissions = React.useMemo(() => {
-    if (!searchQuery) return submissions;
+    let filtered = submissions;
 
-    return submissions.filter((submission) => {
-      const contractorName = submission.contractorName?.toLowerCase() || "";
-      const contractorEmail = submission.contractorEmail?.toLowerCase() || "";
-      const query = searchQuery.toLowerCase();
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter((submission) => {
+        const contractorName = submission.contractorName?.toLowerCase() || "";
+        const contractorEmail = submission.contractorEmail?.toLowerCase() || "";
+        const query = searchQuery.toLowerCase();
 
-      return contractorName.includes(query) || contractorEmail.includes(query);
-    });
-  }, [submissions, searchQuery]);
+        return contractorName.includes(query) || contractorEmail.includes(query);
+      });
+    }
+
+    // Filter by selected months
+    if (selectedMonths.length > 0) {
+      filtered = filtered.filter((submission) => {
+        // Extract YYYY-MM from workPeriod
+        const workPeriod = submission.workPeriod;
+        if (!workPeriod) return false;
+
+        // Handle different workPeriod formats
+        let monthKey: string | null = null;
+
+        // Format: "YYYY-MM"
+        if (/^\d{4}-\d{2}$/.test(workPeriod)) {
+          monthKey = workPeriod;
+        }
+        // Format: "January 2026" or similar
+        else if (/^[A-Za-z]+ \d{4}$/.test(workPeriod)) {
+          try {
+            const date = new Date(workPeriod);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            monthKey = `${year}-${month}`;
+          } catch {
+            return false;
+          }
+        }
+        // Format: "2026-01-01" or other date strings
+        else {
+          try {
+            const date = new Date(workPeriod);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            monthKey = `${year}-${month}`;
+          } catch {
+            return false;
+          }
+        }
+
+        return monthKey ? selectedMonths.includes(monthKey) : false;
+      });
+    }
+
+    return filtered;
+  }, [submissions, searchQuery, selectedMonths]);
+
 
   const isLoading = metricsLoading || submissionsLoading || teamLoading;
 
@@ -272,25 +321,20 @@ export function ManagerDashboard() {
                 />
               </div>
               <div className="md:col-span-4">
-                <Combobox
-                  value={timeRangeFilter}
-                  onValueChange={setTimeRangeFilter}
-                  options={[
-                    { value: "this_month", label: "This Month" },
-                    { value: "last_month", label: "Last Month" },
-                    { value: "this_quarter", label: "This Quarter" },
-                  ]}
+                <MultiMonthSelector
+                  selectedMonths={selectedMonths}
+                  onMonthsChange={setSelectedMonths}
                   placeholder="All Time"
                 />
               </div>
               <div className="md:col-span-4 flex md:justify-end">
-                {(searchQuery || statusFilter || timeRangeFilter) && (
+                {(searchQuery || statusFilter || selectedMonths.length > 0) && (
                   <Button
                     variant="outline"
                     onClick={() => {
                       setSearchQuery("");
                       setStatusFilter("");
-                      setTimeRangeFilter("");
+                      setSelectedMonths([]);
                       toast.success("All filters cleared");
                     }}
                     className="w-full md:w-auto h-11 border-gray-200 rounded-lg"
@@ -357,7 +401,7 @@ export function ManagerDashboard() {
                         <FileText className="h-12 w-12 text-gray-300" />
                         <p className="text-gray-600">No submissions found</p>
                         <p className="text-sm text-gray-500">
-                          {searchQuery || statusFilter || timeRangeFilter
+                          {searchQuery || statusFilter || selectedMonths.length > 0
                             ? "Try adjusting your filters"
                             : "Submissions will appear here"}
                         </p>
