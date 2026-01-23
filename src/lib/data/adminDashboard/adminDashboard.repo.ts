@@ -19,6 +19,7 @@ import type {
 import {
   calculateTotalAmount,
 } from './adminDashboard.mappers';
+import { toSafeNumber, calculateFixedTotal } from '../../calculations';
 
 /**
  * Get admin dashboard metrics
@@ -170,13 +171,56 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
     if (sub.status === 'approved' && sub.paid_at) {
       displayStatus = 'paid';
     }
+    ratesMap.get(r.contract_id)!.push(r);
+  });
+
+  // Map to domain type with merged data
+  let submissions = data.map(sub => {
+    const contractor = contractorMap.get(sub.contractor_user_id);
+    const contract = contractMap.get(sub.contract_id);
+    const manager = contract?.manager_user_id ? managerMap.get(contract.manager_user_id) : null;
+    const contractRates = ratesMap.get(sub.contract_id) || [];
+
+    // Calculate hours
+    const lineItems = Array.isArray(sub.submission_line_items) ? sub.submission_line_items : [];
+    const overtimeEntries = Array.isArray(sub.overtime_entries) ? sub.overtime_entries : [];
+    const regularHours = lineItems.reduce((sum: number, li: any) => sum + (li.hours || 0), 0);
+    const overtimeHours = overtimeEntries.reduce((sum: number, ot: any) => sum + (ot.overtime_hours || 0), 0);
+
+    // Find current rate
+    const today = new Date().toISOString().split('T')[0];
+    const currentRate = contractRates.find(r =>
+      r.effective_from <= today && (!r.effective_to || r.effective_to >= today)
+    );
+
+    // Determine contractor type
+    const contractType = contract?.contract_type === 'hourly' ? 'Hourly' as const : 'Fixed' as const;
+    
+    // Calculate total amount based on contractor type
+    let totalAmount: number;
+    if (sub.total_amount) {
+      // Use stored total if available
+      totalAmount = toSafeNumber(sub.total_amount);
+    } else if (contractType === 'Fixed') {
+      // For fixed-rate contractors, use monthly rate (from contract/rates)
+      const monthlyRate = currentRate?.monthly_rate || currentRate?.fixed_rate || 0;
+      totalAmount = calculateFixedTotal({ monthlyRate });
+    } else {
+      // For hourly contractors, calculate from hours × rates
+      totalAmount = calculateTotalAmount(
+        regularHours,
+        overtimeHours,
+        currentRate?.hourly_rate,
+        currentRate?.overtime_multiplier
+      );
+    }
 
     return {
       id: sub.id,
-      contractorName: profile?.full_name || 'Unknown Contractor',
-      contractorType: 'Hourly' as const, // Default, could be enhanced with contract lookup
-      projectName: sub.project_name || 'Unknown Project',
-      managerName: 'Manager', // Could be enhanced with manager lookup if needed
+      contractorName: contractor?.full_name || 'Unknown Contractor',
+      contractorType: contractType,
+      projectName: contract?.project_name || 'Unknown Project',
+      managerName: manager?.full_name || 'Unknown Manager',
       regularHours,
       overtimeHours,
       totalAmount,
@@ -290,10 +334,52 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
   // Handle potential array or object return from joins
   const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
 
-  // Use direct columns - same as Manager repo
-  const regularHours = data.regular_hours || 0;
-  const overtimeHours = data.overtime_hours || 0;
-  const totalAmount = data.total_amount || 0;
+  // Fetch manager
+  const { data: manager } = contract?.manager_user_id ? await supabase
+    .from('app_users')
+    .select('full_name')
+    .eq('id', contract.manager_user_id)
+    .single() : { data: null };
+
+  // Fetch rates
+  const { data: rates } = await supabase
+    .from('rates')
+    .select('hourly_rate, overtime_multiplier, effective_from, effective_to')
+    .eq('contract_id', data.contract_id);
+
+  // Calculate hours
+  const lineItems = Array.isArray(data.submission_line_items) ? data.submission_line_items : [];
+  const overtimeEntries = Array.isArray(data.overtime_entries) ? data.overtime_entries : [];
+  const regularHours = lineItems.reduce((sum: number, li: any) => sum + (li.hours || 0), 0);
+  const overtimeHours = overtimeEntries.reduce((sum: number, ot: any) => sum + (ot.overtime_hours || 0), 0);
+
+  // Find current rate
+  const today = new Date().toISOString().split('T')[0];
+  const currentRate = (rates || []).find(r =>
+    r.effective_from <= today && (!r.effective_to || r.effective_to >= today)
+  );
+
+  // Determine contractor type
+  const contractType = contract?.contract_type === 'hourly' ? 'Hourly' as const : 'Fixed' as const;
+  
+  // Calculate total amount based on contractor type
+  let totalAmount: number;
+  if (data.total_amount) {
+    // Use stored total if available
+    totalAmount = toSafeNumber(data.total_amount);
+  } else if (contractType === 'Fixed') {
+    // For fixed-rate contractors, use monthly rate
+    const monthlyRate = currentRate?.monthly_rate || currentRate?.fixed_rate || 0;
+    totalAmount = calculateFixedTotal({ monthlyRate });
+  } else {
+    // For hourly contractors, calculate from hours × rates
+    totalAmount = calculateTotalAmount(
+      regularHours,
+      overtimeHours,
+      currentRate?.hourly_rate,
+      currentRate?.overtime_multiplier
+    );
+  }
 
   // Determine display status (paid if approved + has paid_at)
   let displayStatus = data.status;
@@ -303,11 +389,11 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
 
   return {
     id: data.id,
-    contractorName: profile?.full_name || 'Unknown Contractor',
-    contractorEmail: profile?.email || '',
-    contractorType: 'Hourly' as const, // Default
-    projectName: data.project_name || 'Unknown Project',
-    managerName: 'Manager', // Could be enhanced with manager lookup
+    contractorName: contractor?.full_name || 'Unknown Contractor',
+    contractorEmail: contractor?.email || '',
+    contractorType: contractType,
+    projectName: contract?.project_name || 'Unknown Project',
+    managerName: manager?.full_name || 'Unknown Manager',
     regularHours,
     overtimeHours,
     totalAmount,

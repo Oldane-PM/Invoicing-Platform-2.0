@@ -6,23 +6,47 @@
  */
 
 import type { AdminSubmission, SubmissionDetails } from './adminDashboard.types';
-
-// Rate constants - fallback if rates not found
-const DEFAULT_HOURLY_RATE = 75;
-const DEFAULT_OT_MULTIPLIER = 1.5;
+import {
+  calculateHourlyTotal,
+  calculateFixedTotal,
+  toSafeNumber,
+  normalizePayType,
+  DEFAULT_HOURLY_RATE,
+  DEFAULT_OT_MULTIPLIER,
+} from '../../calculations';
 
 /**
  * Calculate total amount based on hours and rates
+ * 
+ * Uses the centralized calculation utility.
+ * For hourly: (regularRate × regularHours) + (overtimeRate × overtimeHours)
+ * For fixed: uses monthlyRate directly
  */
 export function calculateTotalAmount(
   regularHours: number,
   overtimeHours: number,
   hourlyRate: number = DEFAULT_HOURLY_RATE,
-  otMultiplier: number = DEFAULT_OT_MULTIPLIER
+  otMultiplier: number = DEFAULT_OT_MULTIPLIER,
+  contractType?: 'hourly' | 'fixed' | string,
+  monthlyRate?: number
 ): number {
-  const regularAmount = regularHours * hourlyRate;
-  const overtimeAmount = overtimeHours * hourlyRate * otMultiplier;
-  return regularAmount + overtimeAmount;
+  const payType = normalizePayType(contractType);
+  
+  if (payType === 'fixed' && monthlyRate !== undefined) {
+    return calculateFixedTotal({ monthlyRate });
+  }
+  
+  // Calculate overtime rate from multiplier
+  const overtimeRate = toSafeNumber(hourlyRate) * toSafeNumber(otMultiplier);
+  
+  const { totalAmount } = calculateHourlyTotal({
+    regularRate: hourlyRate,
+    regularHours,
+    overtimeRate,
+    overtimeHours,
+  });
+  
+  return totalAmount;
 }
 
 /**

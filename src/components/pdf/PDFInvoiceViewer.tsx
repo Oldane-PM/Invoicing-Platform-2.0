@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { X, Download } from "lucide-react";
 import { format } from "date-fns";
+import { calculateHourlyTotal, calculateFixedTotal } from "../../lib/calculations";
 
 interface InvoiceData {
   // Submission Data
@@ -26,6 +27,10 @@ interface InvoiceData {
   hourlyRate: number;
   overtimeRate: number;
   position: string;
+  
+  // Pay type info (for fixed-rate contractors)
+  payType?: "hourly" | "fixed";
+  monthlyRate?: number;
   
   // Banking Details
   bankName?: string;
@@ -50,10 +55,31 @@ interface PDFInvoiceViewerProps {
 export function PDFInvoiceViewer({ open, onOpenChange, invoiceData }: PDFInvoiceViewerProps) {
   if (!invoiceData) return null;
 
-  // Calculate amounts
-  const regularAmount = invoiceData.regularHours * invoiceData.hourlyRate;
-  const overtimeAmount = invoiceData.overtimeHours * invoiceData.overtimeRate;
-  const totalAmount = regularAmount + overtimeAmount;
+  // Determine if this is a fixed-rate contractor
+  const isFixedRate = invoiceData.payType === "fixed";
+
+  // Calculate amounts using centralized calculation
+  let regularAmount: number;
+  let overtimeAmount: number;
+  let totalAmount: number;
+
+  if (isFixedRate && invoiceData.monthlyRate !== undefined) {
+    // Fixed-rate contractor: total is the monthly rate
+    regularAmount = 0;
+    overtimeAmount = 0;
+    totalAmount = calculateFixedTotal({ monthlyRate: invoiceData.monthlyRate });
+  } else {
+    // Hourly contractor: calculate from hours × rates
+    const calculation = calculateHourlyTotal({
+      regularRate: invoiceData.hourlyRate,
+      regularHours: invoiceData.regularHours,
+      overtimeRate: invoiceData.overtimeRate,
+      overtimeHours: invoiceData.overtimeHours,
+    });
+    regularAmount = calculation.regularAmount;
+    overtimeAmount = calculation.overtimeAmount;
+    totalAmount = calculation.totalAmount;
+  }
 
   // Generate invoice number (in real app, this would come from backend)
   const invoiceNumber = `INV-${invoiceData.submissionId}`;
