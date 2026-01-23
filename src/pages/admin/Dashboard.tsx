@@ -49,6 +49,52 @@ const statusLabels: Record<string, string> = {
   paid: "Paid",
 };
 
+/**
+ * Format work period for display (null-safe with fallback)
+ * Expects workPeriod in format "YYYY-MM" or uses periodStart as fallback
+ */
+function formatWorkPeriod(workPeriod: string | undefined, periodStart: string | undefined): string {
+  // Try to parse workPeriod if it exists
+  if (workPeriod) {
+    // If it's already formatted like "January 2026", return as-is abbreviated
+    if (/^[A-Za-z]+ \d{4}$/.test(workPeriod)) {
+      try {
+        return format(new Date(workPeriod), "MMM yyyy");
+      } catch {
+        return workPeriod;
+      }
+    }
+
+    // If it's "YYYY-MM" format
+    if (/^\d{4}-\d{2}$/.test(workPeriod)) {
+      try {
+        const [year, month] = workPeriod.split("-").map(Number);
+        return format(new Date(year, month - 1, 1), "MMM yyyy");
+      } catch {
+        return workPeriod;
+      }
+    }
+
+    // If it's a date string like "2026-01-01"
+    try {
+      return format(new Date(workPeriod), "MMM yyyy");
+    } catch {
+      return workPeriod;
+    }
+  }
+
+  // Fallback: use periodStart if work period is missing
+  if (periodStart) {
+    try {
+      return format(new Date(periodStart), "MMM yyyy");
+    } catch {
+      return "—";
+    }
+  }
+
+  return "—";
+}
+
 export function AdminDashboard() {
   // Filters state
   const [filters, setFilters] = React.useState<SubmissionFilters>({});
@@ -231,6 +277,9 @@ export function AdminDashboard() {
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-gray-50">
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                  Work Period
+                </TableHead>
+                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
                   Contractor
                 </TableHead>
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
@@ -253,7 +302,7 @@ export function AdminDashboard() {
             <TableBody>
               {submissionsLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
+                  <TableCell colSpan={7} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <Loader2 className="w-8 h-8 mb-3 animate-spin" />
                       <div className="text-gray-600 font-medium">Loading submissions...</div>
@@ -262,7 +311,7 @@ export function AdminDashboard() {
                 </TableRow>
               ) : submissionsError ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
+                  <TableCell colSpan={7} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <AlertCircle className="w-16 h-16 mb-3 text-red-500" />
                       <div className="text-gray-600 font-medium mb-2">Failed to load submissions</div>
@@ -274,7 +323,7 @@ export function AdminDashboard() {
                 </TableRow>
               ) : !submissions || submissions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
+                  <TableCell colSpan={7} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <FileX className="w-16 h-16 mb-3" strokeWidth={1.5} />
                       <div className="text-gray-600 font-medium">No submissions match your filters</div>
@@ -289,6 +338,9 @@ export function AdminDashboard() {
                     className="h-16 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
                     onClick={() => handleSubmissionClick(submission.id)}
                   >
+                    <TableCell className="text-gray-700">
+                      {formatWorkPeriod(submission.workPeriod, submission.periodStart)}
+                    </TableCell>
                     <TableCell>
                       <div>
                         <div className="font-medium text-gray-900">{submission.contractorName}</div>
@@ -298,8 +350,8 @@ export function AdminDashboard() {
                       </div>
                     </TableCell>
                     <TableCell className="text-gray-700">{submission.contractorType}</TableCell>
-                    <TableCell className="text-gray-700">{submission.regularHours}</TableCell>
-                    <TableCell className="text-gray-700">{submission.overtimeHours}</TableCell>
+                    <TableCell className="text-gray-700">{submission.regularHours}h</TableCell>
+                    <TableCell className="text-gray-700">{submission.overtimeHours}h</TableCell>
                     <TableCell className="font-semibold text-gray-900">
                       ${submission.totalAmount.toLocaleString()}
                     </TableCell>

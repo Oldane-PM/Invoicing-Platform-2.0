@@ -21,11 +21,13 @@ export interface AdminSubmission {
   regularHours: number;
   overtimeHours: number;
   totalAmount: number;
-  status: 'submitted' | 'approved' | 'rejected' | 'needs_clarification' | 'paid';
+  status: 'submitted' | 'pending_manager' | 'approved' | 'rejected' | 'needs_clarification' | 'clarification_requested' | 'paid';
   submittedAt: string;
   periodStart: string;
   periodEnd: string;
+  workPeriod: string; // Work period in YYYY-MM format or formatted string
   paidAt?: string | null; // Timestamp when submission was paid
+  approvedAt?: string | null; // Timestamp when manager approved (required for admin actions)
 }
 
 export interface SubmissionDetails extends AdminSubmission {
@@ -36,6 +38,7 @@ export interface SubmissionDetails extends AdminSubmission {
   clarificationMessage?: string;
   adminNote?: string | null; // Admin's clarification request note
   managerNote?: string | null; // Manager's response to clarification
+  overtimeDescription?: string | null; // Description of overtime work
 }
 
 export interface SubmissionFilters {
@@ -45,17 +48,6 @@ export interface SubmissionFilters {
   project?: string;
   manager?: string;
   month?: string;
-}
-
-export interface ApproveSubmissionParams {
-  submissionId: string;
-  adminUserId: string;
-}
-
-export interface RejectSubmissionParams {
-  submissionId: string;
-  reason: string;
-  adminUserId: string;
 }
 
 export interface RequestClarificationParams {
