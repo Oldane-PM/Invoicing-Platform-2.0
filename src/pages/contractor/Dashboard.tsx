@@ -2,12 +2,10 @@ import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { ContractorSubmissionDrawer } from "../../components/drawers/ContractorSubmissionDrawer";
-import { PDFInvoiceViewer } from "../../components/pdf/PDFInvoiceViewer";
-import { Plus, Clock, FileText, Loader2, RefreshCw, Edit } from "lucide-react";
+import { InvoiceButton } from "../../components/shared/InvoiceButton";
+import { Plus, Clock, Loader2, RefreshCw, Edit } from "lucide-react";
 import { format, parse } from "date-fns";
-import { toast } from "sonner";
 import { useSubmissions } from "../../lib/hooks/contractor/useSubmissions";
-import { useAuth } from "../../lib/hooks/useAuth";
 import { getWorkPeriodKey, groupSubmissionsByWorkPeriod } from "../../lib/utils";
 import type { ContractorSubmission, SubmissionStatus } from "../../lib/types";
 
@@ -66,7 +64,6 @@ export function ContractorDashboard({
 }: ContractorDashboardProps) {
   // Use the Supabase-backed submissions hook
   const { submissions, loading, error, refetch } = useSubmissions();
-  const { profile } = useAuth(); // Get live profile data
 
   // Get the 3 most recent submissions for the dashboard, grouped by Work Period
   const groupedRecentSubmissions = React.useMemo(() => {
@@ -90,83 +87,10 @@ export function ContractorDashboard({
   const [selectedSubmission, setSelectedSubmission] =
     React.useState<ContractorSubmission | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const [pdfViewerOpen, setPdfViewerOpen] = React.useState(false);
-  const [pdfInvoiceData, setPdfInvoiceData] = React.useState<any>(null);
 
   const handleCardClick = (submission: ContractorSubmission) => {
     setSelectedSubmission(submission);
     setDrawerOpen(true);
-  };
-
-  const handleViewPDF = (
-    e: React.MouseEvent,
-    submission: ContractorSubmission
-  ) => {
-    e.stopPropagation(); // Prevent card click
-
-    // Check if invoice URL exists
-    if (!submission.invoiceUrl) {
-      toast.info("Invoice not yet available.", {
-        description: "Invoice will be generated once the submission is approved.",
-      });
-      return;
-    }
-
-    // Parse work period to get start/end dates
-    const workPeriodDate = submission.workPeriod
-      ? parse(submission.workPeriod, "yyyy-MM", new Date())
-      : new Date();
-    const workPeriodStart = new Date(
-      workPeriodDate.getFullYear(),
-      workPeriodDate.getMonth(),
-      1
-    );
-    const workPeriodEnd = new Date(
-      workPeriodDate.getFullYear(),
-      workPeriodDate.getMonth() + 1,
-      0
-    );
-
-    // Generate invoice data from submission + profile
-    // TODO: Fetch contractor rates, banking details, and company info from Supabase
-    const invoiceData = {
-      // Submission Data (from Supabase)
-      submissionId: submission.id,
-      submissionDate: new Date(submission.submissionDate),
-      workPeriodStart,
-      workPeriodEnd,
-      regularHours: submission.regularHours,
-      overtimeHours: submission.overtimeHours,
-      regularDescription: submission.description,
-      overtimeDescription: submission.overtimeDescription || undefined,
-
-      // Contractor Personal Info (from Supabase profile)
-      contractorName: profile?.fullName || "",
-      contractorAddress: "", // TODO: Add address field to contractor_profiles table
-      contractorCountry: "", // TODO: Add country field to contractor_profiles table
-      contractorEmail: profile?.email || "",
-
-      // Contract Info - TODO: Fetch from contracts table
-      hourlyRate: 0, // TODO: Fetch from contractor's active contract
-      overtimeRate: 0, // TODO: Calculate from contract overtime multiplier
-      position: profile?.role === "CONTRACTOR" ? "Contractor" : "Staff",
-
-      // Banking Details - TODO: Add bank_details table or fields
-      bankName: "",
-      bankAddress: "",
-      swiftCode: "",
-      routingNumber: "",
-      accountType: "",
-      accountNumber: "",
-      currency: "USD",
-
-      // Company/Client Info - TODO: Fetch from company_settings table
-      companyName: "",
-      companyAddress: "",
-    };
-
-    setPdfInvoiceData(invoiceData);
-    setPdfViewerOpen(true);
   };
 
   return (
@@ -334,38 +258,24 @@ export function ContractorDashboard({
                         )}
 
                         {/* Action Buttons */}
-                        <div className="mt-4 flex gap-2">
-                          {/* Edit Button - only for editable submissions */}
+                        <div className="mt-4 flex justify-between gap-2">
+                          {/* View Invoice Button - LEFT (uses backend-generated PDF) */}
+                          <InvoiceButton submissionId={submission.id} />
+                          
+                          {/* Edit Button - RIGHT - only for editable submissions */}
                           {(submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR") && onEditSubmission && (
                             <Button
-                              onClick={() => onEditSubmission(submission)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditSubmission(submission);
+                              }}
                               variant="outline"
-                              className="flex-1 h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50"
+                              className="h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50 px-4"
                             >
                               <Edit className="w-4 h-4 mr-2" />
                               Edit
                             </Button>
                           )}
-                          
-                          {/* View Invoice Button */}
-                          <Button
-                            onClick={(e) => handleViewPDF(e, submission)}
-                            disabled={!submission.invoiceUrl}
-                            className={`${
-                              (submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR") && onEditSubmission
-                                ? "flex-1"
-                                : "w-full"
-                            } h-10 rounded-[10px] px-4 ${
-                              submission.invoiceUrl
-                                ? "bg-blue-600 hover:bg-blue-700"
-                                : "bg-gray-300 cursor-not-allowed"
-                            }`}
-                          >
-                            <FileText className="w-4 h-4 mr-2" />
-                            {submission.invoiceUrl
-                              ? "View Invoice"
-                              : "Invoice Pending"}
-                          </Button>
                         </div>
                       </div>
                     );
@@ -382,13 +292,6 @@ export function ContractorDashboard({
         submission={selectedSubmission}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-      />
-
-      {/* PDF Invoice Viewer */}
-      <PDFInvoiceViewer
-        invoiceData={pdfInvoiceData}
-        open={pdfViewerOpen}
-        onOpenChange={setPdfViewerOpen}
       />
     </>
   );
