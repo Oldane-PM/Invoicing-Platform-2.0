@@ -32,6 +32,8 @@ export interface SubmissionsDataSource {
   hasSubmissionForPeriod(workPeriod: string): Promise<boolean>;
   /** Resubmit a rejected submission - updates status back to PENDING_MANAGER */
   resubmitAfterRejection(submissionId: string, updatedData?: Partial<SubmissionDraft>): Promise<ContractorSubmission>;
+  /** Delete a submission - not allowed for APPROVED or PAID submissions */
+  deleteSubmission(submissionId: string): Promise<void>;
 }
 
 
@@ -505,6 +507,57 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       managerNote: null,
       updatedAt: updated.updated_at,
     };
+  }
+
+  /**
+   * Delete a submission
+   * Not allowed for APPROVED or PAID submissions
+   */
+  async deleteSubmission(submissionId: string): Promise<void> {
+    if (!supabase) {
+      throw new Error("Supabase client not available");
+    }
+
+    const contractorUserId = await this.getContractorUserId();
+
+    // First verify this submission belongs to the user and check its status
+    const { data: existing, error: fetchError } = await supabase
+      .from("submissions")
+      .select("id, status, paid_at")
+      .eq("id", submissionId)
+      .eq("contractor_user_id", contractorUserId)
+      .single();
+
+    if (fetchError || !existing) {
+      throw new Error("Submission not found or access denied");
+    }
+
+    // Check if submission is approved or paid - block deletion
+    const currentStatus = mapDbStatusToSubmissionStatus(existing.status, existing.paid_at);
+    if (currentStatus === "PAID") {
+      throw new Error("Paid submissions cannot be deleted");
+    }
+    if (currentStatus === "AWAITING_ADMIN_PAYMENT") {
+      throw new Error("Approved submissions cannot be deleted");
+    }
+
+    // Perform the deletion
+    const { error: deleteError } = await supabase
+      .from("submissions")
+      .delete()
+      .eq("id", submissionId)
+      .eq("contractor_user_id", contractorUserId);
+
+    if (deleteError) {
+      console.error("[SupabaseSubmissionsDataSource] Error deleting submission:", deleteError);
+      throw new Error(deleteError.message || "Failed to delete submission");
+    }
+
+    // Clear cache since data has changed
+    SupabaseSubmissionsDataSource.cachedResult = null;
+    SupabaseSubmissionsDataSource.cacheTimestamp = 0;
+
+    console.log("[SupabaseSubmissionsDataSource] Deleted submission:", submissionId);
   }
 }
 

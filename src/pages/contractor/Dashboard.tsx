@@ -3,9 +3,21 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { ContractorSubmissionDrawer } from "../../components/drawers/ContractorSubmissionDrawer";
 import { InvoiceButton } from "../../components/shared/InvoiceButton";
-import { Plus, Clock, Loader2, RefreshCw, Edit } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
+import { Plus, Clock, Loader2, RefreshCw, Edit, Trash2 } from "lucide-react";
 import { format, parse } from "date-fns";
+import { toast } from "sonner";
 import { useSubmissions } from "../../lib/hooks/contractor/useSubmissions";
+import { useDeleteSubmission } from "../../lib/hooks/contractor/useDeleteSubmission";
 import { getWorkPeriodKey, groupSubmissionsByWorkPeriod } from "../../lib/utils";
 import type { ContractorSubmission, SubmissionStatus } from "../../lib/types";
 
@@ -64,6 +76,11 @@ export function ContractorDashboard({
 }: ContractorDashboardProps) {
   // Use the Supabase-backed submissions hook
   const { submissions, loading, error, refetch } = useSubmissions();
+  const { deleteSubmission, loading: isDeleting } = useDeleteSubmission();
+
+  // Delete confirmation state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [submissionToDelete, setSubmissionToDelete] = React.useState<ContractorSubmission | null>(null);
 
   // Get the 3 most recent submissions for the dashboard, grouped by Work Period
   const groupedRecentSubmissions = React.useMemo(() => {
@@ -91,6 +108,42 @@ export function ContractorDashboard({
   const handleCardClick = (submission: ContractorSubmission) => {
     setSelectedSubmission(submission);
     setDrawerOpen(true);
+  };
+
+  // Check if a submission can be deleted (not approved or paid)
+  const isDeletable = (status: SubmissionStatus) => {
+    return status !== "PAID" && status !== "AWAITING_ADMIN_PAYMENT";
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, submission: ContractorSubmission) => {
+    e.stopPropagation();
+    
+    // Show specific message if trying to delete non-deletable submission
+    if (submission.status === "PAID") {
+      toast.error("Paid submissions cannot be deleted");
+      return;
+    }
+    if (submission.status === "AWAITING_ADMIN_PAYMENT") {
+      toast.error("Approved submissions cannot be deleted");
+      return;
+    }
+    
+    setSubmissionToDelete(submission);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!submissionToDelete) return;
+    
+    const success = await deleteSubmission(submissionToDelete.id);
+    
+    if (success) {
+      toast.success("Submission deleted");
+      setIsDeleteDialogOpen(false);
+      setSubmissionToDelete(null);
+    } else {
+      toast.error("Failed to delete submission");
+    }
   };
 
   return (
@@ -262,20 +315,37 @@ export function ContractorDashboard({
                           {/* View Invoice Button - LEFT (uses backend-generated PDF) */}
                           <InvoiceButton submissionId={submission.id} />
                           
-                          {/* Edit Button - RIGHT - only for editable submissions */}
-                          {(submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR") && onEditSubmission && (
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEditSubmission(submission);
-                              }}
-                              variant="outline"
-                              className="h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50 px-4"
-                            >
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </Button>
-                          )}
+                          {/* RIGHT: Action Buttons */}
+                          <div className="flex gap-2">
+                            {/* Delete Button - only for deletable submissions */}
+                            {isDeletable(submission.status) && (
+                              <Button
+                                onClick={(e) => handleDeleteClick(e, submission)}
+                                variant="outline"
+                                size="icon"
+                                className="h-10 w-10 rounded-[10px] border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                                aria-label="Delete submission"
+                                title="Delete submission"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                            
+                            {/* Edit Button - only for editable submissions */}
+                            {(submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR") && onEditSubmission && (
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditSubmission(submission);
+                                }}
+                                variant="outline"
+                                className="h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50 px-4"
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -293,6 +363,35 @@ export function ContractorDashboard({
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
       />
+
+      {/* Delete Confirmation Modal */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Submission</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this submission? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
