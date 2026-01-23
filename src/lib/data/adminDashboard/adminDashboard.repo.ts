@@ -21,6 +21,7 @@ import type {
 import {
   calculateTotalAmount,
 } from './adminDashboard.mappers';
+import { toSafeNumber, calculateFixedTotal } from '../../calculations';
 
 /**
  * Get admin dashboard metrics
@@ -201,17 +202,32 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
       r.effective_from <= today && (!r.effective_to || r.effective_to >= today)
     );
 
-    const totalAmount = sub.total_amount || calculateTotalAmount(
-      regularHours,
-      overtimeHours,
-      currentRate?.hourly_rate,
-      currentRate?.overtime_multiplier
-    );
+    // Determine contractor type
+    const contractType = contract?.contract_type === 'hourly' ? 'Hourly' as const : 'Fixed' as const;
+    
+    // Calculate total amount based on contractor type
+    let totalAmount: number;
+    if (sub.total_amount) {
+      // Use stored total if available
+      totalAmount = toSafeNumber(sub.total_amount);
+    } else if (contractType === 'Fixed') {
+      // For fixed-rate contractors, use monthly rate (from contract/rates)
+      const monthlyRate = currentRate?.monthly_rate || currentRate?.fixed_rate || 0;
+      totalAmount = calculateFixedTotal({ monthlyRate });
+    } else {
+      // For hourly contractors, calculate from hours × rates
+      totalAmount = calculateTotalAmount(
+        regularHours,
+        overtimeHours,
+        currentRate?.hourly_rate,
+        currentRate?.overtime_multiplier
+      );
+    }
 
     return {
       id: sub.id,
       contractorName: contractor?.full_name || 'Unknown Contractor',
-      contractorType: contract?.contract_type === 'hourly' ? 'Hourly' as const : 'Fixed' as const,
+      contractorType: contractType,
       projectName: contract?.project_name || 'Unknown Project',
       managerName: manager?.full_name || 'Unknown Manager',
       regularHours,
@@ -339,12 +355,27 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
     r.effective_from <= today && (!r.effective_to || r.effective_to >= today)
   );
 
-  const totalAmount = data.total_amount || calculateTotalAmount(
-    regularHours,
-    overtimeHours,
-    currentRate?.hourly_rate,
-    currentRate?.overtime_multiplier
-  );
+  // Determine contractor type
+  const contractType = contract?.contract_type === 'hourly' ? 'Hourly' as const : 'Fixed' as const;
+  
+  // Calculate total amount based on contractor type
+  let totalAmount: number;
+  if (data.total_amount) {
+    // Use stored total if available
+    totalAmount = toSafeNumber(data.total_amount);
+  } else if (contractType === 'Fixed') {
+    // For fixed-rate contractors, use monthly rate
+    const monthlyRate = currentRate?.monthly_rate || currentRate?.fixed_rate || 0;
+    totalAmount = calculateFixedTotal({ monthlyRate });
+  } else {
+    // For hourly contractors, calculate from hours × rates
+    totalAmount = calculateTotalAmount(
+      regularHours,
+      overtimeHours,
+      currentRate?.hourly_rate,
+      currentRate?.overtime_multiplier
+    );
+  }
 
   // Extract description from line items
   const description = lineItems
@@ -356,7 +387,7 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
     id: data.id,
     contractorName: contractor?.full_name || 'Unknown Contractor',
     contractorEmail: contractor?.email || '',
-    contractorType: contract?.contract_type === 'hourly' ? 'Hourly' as const : 'Fixed' as const,
+    contractorType: contractType,
     projectName: contract?.project_name || 'Unknown Project',
     managerName: manager?.full_name || 'Unknown Manager',
     regularHours,

@@ -14,10 +14,12 @@ import type { ContractorSubmission, SubmissionDraft, SubmissionStatus } from "..
 import { mapDbStatusToSubmissionStatus } from "../types";
 import { supabase, isSupabaseConfigured } from "../supabase/client";
 import { format, parse, startOfMonth, endOfMonth } from "date-fns";
-
-// Rate constants - will be fetched from contract/rates table in production
-const DEFAULT_HOURLY_RATE = 75;
-const DEFAULT_OT_MULTIPLIER = 1.5;
+import {
+  calculateTotalForStorage,
+  DEFAULT_HOURLY_RATE,
+  DEFAULT_OT_MULTIPLIER,
+  getDefaultOvertimeRate,
+} from "../calculations";
 
 /**
  * Interface for submissions data source
@@ -281,15 +283,22 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     // Get contractor details (for rates)
     const details = await this.getContractorDetails(contractorUserId);
     const hourlyRate = details?.hourlyRate || DEFAULT_HOURLY_RATE;
-    const overtimeRate = details?.overtimeRate || (hourlyRate * DEFAULT_OT_MULTIPLIER);
+    const overtimeRate = details?.overtimeRate || getDefaultOvertimeRate(hourlyRate);
 
     // Parse work period to get period_start and period_end
     const periodDate = parse(draft.workPeriod, "yyyy-MM", new Date());
     const periodStart = format(startOfMonth(periodDate), "yyyy-MM-dd");
     const periodEnd = format(endOfMonth(periodDate), "yyyy-MM-dd");
 
-    // Calculate total amount
-    const totalAmount = (draft.hoursSubmitted * hourlyRate) + (draft.overtimeHours * overtimeRate);
+    // Calculate total amount using centralized calculation
+    // For now, assuming hourly contractors (fixed-rate logic can be added when contract type is available)
+    const totalAmount = calculateTotalForStorage({
+      payType: "hourly",
+      regularHours: draft.hoursSubmitted,
+      overtimeHours: draft.overtimeHours,
+      regularRate: hourlyRate,
+      overtimeRate: overtimeRate,
+    });
 
     const { data: submission, error: submissionError } = await supabase
       .from("submissions")
@@ -440,17 +449,28 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     }
     if (updatedData?.hoursSubmitted !== undefined) {
       updatePayload.regular_hours = updatedData.hoursSubmitted;
-      // Recalculate total if hours changed
-      const hourlyRate = DEFAULT_HOURLY_RATE;
-      const overtimeRate = hourlyRate * DEFAULT_OT_MULTIPLIER;
-      const overtimeHours = updatedData.overtimeHours ?? existing.overtime_hours ?? 0;
-      updatePayload.total_amount = (updatedData.hoursSubmitted * hourlyRate) + (overtimeHours * overtimeRate);
     }
     if (updatedData?.overtimeHours !== undefined) {
       updatePayload.overtime_hours = updatedData.overtimeHours;
     }
     if (updatedData?.overtimeDescription !== undefined) {
       updatePayload.overtime_description = updatedData.overtimeDescription;
+    }
+    
+    // Recalculate total if hours were updated
+    if (updatedData?.hoursSubmitted !== undefined || updatedData?.overtimeHours !== undefined) {
+      const regularHours = updatedData?.hoursSubmitted ?? existing.regular_hours ?? 0;
+      const overtimeHours = updatedData?.overtimeHours ?? existing.overtime_hours ?? 0;
+      const hourlyRate = DEFAULT_HOURLY_RATE;
+      const overtimeRate = getDefaultOvertimeRate(hourlyRate);
+      
+      updatePayload.total_amount = calculateTotalForStorage({
+        payType: "hourly",
+        regularHours,
+        overtimeHours,
+        regularRate: hourlyRate,
+        overtimeRate,
+      });
     }
 
     const { data: updated, error: updateError } = await supabase
