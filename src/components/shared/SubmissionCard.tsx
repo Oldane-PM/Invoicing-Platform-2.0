@@ -86,7 +86,7 @@ export function SubmissionCard({ submission, onEdit }: SubmissionCardProps) {
       {/* Action Buttons Row */}
       <div className="mt-4 flex flex-row justify-between gap-2">
         {/* LEFT: Invoice/View Invoice Button */}
-        <InvoiceButton invoiceUrl={submission.invoiceUrl} />
+        <InvoiceButton submissionId={submission.id} />
         
         {/* RIGHT: Edit Button (conditional) */}
         {isEditable && onEdit && (
