@@ -1,9 +1,22 @@
+import { useState } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { SubmissionStatusPill } from "./SubmissionStatusPill";
 import { InvoiceButton } from "./InvoiceButton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import { formatDate, formatCurrency } from "../../lib/utils";
-import { Edit } from "lucide-react";
+import { Edit, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useDeleteSubmission } from "../../lib/hooks/contractor";
 import type { ContractorSubmission } from "../../lib/types";
 
 interface SubmissionCardProps {
@@ -12,19 +25,41 @@ interface SubmissionCardProps {
 }
 
 export function SubmissionCard({ submission, onEdit }: SubmissionCardProps) {
-  // Debug logging
-  console.log('[SubmissionCard] Rendering submission:', {
-    id: submission.id,
-    status: submission.status,
-    rejectionReason: submission.rejectionReason,
-    hasRejectionReason: !!submission.rejectionReason,
-    isRejected: submission.status === "REJECTED_CONTRACTOR"
-  });
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const { deleteSubmission, loading: isDeleting } = useDeleteSubmission();
 
   // Check if submission can be edited
   const isEditable = submission.status === "PENDING_MANAGER" || submission.status === "REJECTED_CONTRACTOR";
   
-  console.log('[SubmissionCard] BUTTON ORDER: Invoice LEFT, Edit RIGHT - Build timestamp:', new Date().toISOString());
+  // Check if submission can be deleted (not approved or paid)
+  const isDeletable = submission.status !== "PAID" && submission.status !== "AWAITING_ADMIN_PAYMENT";
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Show specific message if trying to delete non-deletable submission
+    if (submission.status === "PAID") {
+      toast.error("Paid submissions cannot be deleted");
+      return;
+    }
+    if (submission.status === "AWAITING_ADMIN_PAYMENT") {
+      toast.error("Approved submissions cannot be deleted");
+      return;
+    }
+    
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    const success = await deleteSubmission(submission.id);
+    
+    if (success) {
+      toast.success("Submission deleted");
+      setIsDeleteDialogOpen(false);
+    } else {
+      toast.error("Failed to delete submission");
+    }
+  };
 
   return (
     <Card className="bg-white rounded-[14px] border border-[#EFEFEF] p-5 transition-all hover:shadow-md">
@@ -88,18 +123,64 @@ export function SubmissionCard({ submission, onEdit }: SubmissionCardProps) {
         {/* LEFT: Invoice/View Invoice Button */}
         <InvoiceButton submissionId={submission.id} />
         
-        {/* RIGHT: Edit Button (conditional) */}
-        {isEditable && onEdit && (
-          <Button
-            onClick={() => onEdit(submission)}
-            variant="outline"
-            className="h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50 px-4"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Edit Submission
-          </Button>
-        )}
+        {/* RIGHT: Action Buttons */}
+        <div className="flex gap-2">
+          {/* Delete Button - only for deletable submissions */}
+          {isDeletable && (
+            <Button
+              onClick={handleDeleteClick}
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-[10px] border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+              aria-label="Delete submission"
+              title="Delete submission"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
+          
+          {/* Edit Button (conditional) */}
+          {isEditable && onEdit && (
+            <Button
+              onClick={() => onEdit(submission)}
+              variant="outline"
+              className="h-10 rounded-[10px] border-blue-600 text-blue-600 hover:bg-blue-50 px-4"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Submission
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Submission</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this submission? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
