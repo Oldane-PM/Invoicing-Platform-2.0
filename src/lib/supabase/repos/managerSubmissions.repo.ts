@@ -25,8 +25,11 @@ export interface ManagerSubmission {
   submittedAt: string;
   approvedAt: string | null;
   paidAt: string | null;
-  hourlyRate?: number;
-  overtimeRate?: number;
+  // Contract/Rate information
+  contractType: "hourly" | "fixed"; // from contracts.contract_type
+  hourlyRate: number | null;        // from contractors.hourly_rate
+  overtimeRate: number | null;      // from contractors.overtime_rate
+  fixedMonthlyRate: number | null;  // derived: for fixed contracts, use total_amount as proxy or from future column
 }
 
 // Map DB status to filter values (lowercase)
@@ -70,15 +73,15 @@ export async function listTeamSubmissions(
     return [];
   }
 
-  // Build submissions query
-  // Using simplified join syntax to avoid "Could not find relationship" errors if FK names are strict
-  // We manually join or carefuly select related data
+  // Build submissions query - only join with profiles (which has proper FK relationship)
+  // Contractor rates and contract type will be fetched separately
   let query = supabase
     .from("submissions")
     .select(
       `
       id,
       contractor_user_id,
+      contract_id,
       project_name,
       description,
       work_period,
@@ -123,6 +126,36 @@ export async function listTeamSubmissions(
     throw error;
   }
 
+  // Fetch contractor rate information separately (contractors table uses contractor_id, not contractor_user_id)
+  const { data: contractorsData } = await supabase
+    .from("contractors")
+    .select("contractor_id, hourly_rate, overtime_rate")
+    .in("contractor_id", teamContractorIds);
+
+  // Build a map of contractor_id -> rate info
+  const contractorRatesMap = new Map<string, { hourlyRate: number | null; overtimeRate: number | null }>();
+  (contractorsData || []).forEach((c: any) => {
+    contractorRatesMap.set(c.contractor_id, {
+      hourlyRate: c.hourly_rate ?? null,
+      overtimeRate: c.overtime_rate ?? null,
+    });
+  });
+
+  // Fetch contract type information separately
+  const contractIds = [...new Set((data || []).map((s: any) => s.contract_id).filter(Boolean))];
+  const contractTypeMap = new Map<string, string>();
+  
+  if (contractIds.length > 0) {
+    const { data: contractsData } = await supabase
+      .from("contracts")
+      .select("id, contract_type")
+      .in("id", contractIds);
+    
+    (contractsData || []).forEach((c: any) => {
+      contractTypeMap.set(c.id, c.contract_type || "hourly");
+    });
+  }
+
   // Transform and filter by search if needed
   // Map lowercase DB status to uppercase frontend status
   const mapDbStatusToFrontend = (dbStatus: string, paidAt: string | null): string => {
@@ -141,26 +174,44 @@ export async function listTeamSubmissions(
   let submissions = (data || []).map((s: any) => {
     // Handle potential array or object return from joins
     const profile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
+    
+    // Get contractor rates from the map
+    const contractorRates = contractorRatesMap.get(s.contractor_user_id);
+    const hourlyRate = contractorRates?.hourlyRate ?? null;
+    const overtimeRate = contractorRates?.overtimeRate ?? null;
+
+    // Get contract type from the map (default to 'hourly' if not found)
+    const contractType = contractTypeMap.get(s.contract_id) === "fixed" ? "fixed" : "hourly";
+    
+    // For fixed contracts, the monthly rate would ideally come from a dedicated column
+    // For now, if contract type is fixed, we don't show hourly rates
+    const fixedMonthlyRate = contractType === "fixed" ? (s.total_amount || null) : null;
 
     return {
-    id: s.id,
-    contractorId: s.contractor_user_id,
-    contractorName: profile?.full_name || "Unknown",
-    contractorEmail: profile?.email || "",
-    projectName: s.project_name || "",
-    description: s.description || "",
-    workPeriod: s.work_period || "",
-    submissionDate: s.submitted_at || s.created_at,
-    regularHours: s.regular_hours || 0,
-    overtimeHours: s.overtime_hours || 0,
-    overtimeDescription: s.overtime_description,
-    totalAmount: s.total_amount || 0,
-    status: mapDbStatusToFrontend(s.status, s.paid_at),
-    rejectionReason: (s as any).rejection_reason ?? null,
-    submittedAt: s.submitted_at,
-    approvedAt: s.approved_at,
-    paidAt: s.paid_at,
-  }});
+      id: s.id,
+      contractorId: s.contractor_user_id,
+      contractorName: profile?.full_name || "Unknown",
+      contractorEmail: profile?.email || "",
+      projectName: s.project_name || "",
+      description: s.description || "",
+      workPeriod: s.work_period || "",
+      submissionDate: s.submitted_at || s.created_at,
+      regularHours: s.regular_hours || 0,
+      overtimeHours: s.overtime_hours || 0,
+      overtimeDescription: s.overtime_description,
+      totalAmount: s.total_amount || 0,
+      status: mapDbStatusToFrontend(s.status, s.paid_at),
+      rejectionReason: (s as any).rejection_reason ?? null,
+      submittedAt: s.submitted_at,
+      approvedAt: s.approved_at,
+      paidAt: s.paid_at,
+      // Contract/Rate information
+      contractType: contractType as "hourly" | "fixed",
+      hourlyRate,
+      overtimeRate,
+      fixedMonthlyRate,
+    };
+  });
 
   // Apply search filter client-side
   if (filters?.search) {
@@ -194,12 +245,14 @@ export async function getSubmissionDetails(
 
   const teamContractorIds = (teamData || []).map((t: any) => t.contractor_id);
 
+  // Fetch submission with profile join only (contractors/contracts joins don't work)
   const { data, error } = await supabase
     .from("submissions")
     .select(
       `
       id,
       contractor_user_id,
+      contract_id,
       project_name,
       description,
       work_period,
@@ -231,6 +284,36 @@ export async function getSubmissionDetails(
     return null;
   }
 
+  // Fetch contractor rate info separately
+  let hourlyRate: number | null = null;
+  let overtimeRate: number | null = null;
+  
+  const { data: contractorData } = await supabase
+    .from("contractors")
+    .select("hourly_rate, overtime_rate")
+    .eq("contractor_id", data.contractor_user_id)
+    .maybeSingle();
+  
+  if (contractorData) {
+    hourlyRate = contractorData.hourly_rate ?? null;
+    overtimeRate = contractorData.overtime_rate ?? null;
+  }
+
+  // Fetch contract type separately
+  let contractType: "hourly" | "fixed" = "hourly";
+  
+  if (data.contract_id) {
+    const { data: contractData } = await supabase
+      .from("contracts")
+      .select("contract_type")
+      .eq("id", data.contract_id)
+      .maybeSingle();
+    
+    if (contractData?.contract_type === "fixed") {
+      contractType = "fixed";
+    }
+  }
+
   // Map lowercase DB status to uppercase frontend status
   const mapDbStatusToFrontend = (dbStatus: string, paidAt: string | null): string => {
     if (paidAt) return "PAID";
@@ -247,6 +330,9 @@ export async function getSubmissionDetails(
 
   // Safe access to joined data
   const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
+  
+  // For fixed contracts, use total_amount as proxy for monthly rate
+  const fixedMonthlyRate = contractType === "fixed" ? (data.total_amount || null) : null;
 
   return {
     id: data.id,
@@ -266,6 +352,11 @@ export async function getSubmissionDetails(
     submittedAt: data.submitted_at,
     approvedAt: data.approved_at,
     paidAt: data.paid_at,
+    // Contract/Rate information
+    contractType,
+    hourlyRate,
+    overtimeRate,
+    fixedMonthlyRate,
   };
 }
 

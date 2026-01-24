@@ -18,7 +18,7 @@ interface ManagerSubmission {
   id: string;
   employeeName: string;
   employeeEmail: string;
-  contractorType: string;
+  contractType: "hourly" | "fixed";
   project: string;
   dateSubmitted: Date;
   regularHours: number;
@@ -26,7 +26,9 @@ interface ManagerSubmission {
   totalHours: number;
   invoiceAmount: number;
   status: "Pending" | "Approved" | "Rejected" | "Clarification" | "Paid";
-  rate: number;
+  hourlyRate: number | null;
+  overtimeRate: number | null;
+  fixedMonthlyRate: number | null;
   notes?: string;
   rejectionReason?: string | null;
   adminNote?: string | null; // Admin's clarification request
@@ -213,16 +215,33 @@ export function ManagerSubmissionDrawer({
                       </div>
                       <div className="flex-1">
                         <div className="text-xs text-gray-600 mb-0.5">Contract Type & Rate</div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="secondary"
-                            className="bg-gray-100 text-gray-700 border-gray-200"
-                          >
-                            {submission.contractorType}
-                          </Badge>
-                          <span className="text-sm font-medium text-gray-900">
-                            ${submission.rate}/hr
-                          </span>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="secondary"
+                              className={
+                                submission.contractType === "hourly"
+                                  ? "bg-blue-100 text-blue-700 border-blue-200"
+                                  : "bg-purple-100 text-purple-700 border-purple-200"
+                              }
+                            >
+                              {submission.contractType === "hourly" ? "Hourly" : "Fixed"}
+                            </Badge>
+                          </div>
+                          {submission.contractType === "hourly" ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-sm font-medium text-gray-900">
+                                Regular: {submission.hourlyRate != null ? `$${submission.hourlyRate}/hr` : "—"}
+                              </span>
+                              <span className="text-sm text-gray-600">
+                                Overtime: {submission.overtimeRate != null ? `$${submission.overtimeRate}/hr` : "—"}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-sm font-medium text-gray-900">
+                              Monthly: {submission.fixedMonthlyRate != null ? `$${submission.fixedMonthlyRate.toLocaleString()}/mo` : "—"}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
