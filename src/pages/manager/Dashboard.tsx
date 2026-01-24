@@ -469,7 +469,7 @@ export function ManagerDashboard() {
                 id: selectedSubmission.id,
                 employeeName: selectedSubmission.contractorName || "Unknown",
                 employeeEmail: selectedSubmission.contractorEmail || "",
-                contractorType: "Hourly",
+                contractType: selectedSubmission.contractType,
                 project: selectedSubmission.projectName || "",
                 dateSubmitted: new Date(selectedSubmission.submissionDate),
                 regularHours: selectedSubmission.regularHours,
@@ -481,7 +481,9 @@ export function ManagerDashboard() {
                 status: mapStatusToDisplay(
                   selectedSubmission.status
                 ) as "Pending" | "Approved" | "Rejected" | "Paid" | "Clarification",
-                rate: 0,
+                hourlyRate: selectedSubmission.hourlyRate,
+                overtimeRate: selectedSubmission.overtimeRate,
+                fixedMonthlyRate: selectedSubmission.fixedMonthlyRate,
                 notes: selectedSubmission.description,
                 rejectionReason: selectedSubmission.rejectionReason,
               }
