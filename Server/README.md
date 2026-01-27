@@ -23,6 +23,74 @@ Key environment variables:
 - `DATABASE_URL` - Database connection string
 - `JWT_SECRET` - Secret key for JWT tokens
 - `ALLOWED_ORIGINS` - CORS allowed origins
+- `EMAIL_PROVIDER` - Email provider: `smtp` or `console` (default)
+- `SMTP_*` - SMTP configuration (see Email Notifications section)
+
+## 📧 Email Notifications
+
+The server includes a background worker that sends email notifications matching in-app notifications.
+
+### Configuration
+
+Set `EMAIL_PROVIDER` to choose your provider:
+
+| Provider  | Description                                  |
+|-----------|----------------------------------------------|
+| `console` | Logs emails to server console (default/dev)  |
+| `smtp`    | Sends via SMTP (configure SMTP_* vars)       |
+
+### SMTP Configuration
+
+```env
+EMAIL_PROVIDER=smtp
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-username
+SMTP_PASS=your-password
+SMTP_FROM="Invoicing Platform <notifications@company.com>"
+```
+
+### Provider-Specific Setup
+
+**Gmail** (requires [App Password](https://support.google.com/accounts/answer/185833)):
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-16-char-app-password
+```
+
+**Microsoft 365 / Outlook**:
+```env
+SMTP_HOST=smtp.office365.com
+SMTP_PORT=587
+SMTP_USER=your-email@company.com
+SMTP_PASS=your-password
+```
+
+**SendGrid**:
+```env
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_USER=apikey
+SMTP_PASS=your-sendgrid-api-key
+```
+
+**AWS SES**:
+```env
+SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+SMTP_PORT=587
+SMTP_USER=your-ses-smtp-user
+SMTP_PASS=your-ses-smtp-password
+```
+
+### How It Works
+
+1. When submission status changes, a DB trigger creates in-app notifications
+2. Background worker polls for notifications with `email_status='PENDING'`
+3. Worker sends email and updates status to `SENT` or `FAILED`
+4. Email content mirrors the in-app notification message
 
 ## 📁 Project Structure
 
@@ -33,6 +101,12 @@ server/
 ├── controllers/       # Route controllers
 ├── middleware/        # Custom middleware
 ├── models/            # Data models
+├── clients/           # External clients (Supabase)
+├── services/          # Business logic services
+│   ├── email/         # Email provider system
+│   └── invoices/      # Invoice generation
+├── workers/           # Background workers
+│   └── notificationEmail.worker.ts
 └── README.md          # This file
 ```
 

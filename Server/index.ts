@@ -34,6 +34,9 @@ app.get('/api/health', (req: Request, res: Response) => {
 import exampleRoutes from './routes/example.routes';
 import invoiceRoutes from './routes/invoice.routes';
 
+// Import workers
+import { startNotificationEmailWorker } from './workers/notificationEmail.worker';
+
 // Register routes
 app.use('/api/example', exampleRoutes);
 app.use('/api/invoices', invoiceRoutes);
@@ -62,6 +65,9 @@ app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 API Health Check: http://localhost:${PORT}/api/health`);
+  
+  // Start background workers
+  startNotificationEmailWorker();
 });
 
 export default app;
