@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Button } from "./components/ui/button";
 import { Avatar, AvatarFallback } from "./components/ui/avatar";
-import { Badge } from "./components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,94 +9,163 @@ import {
 } from "./components/ui/dropdown-menu";
 import { Toaster } from "sonner";
 import {
-  Bell,
   Settings,
   LayoutDashboard,
   Users,
   Shield,
   Calendar,
+  Briefcase,
   LogOut,
   User as UserIcon,
 } from "lucide-react";
-import { Login } from "./pages/Login";
-import { AdminDashboard } from "./pages/AdminDashboard";
-import { ManagerDashboard } from "./pages/ManagerDashboard";
-import { ManagerTeamView } from "./pages/ManagerTeamView";
-import { ContractorDashboard } from "./pages/ContractorDashboard";
-import { ContractorProfile } from "./pages/ContractorProfile";
-import { SubmitHoursPage } from "./pages/SubmitHoursPage";
-import { EmployeeDirectory } from "./pages/EmployeeDirectory";
-import { UserAccessManagement } from "./pages/UserAccessManagement";
-import { AdminCalendar } from "./pages/AdminCalendar";
-import { NotificationsDrawer } from "./pages/NotificationsDrawer";
-import { ContractorDetailDrawer } from "./pages/ContractorDetailDrawer";
-import { ContractorSubmissions } from "./pages/ContractorSubmissions";
-import {
-  mockMetrics,
-  mockSubmissions,
-  projects,
-  managers,
-  months,
-  mockEmployees,
-  mockUsers,
-  mockNotifications,
-  mockContractorSubmissions,
-} from "./lib/data/mockData";
-import type { Employee, User } from "./lib/types";
+import { Login } from "./pages/auth/Login";
+import { AdminDashboard } from "./pages/admin/Dashboard";
+import { ManagerDashboard } from "./pages/manager/Dashboard";
+import { ManagerTeamView } from "./pages/manager/Team";
+import { ContractorDashboard } from "./pages/contractor/Dashboard";
+import { ContractorProfile } from "./pages/contractor/Profile";
+import { SubmitHoursPage } from "./pages/contractor/SubmitHours";
+import { EmployeeDirectory } from "./pages/admin/EmployeeDirectory";
+import { UserAccessManagement } from "./pages/admin/UserAccessManagement";
+import { AdminCalendar } from "./pages/admin/Calendar";
+import { AdminProjects } from "./pages/admin/Projects";
+import { NotificationBell } from "./components/shared/NotificationBell";
+import { NotificationDrawer } from "./components/shared/NotificationDrawer";
+import { ContractorDetailDrawer } from "./components/drawers/ContractorDetailDrawer";
+import { useAuth } from "./lib/hooks/useAuth";
+import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
+import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 
-type Screen = "dashboard" | "directory" | "access" | "calendar";
+type Screen = "dashboard" | "directory" | "access" | "calendar" | "projects";
 type ManagerScreen = "dashboard" | "team";
 type ContractorScreen =
   | "dashboard"
   | "profile"
-  | "submit-hours"
-  | "submissions";
+  | "submit-hours";
 type UserRole = "Admin" | "Manager" | "Contractor" | null;
 
 function App() {
+  // Supabase auth for Contractor and Manager
+  const { isAuthenticated, user, signIn, signOut, loading: authLoading } = useAuth();
+
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
   const [currentScreen, setCurrentScreen] = React.useState<Screen>("dashboard");
   const [managerScreen, setManagerScreen] =
     React.useState<ManagerScreen>("dashboard");
   const [contractorScreen, setContractorScreen] =
     React.useState<ContractorScreen>("dashboard");
+  const [editingSubmission, setEditingSubmission] =
+    React.useState<ContractorSubmission | null>(null);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const [contractorDrawerOpen, setContractorDrawerOpen] = React.useState(false);
   const [selectedEmployee, setSelectedEmployee] =
-    React.useState<Employee | null>(null);
-  const [employees, setEmployees] = React.useState(mockEmployees);
-  const [users, setUsers] = React.useState(mockUsers);
+    React.useState<EmployeeDirectoryRow | null>(null);
+  const [employees, setEmployees] = React.useState<EmployeeDirectoryRow[]>([]);
 
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
-  const currentUserId = "USER-004"; // John Administrator
+  // Filter options - these could come from Supabase in the future
+  // const projects: string[] = []; // Unused - kept for future use
+  // const managers: string[] = []; // Unused - kept for future use
+  // const months: string[] = []; // Unused - kept for future use
 
-  const handleLogin = (username: string) => {
-    setCurrentUser(username as UserRole);
+
+
+  // Sync Supabase auth state with currentUser and fetch role from database
+  React.useEffect(() => {
+    async function fetchUserRole() {
+      if (isAuthenticated && user) {
+        // User is authenticated via Supabase - fetch their role and is_active status from profiles table
+        const { getSupabaseClient } = await import('./lib/supabase/client');
+        const supabase = getSupabaseClient();
+        
+        const { data: appUser, error } = await supabase
+          .from('profiles')
+          .select('role, is_active')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user role:', error);
+          // Sign out and show error
+          await signOut();
+          alert('Unable to fetch user role. Please try again.');
+        } else if (appUser) {
+          // Double-check is_active status (belt and suspenders approach)
+          // This catches any disabled users who briefly got authenticated
+          if (appUser.is_active === false) {
+            console.log('[App] Disabled user detected, signing out');
+            await signOut();
+            // Don't set currentUser - keep them on login page
+            return;
+          }
+          
+          // Map database role to app role
+          const roleMap: Record<string, UserRole> = {
+            'admin': 'Admin',
+            'manager': 'Manager',
+            'contractor': 'Contractor',
+          };
+          // Handle both uppercase (DB) and lowercase
+          const userRole = roleMap[appUser.role.toLowerCase()] || 'Contractor';
+          
+          // Validate that user is logging in through the correct option
+          // This prevents admins from logging in through "Contractor" and vice versa
+          const loginIntent = sessionStorage.getItem('loginIntent');
+          if (loginIntent && loginIntent !== userRole) {
+            // User tried to log in through wrong option
+            await signOut();
+            alert(`You cannot log in as ${loginIntent}. Please use the ${userRole} login option.`);
+            sessionStorage.removeItem('loginIntent');
+          } else {
+            setCurrentUser(userRole);
+            sessionStorage.removeItem('loginIntent');
+          }
+        }
+      } else if (!authLoading && currentUser && !isAuthenticated) {
+        // User was logged out from Supabase
+        setCurrentUser(null);
+      }
+    }
+
+    fetchUserRole();
+  }, [isAuthenticated, user, authLoading, signOut]);
+
+  // Handle Supabase login success (for all roles)
+  const handleSupabaseLogin = (authRole: AuthUserRole) => {
+    if (authRole === "ADMIN") {
+      setCurrentUser("Admin");
+    } else if (authRole === "MANAGER") {
+      setCurrentUser("Manager");
+    } else if (authRole === "CONTRACTOR") {
+      setCurrentUser("Contractor");
+    }
   };
 
-  const handleLogout = () => {
+  // Handle logout for all user types
+  const handleLogout = async () => {
+    if (currentUser === "Contractor" || currentUser === "Manager") {
+      // Sign out from Supabase for Contractors and Managers
+      await signOut();
+    }
     setCurrentUser(null);
     setCurrentScreen("dashboard");
+    setManagerScreen("dashboard");
+    setContractorScreen("dashboard");
   };
 
-  const handleEmployeeClick = (employee: Employee) => {
+  const handleEmployeeClick = (employee: EmployeeDirectoryRow) => {
     setSelectedEmployee(employee);
     setContractorDrawerOpen(true);
   };
 
-  const handleSaveEmployee = (updatedEmployee: Employee) => {
+  const handleSaveEmployee = (updatedEmployee: EmployeeDirectoryRow) => {
     setEmployees(
       employees.map((emp) =>
-        emp.id === updatedEmployee.id ? updatedEmployee : emp
+        emp.contractor_id === updatedEmployee.contractor_id ? updatedEmployee : emp
       )
     );
   };
 
-  const handleUserUpdate = (updatedUser: User) => {
-    setUsers(
-      users.map((user) => (user.id === updatedUser.id ? updatedUser : user))
-    );
-  };
+  // handleUserUpdate removed - not currently used
 
   const getPageInfo = () => {
     switch (currentScreen) {
@@ -122,6 +190,11 @@ function App() {
           subtitle:
             "Manage holidays and special time off that affect employee submissions",
         };
+      case "projects":
+        return {
+          title: "Projects",
+          subtitle: "Manage projects and track resources",
+        };
       default:
         return { title: "", subtitle: "" };
     }
@@ -131,7 +204,17 @@ function App() {
 
   // Show login screen if not authenticated
   if (!currentUser) {
+<<<<<<< HEAD
     return <Login />;
+=======
+    return (
+      <Login
+        onSupabaseLogin={handleSupabaseLogin}
+        signIn={signIn}
+        authLoading={authLoading}
+      />
+    );
+>>>>>>> 5f43e96d20aab0e4f2e0939321520e5694c013f6
   }
 
   // Manager Portal - Limited View
@@ -153,22 +236,7 @@ function App() {
                 </p>
               </div>
               <div className="flex items-center gap-2 md:gap-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
-                  onClick={() => setNotificationsOpen(true)}
-                >
-                  <Bell
-                    className="w-4 h-4 md:w-5 md:h-5 text-gray-600"
-                    strokeWidth={2}
-                  />
-                  {unreadCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs border-2 border-white">
-                      {unreadCount}
-                    </Badge>
-                  )}
-                </Button>
+                <NotificationBell onClick={() => setNotificationsOpen(true)} />
                 <Button
                   variant="ghost"
                   size="icon"
@@ -246,10 +314,14 @@ function App() {
         </main>
 
         {/* Drawers */}
-        <NotificationsDrawer
+        <NotificationDrawer
           open={notificationsOpen}
           onOpenChange={setNotificationsOpen}
-          notifications={mockNotifications}
+          onNavigateToSubmission={(submissionId) => {
+            // Admin: Navigate to dashboard (submission details handled by AdminDashboard component)
+            setCurrentScreen('dashboard');
+            console.log('[Admin] Navigate to submission:', submissionId);
+          }}
         />
       </div>
     );
@@ -297,19 +369,7 @@ function App() {
               </Button>
 
               {/* Notifications */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
-                onClick={() => setNotificationsOpen(true)}
-              >
-                <Bell className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
-                {unreadCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs border-2 border-white">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </Button>
+              <NotificationBell onClick={() => setNotificationsOpen(true)} />
 
               {/* Avatar Dropdown */}
               <DropdownMenu>
@@ -346,8 +406,14 @@ function App() {
         <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
           {contractorScreen === "dashboard" && (
             <ContractorDashboard
-              onNavigateToSubmit={() => setContractorScreen("submit-hours")}
-              onNavigateToSubmissions={() => setContractorScreen("submissions")}
+              onNavigateToSubmit={() => {
+                setEditingSubmission(null); // Clear any existing submission
+                setContractorScreen("submit-hours");
+              }}
+              onEditSubmission={(submission) => {
+                setEditingSubmission(submission);
+                setContractorScreen("submit-hours");
+              }}
             />
           )}
           {contractorScreen === "profile" && (
@@ -357,23 +423,28 @@ function App() {
           )}
           {contractorScreen === "submit-hours" && (
             <SubmitHoursPage
-              onCancel={() => setContractorScreen("dashboard")}
-            />
-          )}
-          {contractorScreen === "submissions" && (
-            <ContractorSubmissions
-              submissions={mockContractorSubmissions}
-              onSubmitHours={() => setContractorScreen("submit-hours")}
-              onBack={() => setContractorScreen("dashboard")}
+              editingSubmission={editingSubmission}
+              onCancel={() => {
+                setEditingSubmission(null);
+                setContractorScreen("dashboard");
+              }}
+              onSuccess={() => {
+                setEditingSubmission(null);
+                setContractorScreen("dashboard");
+              }}
             />
           )}
         </main>
 
         {/* Drawers */}
-        <NotificationsDrawer
+        <NotificationDrawer
           open={notificationsOpen}
           onOpenChange={setNotificationsOpen}
-          notifications={mockNotifications}
+          onNavigateToSubmission={(submissionId) => {
+            // Manager: Navigate to dashboard
+            setManagerScreen('dashboard');
+            console.log('[Manager] Navigate to submission:', submissionId);
+          }}
         />
       </div>
     );
@@ -397,22 +468,7 @@ function App() {
               </p>
             </div>
             <div className="flex items-center gap-2 md:gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
-                onClick={() => setNotificationsOpen(true)}
-              >
-                <Bell
-                  className="w-4 h-4 md:w-5 md:h-5 text-gray-600"
-                  strokeWidth={2}
-                />
-                {unreadCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs border-2 border-white">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </Button>
+              <NotificationBell onClick={() => setNotificationsOpen(true)} />
               <Button
                 variant="ghost"
                 size="icon"
@@ -502,6 +558,17 @@ function App() {
               <Calendar className="w-4 h-4" />
               <span className="font-medium text-sm md:text-base">Calendar</span>
             </button>
+            <button
+              onClick={() => setCurrentScreen("projects")}
+              className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
+                currentScreen === "projects"
+                  ? "border-purple-600 text-purple-600"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+              }`}
+            >
+              <Briefcase className="w-4 h-4" />
+              <span className="font-medium text-sm md:text-base">Projects</span>
+            </button>
           </div>
         </div>
       </div>
@@ -509,41 +576,30 @@ function App() {
       {/* Main Content */}
       <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
         {currentScreen === "dashboard" && (
-          <AdminDashboard
-            metrics={mockMetrics}
-            submissions={mockSubmissions}
-            projects={projects}
-            managers={managers}
-            months={months}
-          />
+          <AdminDashboard />
         )}
         {currentScreen === "directory" && (
-          <EmployeeDirectory
-            employees={employees}
-            onEmployeeClick={handleEmployeeClick}
-          />
+          <EmployeeDirectory onEmployeeClick={handleEmployeeClick} />
         )}
-        {currentScreen === "access" && (
-          <UserAccessManagement
-            users={users}
-            currentUserId={currentUserId}
-            onUserUpdate={handleUserUpdate}
-          />
-        )}
+        {currentScreen === "access" && <UserAccessManagement />}
         {currentScreen === "calendar" && <AdminCalendar />}
+        {currentScreen === "projects" && <AdminProjects />}
       </main>
 
       {/* Drawers */}
-      <NotificationsDrawer
+      <NotificationDrawer
         open={notificationsOpen}
         onOpenChange={setNotificationsOpen}
-        notifications={mockNotifications}
+        onNavigateToSubmission={(submissionId) => {
+          // Contractor: Navigate to dashboard
+          setContractorScreen('dashboard');
+          console.log('[Contractor] Navigate to submission:', submissionId);
+        }}
       />
       <ContractorDetailDrawer
         open={contractorDrawerOpen}
         onOpenChange={setContractorDrawerOpen}
         employee={selectedEmployee}
-        submissions={mockSubmissions}
         onSave={handleSaveEmployee}
       />
     </div>
