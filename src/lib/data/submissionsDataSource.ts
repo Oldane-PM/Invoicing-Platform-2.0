@@ -175,6 +175,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         regular_hours,
         overtime_hours,
         overtime_description,
+        excluded_dates,
         total_amount,
         status,
         submitted_at,
@@ -226,7 +227,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         status,
         invoiceUrl: null, // Invoices table does not exist
         workPeriod,
-        excludedDates: [], // Not stored in flat schema
+        excludedDates: sub.excluded_dates || [],
         overtimeDescription: sub.overtime_description,
         // Workflow notes (columns may not exist in all schemas - set to null/undefined)
         rejectionReason: sub.rejection_reason ?? null,
@@ -316,6 +317,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         regular_hours: draft.hoursSubmitted,
         overtime_hours: draft.overtimeHours,
         overtime_description: draft.overtimeDescription || null,
+        excluded_dates: draft.excludedDates,
         total_amount: totalAmount,
         status: "submitted",
         submitted_at: new Date().toISOString(),
@@ -341,7 +343,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       status: "PENDING_MANAGER" as SubmissionStatus,
       invoiceUrl: null,
       workPeriod: submission.work_period,
-      excludedDates: draft.excludedDates, // Returned from input, but not persisted deeply
+      excludedDates: submission.excluded_dates || [],
       overtimeDescription: submission.overtime_description,
       rejectionReason: null,
       adminNote: null,
@@ -457,6 +459,9 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     }
     if (updatedData?.overtimeDescription !== undefined) {
       updatePayload.overtime_description = updatedData.overtimeDescription;
+    }
+    if (updatedData?.excludedDates !== undefined) {
+      updatePayload.excluded_dates = updatedData.excludedDates;
     }
     
     // Recalculate total if hours were updated

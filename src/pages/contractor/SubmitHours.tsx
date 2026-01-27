@@ -144,6 +144,18 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
         setOvertimeDescription(editingSubmission.overtimeDescription || "");
         setIsHoursManuallyEdited(true); // Prevent auto-calculation from overwriting
         
+        // Load excluded dates if they exist
+        console.log('[SubmitHours] editingSubmission.excludedDates:', editingSubmission.excludedDates);
+        if (editingSubmission.excludedDates && editingSubmission.excludedDates.length > 0) {
+          const parsedExcludedDates = editingSubmission.excludedDates
+            .map(dateStr => parse(dateStr, "yyyy-MM-dd", new Date()))
+            .filter(date => !isNaN(date.getTime()));
+          console.log('[SubmitHours] Parsed excluded dates:', parsedExcludedDates);
+          setExcludedDates(parsedExcludedDates);
+        } else {
+          console.log('[SubmitHours] No excluded dates to load');
+        }
+        
         // Allow clear effect to run after pre-population is complete
         setTimeout(() => {
           isPrePopulatingRef.current = false;
@@ -233,10 +245,12 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     if (dayInfo.state === "working") {
       // Exclude this day
       setExcludedDates([...excludedDates, date]);
+      setIsHoursManuallyEdited(false); // Allow auto-calculation to update hours
       toast.info("Day excluded from calculation");
     } else if (dayInfo.state === "excluded") {
       // Re-include this day
       setExcludedDates(excludedDates.filter((d) => !isSameDay(d, date)));
+      setIsHoursManuallyEdited(false); // Allow auto-calculation to update hours
       toast.success("Day added back to calculation");
     }
   };
