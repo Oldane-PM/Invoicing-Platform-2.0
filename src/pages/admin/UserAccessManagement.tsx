@@ -1,4 +1,5 @@
 
+import * as React from "react";
 import { Card } from "../../components/ui/card";
 import {
   Table,
@@ -10,15 +11,37 @@ import {
 } from "../../components/ui/table";
 import { Combobox } from "../../components/shared/Combobox";
 import { Switch } from "../../components/ui/switch";
-import { ShieldAlert, Lock, Loader2, AlertCircle } from "lucide-react";
+import { ShieldAlert, Lock, Loader2, AlertCircle, UserX } from "lucide-react";
 import { Button } from "../../components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import {
   useUserAccessUsers,
   useUpdateUserRole,
   useSetUserEnabled,
   useCurrentUserId,
 } from "../../lib/hooks/userAccess";
+import { RoleChangeConfirmationModal } from "../../components/shared/RoleChangeConfirmationModal";
 import type { UserRole } from "../../lib/data/userAccess";
+
+// Role options in specified order
+const ROLE_OPTIONS = [
+  { value: "Unassigned", label: "Unassigned" },
+  { value: "Contractor", label: "Contractor" },
+  { value: "Manager", label: "Manager" },
+  { value: "Admin", label: "Admin" },
+];
+
+interface PendingRoleChange {
+  userId: string;
+  userName: string;
+  currentRole: UserRole;
+  pendingRole: UserRole;
+}
 
 export function UserAccessManagement() {
   // Fetch data and current user
@@ -29,12 +52,76 @@ export function UserAccessManagement() {
   const updateRole = useUpdateUserRole();
   const setEnabled = useSetUserEnabled();
 
-  const handleRoleChange = (userId: string, userName: string, newRole: string) => {
-    updateRole.mutate({
+  // Pending role change state for confirmation modal
+  const [pendingRoleChange, setPendingRoleChange] = React.useState<PendingRoleChange | null>(null);
+  
+  // Track temporary dropdown values before confirmation
+  const [tempDropdownValues, setTempDropdownValues] = React.useState<Record<string, string>>({});
+
+  // Handle role dropdown change - opens confirmation modal instead of immediately persisting
+  const handleRoleChange = (userId: string, userName: string, newRoleDisplay: string, currentRole: UserRole) => {
+    const newRole = newRoleDisplay.toLowerCase() as UserRole;
+    
+    // Don't do anything if the role hasn't changed
+    if (newRole === currentRole) {
+      return;
+    }
+
+    // Set the pending change and open modal
+    setPendingRoleChange({
       userId,
-      role: newRole.toLowerCase() as UserRole,
       userName,
+      currentRole,
+      pendingRole: newRole,
     });
+    
+    // Store the temp value so dropdown shows the pending selection
+    setTempDropdownValues(prev => ({ ...prev, [userId]: newRoleDisplay }));
+  };
+
+  // Confirm role change - actually persist to database
+  const handleConfirmRoleChange = () => {
+    if (!pendingRoleChange) return;
+
+    updateRole.mutate(
+      {
+        userId: pendingRoleChange.userId,
+        role: pendingRoleChange.pendingRole,
+        userName: pendingRoleChange.userName,
+      },
+      {
+        onSuccess: () => {
+          // Clear pending state on success
+          setPendingRoleChange(null);
+          setTempDropdownValues(prev => {
+            const next = { ...prev };
+            delete next[pendingRoleChange.userId];
+            return next;
+          });
+        },
+        onError: () => {
+          // Revert dropdown on error
+          setTempDropdownValues(prev => {
+            const next = { ...prev };
+            delete next[pendingRoleChange.userId];
+            return next;
+          });
+          setPendingRoleChange(null);
+        },
+      }
+    );
+  };
+
+  // Cancel role change - revert dropdown to current role
+  const handleCancelRoleChange = () => {
+    if (pendingRoleChange) {
+      setTempDropdownValues(prev => {
+        const next = { ...prev };
+        delete next[pendingRoleChange.userId];
+        return next;
+      });
+    }
+    setPendingRoleChange(null);
   };
 
   const handleToggleAccess = (userId: string, userName: string, enabled: boolean) => {
@@ -43,6 +130,13 @@ export function UserAccessManagement() {
       isActive: enabled,
       userName,
     });
+  };
+
+  // Get display value for role dropdown (temp value or actual role)
+  const getDropdownValue = (user: { id: string; role: UserRole }) => {
+    const tempValue = tempDropdownValues[user.id];
+    if (tempValue) return tempValue;
+    return user.role.charAt(0).toUpperCase() + user.role.slice(1);
   };
 
   // Loading state
@@ -111,91 +205,120 @@ export function UserAccessManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="border border-gray-200 rounded-[14px] bg-white overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-gray-200 bg-gray-50">
-                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  User
-                </TableHead>
-                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  Email Address
-                </TableHead>
-                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  Role
-                </TableHead>
-                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  Enable
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => {
-                const isCurrentUser = user.id === currentUserId;
+    <TooltipProvider>
+      <div className="space-y-6">
+        <Card className="border border-gray-200 rounded-[14px] bg-white overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-gray-200 bg-gray-50">
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                    User
+                  </TableHead>
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                    Email Address
+                  </TableHead>
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                    Role
+                  </TableHead>
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                    Enable
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((user) => {
+                  const isCurrentUser = user.id === currentUserId;
+                  const isUnassigned = user.role === "unassigned";
 
-                return (
-                  <TableRow
-                    key={user.id}
-                    className={`h-16 border-b border-gray-100 last:border-0 ${
-                      !user.isActive ? "opacity-60" : ""
-                    }`}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{user.fullName}</span>
-                        {isCurrentUser && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">
-                            You
-                          </span>
-                        )}
-                        {!user.isActive && (
-                          <Lock className="w-4 h-4 text-gray-400" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-gray-600">{user.email}</TableCell>
-                    <TableCell>
-                      <Combobox
-                        value={user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                        onValueChange={(value) =>
-                          handleRoleChange(user.id, user.fullName, value)
-                        }
-                        options={[
-                          { value: "Contractor", label: "Contractor" },
-                          { value: "Manager", label: "Manager" },
-                          { value: "Admin", label: "Admin" },
-                        ]}
-                        placeholder="Select role"
-                        className="w-48"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={user.isActive}
-                          onCheckedChange={(checked) =>
-                            handleToggleAccess(user.id, user.fullName, checked)
+                  return (
+                    <TableRow
+                      key={user.id}
+                      className={`h-16 border-b border-gray-100 last:border-0 ${
+                        !user.isActive ? "opacity-60" : ""
+                      } ${isUnassigned ? "bg-amber-50/50" : ""}`}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{user.fullName}</span>
+                          {isCurrentUser && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">
+                              You
+                            </span>
+                          )}
+                          {isUnassigned && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium cursor-help">
+                                  <UserX className="w-3 h-3" />
+                                  Unassigned
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>User profile not created yet</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          {!user.isActive && (
+                            <Lock className="w-4 h-4 text-gray-400" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-gray-600">{user.email}</TableCell>
+                      <TableCell>
+                        <Combobox
+                          value={getDropdownValue(user)}
+                          onValueChange={(value) =>
+                            handleRoleChange(user.id, user.fullName, value, user.role)
                           }
-                          disabled={isCurrentUser && user.isActive}
-                          className="data-[state=checked]:bg-green-500"
+                          options={ROLE_OPTIONS}
+                          placeholder="Select role"
+                          className="w-48"
                         />
-                        {isCurrentUser && user.isActive && (
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <ShieldAlert className="w-3.5 h-3.5" />
-                            <span>Cannot disable yourself</span>
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
-    </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={user.isActive}
+                            onCheckedChange={(checked) =>
+                              handleToggleAccess(user.id, user.fullName, checked)
+                            }
+                            disabled={isCurrentUser && user.isActive}
+                            className="data-[state=checked]:bg-green-500"
+                          />
+                          {isCurrentUser && user.isActive && (
+                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                              <ShieldAlert className="w-3.5 h-3.5" />
+                              <span>Cannot disable yourself</span>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+
+        {/* Role Change Confirmation Modal */}
+        {pendingRoleChange && (
+          <RoleChangeConfirmationModal
+            open={!!pendingRoleChange}
+            onOpenChange={(open) => {
+              if (!open) handleCancelRoleChange();
+            }}
+            userName={pendingRoleChange.userName}
+            currentRole={pendingRoleChange.currentRole}
+            pendingRole={pendingRoleChange.pendingRole}
+            isCurrentUser={pendingRoleChange.userId === currentUserId}
+            onConfirm={handleConfirmRoleChange}
+            onCancel={handleCancelRoleChange}
+            isLoading={updateRole.isPending}
+          />
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
