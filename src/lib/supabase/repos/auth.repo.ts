@@ -7,7 +7,7 @@
 
 import { getSupabaseClient, supabase } from "../client";
 
-export type UserRole = "ADMIN" | "MANAGER" | "CONTRACTOR";
+export type UserRole = "UNASSIGNED" | "ADMIN" | "MANAGER" | "CONTRACTOR";
 
 export interface UserProfile {
   id: string;

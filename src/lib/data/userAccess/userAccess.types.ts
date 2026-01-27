@@ -5,7 +5,7 @@
  * These types represent the business logic layer and are independent of database schema.
  */
 
-export type UserRole = 'admin' | 'manager' | 'contractor';
+export type UserRole = 'unassigned' | 'admin' | 'manager' | 'contractor';
 
 export interface UserAccessUser {
   id: string;
