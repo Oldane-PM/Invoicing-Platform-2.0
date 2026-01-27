@@ -6,6 +6,9 @@
  * 
  * ARCHITECTURE: UI → Hooks → Repos → Supabase
  * This file is the ONLY place where admin dashboard Supabase queries exist.
+ * 
+ * IMPORTANT: All totals should use stored total_amount from submissions table.
+ * Never recalculate totals independently - this ensures consistency with invoices.
  */
 
 import { getSupabaseClient } from '../../supabase/client';
@@ -16,9 +19,6 @@ import type {
   SubmissionFilters,
   RequestClarificationParams,
 } from './adminDashboard.types';
-import {
-  calculateTotalAmount,
-} from './adminDashboard.mappers';
 
 /**
  * Get admin dashboard metrics
@@ -45,47 +45,23 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
     .eq('status', 'submitted');
 
   // Get total invoice value (sum of all approved submissions this month)
+  // IMPORTANT: Use stored total_amount for consistency - never recalculate
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
   const { data: approvedSubmissions } = await supabase
     .from('submissions')
-    .select(`
-      id,
-      submission_line_items (hours),
-      overtime_entries (overtime_hours),
-      contracts (
-        rates (hourly_rate, overtime_multiplier, effective_from, effective_to)
-      )
-    `)
+    .select('total_amount')
     .eq('status', 'approved')
     .gte('submitted_at', startOfMonth.toISOString());
 
-  // Calculate total invoice value
+  // Sum the stored total_amount values for consistency
+  // This ensures metrics match actual submission/invoice totals
   let totalInvoiceValue = 0;
   if (approvedSubmissions) {
     for (const sub of approvedSubmissions) {
-      const lineItems = Array.isArray(sub.submission_line_items) ? sub.submission_line_items : [];
-      const overtimeEntries = Array.isArray(sub.overtime_entries) ? sub.overtime_entries : [];
-      
-      const regularHours = lineItems.reduce((sum: number, li: any) => sum + (li.hours || 0), 0);
-      const overtimeHours = overtimeEntries.reduce((sum: number, ot: any) => sum + (ot.overtime_hours || 0), 0);
-      
-      const contractData = Array.isArray(sub.contracts) ? sub.contracts[0] : sub.contracts;
-      const rates = Array.isArray((contractData as any)?.rates) ? (contractData as any).rates : [];
-      const currentRate = rates.find((r: any) => {
-        const today = new Date().toISOString().split('T')[0];
-        return r.effective_from <= today && (!r.effective_to || r.effective_to >= today);
-      });
-      
-      const amount = calculateTotalAmount(
-        regularHours,
-        overtimeHours,
-        currentRate?.hourly_rate,
-        currentRate?.overtime_multiplier
-      );
-      totalInvoiceValue += amount;
+      totalInvoiceValue += sub.total_amount || 0;
     }
   }
 

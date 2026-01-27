@@ -2,7 +2,14 @@
  * Admin Dashboard Database Mappers
  * 
  * Maps database rows to domain types for the admin dashboard.
- * Handles data transformation and calculation logic.
+ * 
+ * IMPORTANT: These mappers are primarily for legacy schemas that used
+ * submission_line_items and overtime_entries tables. The current schema
+ * stores data directly on the submissions table.
+ * 
+ * BEST PRACTICE: Always use stored total_amount from submissions table.
+ * Do NOT recalculate totals - this ensures consistency with invoices.
+ * The repo (adminDashboard.repo.ts) handles this correctly.
  */
 
 import type { AdminSubmission, SubmissionDetails } from './adminDashboard.types';
@@ -18,7 +25,10 @@ import {
 /**
  * Calculate total amount based on hours and rates
  * 
- * Uses the centralized calculation utility.
+ * @deprecated PREFER using stored total_amount from submissions table.
+ * This function should only be used as a fallback when stored totals are unavailable.
+ * Using stored totals ensures Submission Total === Invoice Total.
+ * 
  * For hourly: (regularRate × regularHours) + (overtimeRate × overtimeHours)
  * For fixed: uses monthlyRate directly
  */
@@ -51,6 +61,10 @@ export function calculateTotalAmount(
 
 /**
  * Map database submission row to AdminSubmission
+ * 
+ * @deprecated This mapper is for legacy schemas using submission_line_items/overtime_entries.
+ * The current repo (adminDashboard.repo.ts) uses direct column access and stored total_amount.
+ * Prefer the repo's inline mapping which uses stored totals for consistency.
  */
 export function mapDbSubmissionToAdminSubmission(dbRow: any): AdminSubmission {
   // Extract contractor info from app_users join
@@ -107,6 +121,10 @@ export function mapDbSubmissionToAdminSubmission(dbRow: any): AdminSubmission {
 
 /**
  * Map database submission row to SubmissionDetails (includes additional fields)
+ * 
+ * @deprecated This mapper is for legacy schemas using submission_line_items/overtime_entries.
+ * The current repo (adminDashboard.repo.ts) uses direct column access and stored total_amount.
+ * Prefer the repo's inline mapping which uses stored totals for consistency.
  */
 export function mapDbSubmissionToDetails(dbRow: any): SubmissionDetails {
   const baseSubmission = mapDbSubmissionToAdminSubmission(dbRow);
