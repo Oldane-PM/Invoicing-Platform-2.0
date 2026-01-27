@@ -29,6 +29,7 @@ import { EmployeeDirectory } from "./pages/admin/EmployeeDirectory";
 import { UserAccessManagement } from "./pages/admin/UserAccessManagement";
 import { AdminCalendar } from "./pages/admin/Calendar";
 import { AdminProjects } from "./pages/admin/Projects";
+import { UnassignedDashboard } from "./pages/unassigned/Dashboard";
 import { NotificationBell } from "./components/shared/NotificationBell";
 import { NotificationDrawer } from "./components/shared/NotificationDrawer";
 import { ContractorDetailDrawer } from "./components/drawers/ContractorDetailDrawer";
@@ -42,7 +43,7 @@ type ContractorScreen =
   | "dashboard"
   | "profile"
   | "submit-hours";
-type UserRole = "Admin" | "Manager" | "Contractor" | null;
+type UserRole = "Admin" | "Manager" | "Contractor" | "Unassigned" | null;
 
 function App() {
   // Supabase auth for Contractor and Manager
@@ -100,17 +101,19 @@ function App() {
           
           // Map database role to app role
           const roleMap: Record<string, UserRole> = {
+            'unassigned': 'Unassigned',
             'admin': 'Admin',
             'manager': 'Manager',
             'contractor': 'Contractor',
           };
-          // Handle both uppercase (DB) and lowercase
-          const userRole = roleMap[appUser.role.toLowerCase()] || 'Contractor';
+          // Handle both uppercase (DB) and lowercase - default to Unassigned for unknown roles
+          const userRole = roleMap[appUser.role.toLowerCase()] || 'Unassigned';
           
           // Validate that user is logging in through the correct option
           // This prevents admins from logging in through "Contractor" and vice versa
+          // Allow unassigned users to log in through any option - they'll be redirected appropriately
           const loginIntent = sessionStorage.getItem('loginIntent');
-          if (loginIntent && loginIntent !== userRole) {
+          if (loginIntent && loginIntent !== userRole && userRole !== 'Unassigned') {
             // User tried to log in through wrong option
             await signOut();
             alert(`You cannot log in as ${loginIntent}. Please use the ${userRole} login option.`);
@@ -137,19 +140,64 @@ function App() {
       setCurrentUser("Manager");
     } else if (authRole === "CONTRACTOR") {
       setCurrentUser("Contractor");
+    } else if (authRole === "UNASSIGNED") {
+      setCurrentUser("Unassigned");
     }
   };
 
   // Handle logout for all user types
   const handleLogout = async () => {
-    if (currentUser === "Contractor" || currentUser === "Manager") {
-      // Sign out from Supabase for Contractors and Managers
+    if (currentUser === "Contractor" || currentUser === "Manager" || currentUser === "Unassigned" || currentUser === "Admin") {
+      // Sign out from Supabase for all authenticated users
       await signOut();
     }
     setCurrentUser(null);
     setCurrentScreen("dashboard");
     setManagerScreen("dashboard");
     setContractorScreen("dashboard");
+  };
+  
+  // Refresh status for unassigned users - refetch role from database
+  const [isRefreshingStatus, setIsRefreshingStatus] = React.useState(false);
+  
+  const handleRefreshStatus = async () => {
+    if (!user) return;
+    
+    setIsRefreshingStatus(true);
+    try {
+      const { getSupabaseClient } = await import('./lib/supabase/client');
+      const supabase = getSupabaseClient();
+      
+      const { data: appUser, error } = await supabase
+        .from('profiles')
+        .select('role, is_active')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) {
+        console.error('Error refreshing user role:', error);
+        return;
+      }
+      
+      if (appUser) {
+        // Check if role has changed from unassigned
+        const roleMap: Record<string, UserRole> = {
+          'unassigned': 'Unassigned',
+          'admin': 'Admin',
+          'manager': 'Manager',
+          'contractor': 'Contractor',
+        };
+        const newRole = roleMap[appUser.role.toLowerCase()] || 'Unassigned';
+        
+        if (newRole !== 'Unassigned') {
+          setCurrentUser(newRole);
+        }
+      }
+    } catch (err) {
+      console.error('Error refreshing status:', err);
+    } finally {
+      setIsRefreshingStatus(false);
+    }
   };
 
   const handleEmployeeClick = (employee: EmployeeDirectoryRow) => {
@@ -215,6 +263,17 @@ function App() {
       />
     );
 >>>>>>> 5f43e96d20aab0e4f2e0939321520e5694c013f6
+  }
+
+  // Unassigned User Portal - Users without a role assignment
+  if (currentUser === "Unassigned") {
+    return (
+      <UnassignedDashboard
+        onLogout={handleLogout}
+        onRefreshStatus={handleRefreshStatus}
+        isRefreshing={isRefreshingStatus}
+      />
+    );
   }
 
   // Manager Portal - Limited View
