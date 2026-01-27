@@ -30,7 +30,7 @@ export interface SubmissionsDataSource {
   createSubmission(draft: SubmissionDraft): Promise<ContractorSubmission>;
   getSubmittedWorkPeriods(): Promise<string[]>;
   hasSubmissionForPeriod(workPeriod: string): Promise<boolean>;
-  /** Resubmit a rejected submission - updates status back to PENDING_MANAGER */
+  /** Update and resubmit a submission - allowed for PENDING_MANAGER or REJECTED_CONTRACTOR status */
   resubmitAfterRejection(submissionId: string, updatedData?: Partial<SubmissionDraft>): Promise<ContractorSubmission>;
   /** Delete a submission - not allowed for APPROVED or PAID submissions */
   deleteSubmission(submissionId: string): Promise<void>;
@@ -175,6 +175,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         regular_hours,
         overtime_hours,
         overtime_description,
+        excluded_dates,
         total_amount,
         status,
         submitted_at,
@@ -226,7 +227,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         status,
         invoiceUrl: null, // Invoices table does not exist
         workPeriod,
-        excludedDates: [], // Not stored in flat schema
+        excludedDates: sub.excluded_dates || [],
         overtimeDescription: sub.overtime_description,
         // Workflow notes (columns may not exist in all schemas - set to null/undefined)
         rejectionReason: sub.rejection_reason ?? null,
@@ -316,6 +317,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         regular_hours: draft.hoursSubmitted,
         overtime_hours: draft.overtimeHours,
         overtime_description: draft.overtimeDescription || null,
+        excluded_dates: draft.excludedDates,
         total_amount: totalAmount,
         status: "submitted",
         submitted_at: new Date().toISOString(),
@@ -341,7 +343,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       status: "PENDING_MANAGER" as SubmissionStatus,
       invoiceUrl: null,
       workPeriod: submission.work_period,
-      excludedDates: draft.excludedDates, // Returned from input, but not persisted deeply
+      excludedDates: submission.excluded_dates || [],
       overtimeDescription: submission.overtime_description,
       rejectionReason: null,
       adminNote: null,
@@ -405,8 +407,8 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
   }
 
   /**
-   * Resubmit a rejected submission
-   * Only allowed when status is REJECTED_CONTRACTOR
+   * Update and resubmit a submission
+   * Allowed when status is PENDING_MANAGER or REJECTED_CONTRACTOR
    * Transitions status back to PENDING_MANAGER (submitted)
    */
   async resubmitAfterRejection(
@@ -431,10 +433,10 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       throw new Error("Submission not found or access denied");
     }
 
-    // Check status - only allow resubmit from rejected
+    // Check status - allow resubmit from PENDING_MANAGER or REJECTED_CONTRACTOR
     const currentStatus = mapDbStatusToSubmissionStatus(existing.status, existing.paid_at);
-    if (currentStatus !== "REJECTED_CONTRACTOR") {
-      throw new Error(`Cannot resubmit: submission is not in rejected status (current: ${currentStatus})`);
+    if (currentStatus !== "REJECTED_CONTRACTOR" && currentStatus !== "PENDING_MANAGER") {
+      throw new Error(`Cannot edit: submission is not in pending or rejected status (current: ${currentStatus})`);
     }
 
     // Build update payload - only include columns that are guaranteed to exist
@@ -457,6 +459,9 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     }
     if (updatedData?.overtimeDescription !== undefined) {
       updatePayload.overtime_description = updatedData.overtimeDescription;
+    }
+    if (updatedData?.excludedDates !== undefined) {
+      updatePayload.excluded_dates = updatedData.excludedDates;
     }
     
     // Recalculate total if hours were updated
