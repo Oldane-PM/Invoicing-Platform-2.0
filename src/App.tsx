@@ -19,6 +19,7 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { Login } from "./pages/auth/Login";
+import { OAuthCallback } from "./pages/auth/OAuthCallback";
 import { AdminDashboard } from "./pages/admin/Dashboard";
 import { ManagerDashboard } from "./pages/manager/Dashboard";
 import { ManagerTeamView } from "./pages/manager/Team";
@@ -34,7 +35,6 @@ import { NotificationBell } from "./components/shared/NotificationBell";
 import { NotificationDrawer } from "./components/shared/NotificationDrawer";
 import { ContractorDetailDrawer } from "./components/drawers/ContractorDetailDrawer";
 import { useAuth } from "./lib/hooks/useAuth";
-import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
 import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 
 type Screen = "dashboard" | "directory" | "access" | "calendar" | "projects";
@@ -44,12 +44,14 @@ type ContractorScreen =
   | "profile"
   | "submit-hours";
 type UserRole = "Admin" | "Manager" | "Contractor" | "Unassigned" | null;
+type AppView = "login" | "oauth-callback" | "app";
 
 function App() {
   // Supabase auth for Contractor and Manager
   const { isAuthenticated, user, signIn, signOut, loading: authLoading } = useAuth();
 
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
+  const [currentView, setCurrentView] = React.useState<AppView>("login");
   const [currentScreen, setCurrentScreen] = React.useState<Screen>("dashboard");
   const [managerScreen, setManagerScreen] =
     React.useState<ManagerScreen>("dashboard");
@@ -132,8 +134,8 @@ function App() {
     fetchUserRole();
   }, [isAuthenticated, user, authLoading, signOut]);
 
-  // Handle Supabase login success (for all roles)
-  const handleSupabaseLogin = (authRole: AuthUserRole) => {
+  // Handle OAuth callback completion
+  const handleAuthComplete = (authRole: string) => {
     if (authRole === "ADMIN") {
       setCurrentUser("Admin");
     } else if (authRole === "MANAGER") {
@@ -143,6 +145,7 @@ function App() {
     } else if (authRole === "UNASSIGNED") {
       setCurrentUser("Unassigned");
     }
+    setCurrentView("app");
   };
 
   // Handle logout for all user types
@@ -250,19 +253,21 @@ function App() {
 
   const pageInfo = getPageInfo();
 
+  // Check URL for OAuth callback
+  React.useEffect(() => {
+    if (window.location.pathname === "/auth/callback") {
+      setCurrentView("oauth-callback");
+    }
+  }, []);
+
+  // Show OAuth callback screen
+  if (currentView === "oauth-callback") {
+    return <OAuthCallback onAuthComplete={handleAuthComplete} />;
+  }
+
   // Show login screen if not authenticated
   if (!currentUser) {
-<<<<<<< HEAD
-    return <Login />;
-=======
-    return (
-      <Login
-        onSupabaseLogin={handleSupabaseLogin}
-        signIn={signIn}
-        authLoading={authLoading}
-      />
-    );
->>>>>>> 5f43e96d20aab0e4f2e0939321520e5694c013f6
+    return <Login authLoading={authLoading} />;
   }
 
   // Unassigned User Portal - Users without a role assignment

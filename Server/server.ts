@@ -3,9 +3,11 @@ import express from "express";
 import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "../src/lib/auth";
+import invoiceRoutes from "./routes/invoice.routes";
+import oauthCallbackRoutes from "./routes/oauth-callback.routes";
 
 const app = express();
-const port = Number(process.env.PORT ?? 8000);
+const port = Number(process.env.PORT ?? 5001);
 
 // CORS configuration for cross-origin requests
 app.use(
@@ -29,6 +31,12 @@ app.use(express.json());
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
+
+// Invoice routes
+app.use("/api/invoices", invoiceRoutes);
+
+// OAuth callback routes (mounted separately to avoid conflict with Better Auth)
+app.use("/api/callback", oauthCallbackRoutes);
 
 // Example protected API route
 app.get("/api/submissions", async (req, res) => {

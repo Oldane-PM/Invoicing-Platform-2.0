@@ -1,112 +1,46 @@
 import * as React from "react";
 import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
-import { AlertCircle, Loader2, Mail, Lock, Shield, Users, Briefcase } from "lucide-react";
-import type { UserRole } from "../../lib/supabase/repos/auth.repo";
-
-type RoleOption = "admin" | "manager" | "contractor";
+import { Loader2 } from "lucide-react";
+import { signIn } from "../../lib/auth-client";
 
 interface LoginProps {
-  onSupabaseLogin: (role: UserRole) => void;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: UserRole }>;
   authLoading?: boolean;
 }
 
-export function Login({ onSupabaseLogin, signIn, authLoading }: LoginProps) {
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [selectedRole, setSelectedRole] = React.useState<RoleOption | null>(null);
-  const [error, setError] = React.useState("");
+export function Login({ authLoading }: LoginProps) {
   const [loading, setLoading] = React.useState(false);
-  const hasDisabledErrorRef = React.useRef(false);
+  const [error, setError] = React.useState("");
 
-  // Debug: Log when error changes
-  React.useEffect(() => {
-    console.log('[Login] Error state changed to:', error);
-    // If error contains "disabled", mark it so we don't clear it
-    if (error.includes('disabled')) {
-      hasDisabledErrorRef.current = true;
-    }
-  }, [error]);
-
-  const handleLogin = async () => {
-    // Don't clear error if it's a disabled account error
-    if (!hasDisabledErrorRef.current) {
-      // Error will be set/cleared as needed below
-    }
-
-    if (!email.trim()) {
-      setError("Please enter your email");
-      return;
-    }
-
-    if (!password) {
-      setError("Please enter your password");
-      return;
-    }
-
+  const handleGoogleSignIn = async () => {
     setLoading(true);
-    if (!hasDisabledErrorRef.current) {
-      setError(""); // Clear error only when starting actual login attempt
-    }
-
-    // Store login intent in sessionStorage so App.tsx can validate it
-    if (selectedRole) {
-      sessionStorage.setItem('loginIntent', selectedRole);
-    }
+    setError("");
 
     try {
-      const result = await signIn(email, password);
-      console.log('[Login] signIn result:', result);
-
-      if (result.success && result.role) {
-        // Route based on profile role from Supabase
-        onSupabaseLogin(result.role);
-      } else if (result.success && !result.role) {
-        // Logged in but no profile - this shouldn't happen in production
-        setError("Account found but no role assigned. Please contact an administrator.");
-        setLoading(false);
-      } else {
-        console.log('[Login] Setting error:', result.error);
-        setError(result.error || "Login failed. Please check your credentials.");
-        sessionStorage.removeItem('loginIntent');
-        setLoading(false);
-      }
+      await signIn.social(
+        {
+          provider: "google",
+          callbackURL: "http://localhost:5173/auth/callback",
+        },
+        {
+          onRequest: () => {
+            setLoading(true);
+          },
+          onResponse: () => {
+            setLoading(false);
+          },
+          onError: (ctx) => {
+            console.error("[Login] Google sign-in error:", ctx.error);
+            setError("Failed to sign in with Google. Please try again.");
+            setLoading(false);
+          },
+        }
+      );
     } catch (err) {
-      console.error('[Login] Exception:', err);
-      setError("An unexpected error occurred. Please try again.");
-      sessionStorage.removeItem('loginIntent');
+      console.error("[Login] Google sign-in error:", err);
+      setError("An error occurred during sign-in. Please try again.");
       setLoading(false);
     }
   };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleLogin();
-    }
-  };
-
-  const roleCards: { key: RoleOption; label: string; icon: React.ReactNode; color: string }[] = [
-    {
-      key: "admin",
-      label: "Admin",
-      icon: <Shield className="w-5 h-5" />,
-      color: "purple",
-    },
-    {
-      key: "manager",
-      label: "Manager",
-      icon: <Users className="w-5 h-5" />,
-      color: "blue",
-    },
-    {
-      key: "contractor",
-      label: "Contractor",
-      icon: <Briefcase className="w-5 h-5" />,
-      color: "green",
-    },
-  ];
 
   if (authLoading) {
     return (
@@ -123,126 +57,64 @@ export function Login({ onSupabaseLogin, signIn, authLoading }: LoginProps) {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-[400px]">
         {/* Login Card */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          {/* App Title */}
-          <h1 className="text-center text-xl font-semibold text-gray-900 mb-2">
-            Invoicing Platform
+        <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200">
+          {/* Title */}
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+            Sign In
           </h1>
-          <p className="text-center text-sm text-gray-500 mb-6">
-            Enter credentials and select your role
+          <p className="text-sm text-gray-600 mb-6">
+            Sign in with your Google account to access the platform
           </p>
 
-          <div className="space-y-5">
-            {/* Role Selection Cards */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-900 mb-1.5 block">
-                Select Role
-              </Label>
-              <div className="grid grid-cols-3 gap-2">
-                {roleCards.map((role) => {
-                  const isSelected = selectedRole === role.key;
-                  const colorClasses = {
-                    purple: isSelected
-                      ? "border-purple-500 bg-purple-50 text-purple-700"
-                      : "border-gray-200 hover:border-purple-200 hover:bg-purple-50/50",
-                    blue: isSelected
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-200 hover:border-blue-200 hover:bg-blue-50/50",
-                    green: isSelected
-                      ? "border-green-500 bg-green-50 text-green-700"
-                      : "border-gray-200 hover:border-green-200 hover:bg-green-50/50",
-                  };
-
-                  return (
-                    <button
-                      key={role.key}
-                      type="button"
-                      onClick={() => setSelectedRole(role.key)}
-                      className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
-                        colorClasses[role.color as keyof typeof colorClasses]
-                      }`}
-                    >
-                      <div className={isSelected ? "" : "text-gray-500"}>
-                        {role.icon}
-                      </div>
-                      <span className={`text-xs font-medium mt-1 ${isSelected ? "" : "text-gray-600"}`}>
-                        {role.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Username (Email) Field */}
-            <div>
-              <Label htmlFor="email" className="text-sm font-medium text-gray-900 mb-1.5 block">
-                Username
-              </Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="you@example.com"
-                  className="h-11 bg-gray-50 border-gray-200 rounded-lg pl-10"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            {/* Password Field */}
-            <div>
-              <Label htmlFor="password" className="text-sm font-medium text-gray-900 mb-1.5 block">
-                Password
-              </Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Enter your password"
-                  className="h-11 bg-gray-50 border-gray-200 rounded-lg pl-10"
-                />
-              </div>
-            </div>
-
-            {/* Login Button */}
-            <Button
-              onClick={handleLogin}
-              disabled={loading}
-              className="w-full h-11 bg-purple-600 hover:bg-purple-700 rounded-lg mt-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Log In"
-              )}
-            </Button>
-
-            {/* Error Message */}
-            {error && (
-              <div className="flex items-center gap-2 text-red-600 text-sm mt-3">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{error}</span>
-              </div>
+          {/* Google Sign In Button */}
+          <Button
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            variant="outline"
+            className="w-full h-11 border-gray-300 hover:bg-gray-50 flex items-center justify-center gap-3"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                <span className="font-medium">Sign in with Google</span>
+              </>
             )}
-          </div>
+          </Button>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mt-4 text-red-600 text-sm text-center">
+              {error}
+            </div>
+          )}
         </div>
 
-        {/* Helper Text */}
+        {/* Footer Text */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500">
-            Sign in with your assigned email and password.
+            Sign in with your Google account to access the platform.
             <br />
             Your portal access is determined by your account role.
           </p>

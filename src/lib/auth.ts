@@ -7,11 +7,14 @@ const getEnv = (key: string, fallback?: string): string => {
     console.warn(`⚠️  Missing env var: ${key}`);
     return "";
   }
-  return value || fallback || "";
+  const result = value || fallback || "";
+  console.log(`[ENV] ${key} = ${result}`);
+  return result;
 };
 
 export const auth = betterAuth({
-  baseURL: getEnv("BETTER_AUTH_URL", "http://localhost:5001"),
+  baseURL: getEnv("BETTER_AUTH_URL", "http://localhost:5173/api/auth"),
+  basePath: "/api/auth",
   secret: getEnv("BETTER_AUTH_SECRET", "development-secret-change-in-production"),
 
   // Stateless session management (no database required)
@@ -45,5 +48,8 @@ export const auth = betterAuth({
 
   advanced: {
     useSecureCookies: process.env.NODE_ENV === "production",
+    crossSubDomainCookies: {
+      enabled: true,
+    },
   },
 });
