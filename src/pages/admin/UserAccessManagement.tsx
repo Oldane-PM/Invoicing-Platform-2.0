@@ -11,7 +11,7 @@ import {
 } from "../../components/ui/table";
 import { Combobox } from "../../components/shared/Combobox";
 import { Switch } from "../../components/ui/switch";
-import { ShieldAlert, Lock, Loader2, AlertCircle, UserX } from "lucide-react";
+import { ShieldAlert, Lock, Loader2, AlertCircle, UserX, UserPlus } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import {
   Tooltip,
@@ -26,6 +26,8 @@ import {
   useCurrentUserId,
 } from "../../lib/hooks/userAccess";
 import { RoleChangeConfirmationModal } from "../../components/shared/RoleChangeConfirmationModal";
+import { NewUserModal } from "../../components/modals/NewUserModal";
+import { SuccessModal } from "../../components/modals/SuccessModal";
 import type { UserRole } from "../../lib/data/userAccess";
 
 // Role options in specified order
@@ -57,6 +59,10 @@ export function UserAccessManagement() {
   
   // Track temporary dropdown values before confirmation
   const [tempDropdownValues, setTempDropdownValues] = React.useState<Record<string, string>>({});
+
+  // New user modal state
+  const [newUserModalOpen, setNewUserModalOpen] = React.useState(false);
+  const [successModalOpen, setSuccessModalOpen] = React.useState(false);
 
   // Handle role dropdown change - opens confirmation modal instead of immediately persisting
   const handleRoleChange = (userId: string, userName: string, newRoleDisplay: string, currentRole: UserRole) => {
@@ -139,6 +145,12 @@ export function UserAccessManagement() {
     return user.role.charAt(0).toUpperCase() + user.role.slice(1);
   };
 
+  // Handle successful user creation
+  const handleUserCreated = () => {
+    refetch(); // Refresh user list
+    setSuccessModalOpen(true); // Show success modal
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -207,6 +219,21 @@ export function UserAccessManagement() {
   return (
     <TooltipProvider>
       <div className="space-y-6">
+        {/* Header with New User Button */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900">User Access Management</h2>
+            <p className="text-sm text-gray-600 mt-1">Manage user roles and access permissions</p>
+          </div>
+          <Button
+            onClick={() => setNewUserModalOpen(true)}
+            className="bg-purple-600 hover:bg-purple-700 h-10 px-4 rounded-lg"
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Pre-Register User
+          </Button>
+        </div>
+
         <Card className="border border-gray-200 rounded-[14px] bg-white overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
@@ -318,6 +345,21 @@ export function UserAccessManagement() {
             isLoading={updateRole.isPending}
           />
         )}
+
+        {/* New User Modal */}
+        <NewUserModal
+          open={newUserModalOpen}
+          onOpenChange={setNewUserModalOpen}
+          onSuccess={handleUserCreated}
+        />
+
+        {/* Success Modal */}
+        <SuccessModal
+          open={successModalOpen}
+          onOpenChange={setSuccessModalOpen}
+          title="User Pre-Registered!"
+          message="The user will be assigned their role when they sign in with Google"
+        />
       </div>
     </TooltipProvider>
   );
