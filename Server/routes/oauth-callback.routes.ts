@@ -72,13 +72,46 @@ router.post('/supabase', async (req: Request, res: Response) => {
     if (!userProfile) {
       console.log('[OAuth Callback] Creating new profile for:', email);
       
+      // Check for invitation first
+      const { data: invitation, error: invitationError } = await supabase
+        .from('user_invitations')
+        .select('*')
+        .eq('email', email)
+        .is('used_at', null)
+        .single();
+
+      let roleToAssign = 'UNASSIGNED';
+      let contractStartDate = null;
+      let contractEndDate = null;
+      let fullName = name || email.split('@')[0];
+
+      if (invitation && !invitationError) {
+        console.log('[OAuth Callback] Found invitation for:', email, 'with role:', invitation.role);
+        roleToAssign = invitation.role;
+        contractStartDate = invitation.contract_start_date;
+        contractEndDate = invitation.contract_end_date;
+        fullName = invitation.first_name && invitation.last_name 
+          ? `${invitation.first_name} ${invitation.last_name}` 
+          : fullName;
+      } else {
+        console.log('[OAuth Callback] No invitation found, assigning UNASSIGNED role');
+      }
+
+      // Generate a UUID for the profile
+      // Note: Better Auth handles authentication, we just need a UUID for our profile
+      const { data: uuidData } = await supabase.rpc('gen_random_uuid');
+      const profileId = uuidData || crypto.randomUUID();
+      
+      console.log('[OAuth Callback] Creating profile with ID:', profileId);
+      
+      // Create profile
       const { data: newProfile, error: createError } = await supabase
         .from('profiles')
         .insert({
-          id: userId,
+          id: profileId,
           email: email,
-          role: 'unassigned',
-          full_name: name || email.split('@')[0],
+          role: roleToAssign.toLowerCase(), // Convert to lowercase to match DB constraint
+          full_name: fullName,
           is_active: true,
         })
         .select('id, email, role, full_name, is_active')
@@ -94,6 +127,42 @@ router.post('/supabase', async (req: Request, res: Response) => {
 
       userProfile = newProfile;
       console.log('[OAuth Callback] Profile created:', userProfile);
+
+      // If contractor, create contractor record
+      if (roleToAssign === 'CONTRACTOR' && contractStartDate && contractEndDate) {
+        console.log('[OAuth Callback] Creating contractor record for:', email);
+        
+        const { error: contractorError } = await supabase
+          .from('contractors')
+          .insert({
+            contractor_id: profileId,
+            contract_start: contractStartDate,
+            contract_end: contractEndDate,
+            hourly_rate: 75.0, // Default rate
+            overtime_rate: 112.5, // Default overtime rate
+            is_active: true,
+          });
+
+        if (contractorError) {
+          console.error('[OAuth Callback] Error creating contractor record:', contractorError);
+          // Don't fail the whole login, just log the error
+        } else {
+          console.log('[OAuth Callback] Contractor record created');
+        }
+      }
+
+      // Mark invitation as used
+      if (invitation) {
+        await supabase
+          .from('user_invitations')
+          .update({ 
+            used_at: new Date().toISOString(),
+            used_by_user_id: profileId 
+          })
+          .eq('id', invitation.id);
+        
+        console.log('[OAuth Callback] Invitation marked as used');
+      }
     }
 
     // Step 4: Check if user is active
@@ -105,39 +174,9 @@ router.post('/supabase', async (req: Request, res: Response) => {
       });
     }
 
-    // Step 6: Get or create auth user and generate session
-    let authUserId = userProfile.id;
-    
-    // Check if auth user exists
-    const { data: existingAuthUser } = await supabase.auth.admin.getUserById(userProfile.id);
-    
-    if (!existingAuthUser.user) {
-      console.log('[OAuth Callback] Creating Supabase auth user...');
-      
-      const { data: newAuthUser, error: createAuthError } = await supabase.auth.admin.createUser({
-        email: email,
-        email_confirm: true,
-        user_metadata: {
-          full_name: userProfile.full_name,
-          role: userProfile.role,
-        },
-      });
-
-      if (createAuthError || !newAuthUser.user) {
-        console.error('[OAuth Callback] Error creating auth user:', createAuthError);
-        return res.status(500).json({ 
-          success: false, 
-          error: 'Failed to create authentication user' 
-        });
-      }
-
-      authUserId = newAuthUser.user.id;
-      console.log('[OAuth Callback] Auth user created:', authUserId);
-    }
-
-    // Step 7: Generate session using sign-in with email OTP
-    // This creates a valid session that the frontend can use
-    const { data: otpData, error: otpError } = await supabase.auth.admin.generateLink({
+    // Step 4: Generate session using magic link
+    // Better Auth handles authentication, we just need to create a session for Supabase
+    const { data: otpData, error: otpError} = await supabase.auth.admin.generateLink({
       type: 'magiclink',
       email: email,
     });

@@ -83,7 +83,7 @@ function App() {
         const { data: appUser, error } = await supabase
           .from('profiles')
           .select('role, is_active')
-          .eq('id', user.id)
+          .eq('email', user.email)  // Use email instead of ID since Better Auth IDs don't match generated UUIDs
           .single();
 
         if (error) {
@@ -174,7 +174,7 @@ function App() {
       const { data: appUser, error } = await supabase
         .from('profiles')
         .select('role, is_active')
-        .eq('id', user.id)
+        .eq('email', user.email)  // Use email instead of ID
         .single();
       
       if (error) {

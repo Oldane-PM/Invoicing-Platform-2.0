@@ -5,6 +5,7 @@ import { toNodeHandler } from "better-auth/node";
 import { auth } from "../src/lib/auth";
 import invoiceRoutes from "./routes/invoice.routes";
 import oauthCallbackRoutes from "./routes/oauth-callback.routes";
+import userRoutes from "./routes/user.routes";
 
 const app = express();
 const port = Number(process.env.PORT ?? 5001);
@@ -34,6 +35,9 @@ app.get("/health", (_req, res) => {
 
 // Invoice routes
 app.use("/api/invoices", invoiceRoutes);
+
+// User routes (admin only)
+app.use("/api/users", userRoutes);
 
 // OAuth callback routes (mounted separately to avoid conflict with Better Auth)
 app.use("/api/callback", oauthCallbackRoutes);
