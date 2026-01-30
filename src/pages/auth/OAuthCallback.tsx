@@ -10,11 +10,18 @@ interface OAuthCallbackProps {
 export function OAuthCallback({ onAuthComplete }: OAuthCallbackProps) {
   const [error, setError] = React.useState<string | null>(null);
   const { data: session, isPending } = useSession();
+  const hasProcessed = React.useRef(false); // Prevent multiple executions
 
   React.useEffect(() => {
     async function handleCallback() {
       try {
         console.log("[OAuth Callback] Processing OAuth callback...");
+
+        // Prevent multiple executions
+        if (hasProcessed.current) {
+          console.log("[OAuth Callback] Already processed, skipping");
+          return;
+        }
 
         // Wait for Better Auth session
         if (isPending) {
@@ -28,6 +35,8 @@ export function OAuthCallback({ onAuthComplete }: OAuthCallbackProps) {
           return;
         }
 
+        // Mark as processing to prevent duplicate calls
+        hasProcessed.current = true;
         console.log("[OAuth Callback] Better Auth session found:", session.user.email);
 
         // Call backend to create Supabase session
