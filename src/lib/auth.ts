@@ -13,7 +13,7 @@ const getEnv = (key: string, fallback?: string): string => {
 };
 
 export const auth = betterAuth({
-  baseURL: getEnv("BETTER_AUTH_URL", "http://localhost:5173/api/auth"),
+  baseURL: getEnv("BETTER_AUTH_URL", "http://localhost:5001/api/auth"),
   basePath: "/api/auth",
   secret: getEnv("BETTER_AUTH_SECRET", "development-secret-change-in-production"),
 
