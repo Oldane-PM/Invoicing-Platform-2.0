@@ -49,6 +49,7 @@ export interface ContractInfo {
   overtime_rate: number | null;
   position: string | null;
   department: string | null;
+  reporting_manager_id: string | null;  // Manager's UUID for reliable identification
   reporting_manager_name: string | null;
 }
 
@@ -136,7 +137,8 @@ export async function getContractInfo(userId: string): Promise<ContractInfo | nu
     console.error("[contractorProfile.repo] Error fetching contract:", contractError);
   }
   
-  // Try to get manager name from manager_teams
+  // Try to get manager ID and name from manager_teams
+  let reportingManagerId: string | null = null;
   let reportingManagerName: string | null = null;
   const { data: teamData } = await supabase
     .from("manager_teams")
@@ -148,8 +150,9 @@ export async function getContractInfo(userId: string): Promise<ContractInfo | nu
     .limit(1)
     .maybeSingle();
   
-  if (teamData?.profiles) {
-    reportingManagerName = (teamData.profiles as any).full_name || null;
+  if (teamData) {
+    reportingManagerId = teamData.manager_id || null;
+    reportingManagerName = (teamData.profiles as any)?.full_name || null;
   }
   
   // If we have no data at all, return null
@@ -167,6 +170,7 @@ export async function getContractInfo(userId: string): Promise<ContractInfo | nu
     overtime_rate: contractor?.overtime_rate || null,
     position: null, // Not currently stored
     department: null, // Not currently stored
+    reporting_manager_id: reportingManagerId,
     reporting_manager_name: reportingManagerName,
   };
 }
