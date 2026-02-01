@@ -30,7 +30,7 @@ export interface SubmissionsDataSource {
   createSubmission(draft: SubmissionDraft): Promise<ContractorSubmission>;
   getSubmittedWorkPeriods(): Promise<string[]>;
   hasSubmissionForPeriod(workPeriod: string): Promise<boolean>;
-  /** Resubmit a rejected submission - updates status back to PENDING_MANAGER */
+  /** Update and resubmit a submission - allowed for PENDING_MANAGER or REJECTED_CONTRACTOR status */
   resubmitAfterRejection(submissionId: string, updatedData?: Partial<SubmissionDraft>): Promise<ContractorSubmission>;
   /** Delete a submission - not allowed for APPROVED or PAID submissions */
   deleteSubmission(submissionId: string): Promise<void>;
@@ -78,31 +78,50 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
   }
 
   /**
-   * Get the active contractor details (project name, rates)
+   * Get the active contractor details (project name, rates, contract type)
+   * Also fetches contract_type from contracts table
    */
   private async getContractorDetails(contractorUserId: string): Promise<{
     hourlyRate: number;
     overtimeRate: number;
+    fixedRate: number | null;
     projectName: string;
+    contractType: "hourly" | "fixed";
   } | null> {
     if (!supabase) return null;
 
-    const { data, error } = await supabase
+    // Fetch from contractors table (rates)
+    const { data: contractorData, error: contractorError } = await supabase
       .from("contractors")
       .select("hourly_rate, overtime_rate, default_project_name")
       .eq("contractor_id", contractorUserId)
       .eq("is_active", true)
       .single();
 
-    if (error || !data) {
+    if (contractorError || !contractorData) {
       console.log("[SupabaseSubmissionsDataSource] No active contractor details found, using defaults");
       return null;
     }
 
+    // Also fetch contract_type from contracts table
+    const { data: contractData } = await supabase
+      .from("contracts")
+      .select("contract_type, fixed_monthly_rate")
+      .eq("contractor_user_id", contractorUserId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const contractType = contractData?.contract_type === "fixed" ? "fixed" : "hourly";
+    const hourlyRate = contractorData.hourly_rate || DEFAULT_HOURLY_RATE;
+
     return {
-      hourlyRate: data.hourly_rate || DEFAULT_HOURLY_RATE,
-      overtimeRate: data.overtime_rate || (DEFAULT_HOURLY_RATE * DEFAULT_OT_MULTIPLIER),
-      projectName: data.default_project_name || "General Work",
+      hourlyRate,
+      overtimeRate: contractorData.overtime_rate || (hourlyRate * DEFAULT_OT_MULTIPLIER),
+      fixedRate: contractData?.fixed_monthly_rate || null,
+      projectName: contractorData.default_project_name || "General Work",
+      contractType,
     };
   }
 
@@ -175,6 +194,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         regular_hours,
         overtime_hours,
         overtime_description,
+        excluded_dates,
         total_amount,
         status,
         submitted_at,
@@ -226,7 +246,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         status,
         invoiceUrl: null, // Invoices table does not exist
         workPeriod,
-        excludedDates: [], // Not stored in flat schema
+        excludedDates: sub.excluded_dates || [],
         overtimeDescription: sub.overtime_description,
         // Workflow notes (columns may not exist in all schemas - set to null/undefined)
         rejectionReason: sub.rejection_reason ?? null,
@@ -282,10 +302,12 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     const contractId = contractData.id;
     const projectName = contractData.project_name || "General Work";
 
-    // Get contractor details (for rates)
+    // Get contractor details (rates and contract type)
     const details = await this.getContractorDetails(contractorUserId);
     const hourlyRate = details?.hourlyRate || DEFAULT_HOURLY_RATE;
     const overtimeRate = details?.overtimeRate || getDefaultOvertimeRate(hourlyRate);
+    const contractType = details?.contractType || "hourly";
+    const fixedRate = details?.fixedRate;
 
     // Parse work period to get period_start and period_end
     const periodDate = parse(draft.workPeriod, "yyyy-MM", new Date());
@@ -293,15 +315,18 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     const periodEnd = format(endOfMonth(periodDate), "yyyy-MM-dd");
 
     // Calculate total amount using centralized calculation
-    // For now, assuming hourly contractors (fixed-rate logic can be added when contract type is available)
+    // Handles both hourly and fixed-rate contractors
     const totalAmount = calculateTotalForStorage({
-      payType: "hourly",
+      payType: contractType,
       regularHours: draft.hoursSubmitted,
       overtimeHours: draft.overtimeHours,
       regularRate: hourlyRate,
       overtimeRate: overtimeRate,
+      monthlyRate: fixedRate,
     });
 
+    // Store the rates used for this calculation to ensure invoice consistency
+    // For fixed-rate, we still store the hourly rates for reference, but total is the fixed amount
     const { data: submission, error: submissionError } = await supabase
       .from("submissions")
       .insert({
@@ -316,7 +341,12 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         regular_hours: draft.hoursSubmitted,
         overtime_hours: draft.overtimeHours,
         overtime_description: draft.overtimeDescription || null,
+        excluded_dates: draft.excludedDates,
         total_amount: totalAmount,
+        // Store rates at submission time for invoice consistency
+        regular_rate: hourlyRate,
+        overtime_rate: overtimeRate,
+        rate_type: contractType,
         status: "submitted",
         submitted_at: new Date().toISOString(),
       })
@@ -341,7 +371,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       status: "PENDING_MANAGER" as SubmissionStatus,
       invoiceUrl: null,
       workPeriod: submission.work_period,
-      excludedDates: draft.excludedDates, // Returned from input, but not persisted deeply
+      excludedDates: submission.excluded_dates || [],
       overtimeDescription: submission.overtime_description,
       rejectionReason: null,
       adminNote: null,
@@ -405,8 +435,8 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
   }
 
   /**
-   * Resubmit a rejected submission
-   * Only allowed when status is REJECTED_CONTRACTOR
+   * Update and resubmit a submission
+   * Allowed when status is PENDING_MANAGER or REJECTED_CONTRACTOR
    * Transitions status back to PENDING_MANAGER (submitted)
    */
   async resubmitAfterRejection(
@@ -431,10 +461,10 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       throw new Error("Submission not found or access denied");
     }
 
-    // Check status - only allow resubmit from rejected
+    // Check status - allow resubmit from PENDING_MANAGER or REJECTED_CONTRACTOR
     const currentStatus = mapDbStatusToSubmissionStatus(existing.status, existing.paid_at);
-    if (currentStatus !== "REJECTED_CONTRACTOR") {
-      throw new Error(`Cannot resubmit: submission is not in rejected status (current: ${currentStatus})`);
+    if (currentStatus !== "REJECTED_CONTRACTOR" && currentStatus !== "PENDING_MANAGER") {
+      throw new Error(`Cannot edit: submission is not in pending or rejected status (current: ${currentStatus})`);
     }
 
     // Build update payload - only include columns that are guaranteed to exist
@@ -458,21 +488,35 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     if (updatedData?.overtimeDescription !== undefined) {
       updatePayload.overtime_description = updatedData.overtimeDescription;
     }
+    if (updatedData?.excludedDates !== undefined) {
+      updatePayload.excluded_dates = updatedData.excludedDates;
+    }
     
-    // Recalculate total if hours were updated
+    // Recalculate total if hours were updated - fetch actual contractor rates
     if (updatedData?.hoursSubmitted !== undefined || updatedData?.overtimeHours !== undefined) {
       const regularHours = updatedData?.hoursSubmitted ?? existing.regular_hours ?? 0;
       const overtimeHours = updatedData?.overtimeHours ?? existing.overtime_hours ?? 0;
-      const hourlyRate = DEFAULT_HOURLY_RATE;
-      const overtimeRate = getDefaultOvertimeRate(hourlyRate);
+      
+      // IMPORTANT: Get actual contractor rates from contract info, not hardcoded defaults
+      const details = await this.getContractorDetails(contractorUserId);
+      const hourlyRate = details?.hourlyRate || DEFAULT_HOURLY_RATE;
+      const overtimeRate = details?.overtimeRate || getDefaultOvertimeRate(hourlyRate);
+      const contractType = details?.contractType || "hourly";
+      const fixedRate = details?.fixedRate;
       
       updatePayload.total_amount = calculateTotalForStorage({
-        payType: "hourly",
+        payType: contractType,
         regularHours,
         overtimeHours,
         regularRate: hourlyRate,
         overtimeRate,
+        monthlyRate: fixedRate,
       });
+      
+      // Also update stored rates for invoice consistency
+      updatePayload.regular_rate = hourlyRate;
+      updatePayload.overtime_rate = overtimeRate;
+      updatePayload.rate_type = contractType;
     }
 
     const { data: updated, error: updateError } = await supabase

@@ -108,7 +108,7 @@ async function generateInvoiceInternal(
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
 
-  // Fetch submission with all needed data
+  // Fetch submission with all needed data INCLUDING stored rates for invoice consistency
   const { data: submission, error: subError } = await supabase
     .from('submissions')
     .select(`
@@ -123,7 +123,10 @@ async function generateInvoiceInternal(
       submitted_at,
       created_at,
       invoice_due_days,
-      invoice_currency
+      invoice_currency,
+      regular_rate,
+      overtime_rate,
+      rate_type
     `)
     .eq('id', submissionId)
     .single();
@@ -158,16 +161,33 @@ async function generateInvoiceInternal(
     console.error('[invoice.controller] Error fetching user profile:', userError);
   }
 
-  // Fetch contractor rates from contractors table
-  const { data: contractor, error: contractorError } = await supabase
-    .from('contractors')
-    .select('hourly_rate, overtime_rate')
-    .eq('contractor_id', contractorId)
-    .eq('is_active', true)
-    .maybeSingle();
+  // CRITICAL: Use stored rates from submission for invoice consistency
+  // This ensures submission total === invoice total always
+  // Only fall back to contractors table for legacy submissions without stored rates
+  let hourlyRate: number;
+  let overtimeRate: number;
 
-  if (contractorError) {
-    console.error('[invoice.controller] Error fetching contractor rates:', contractorError);
+  if (submission.regular_rate !== null && submission.regular_rate !== undefined) {
+    // Use stored rates from submission (preferred - guarantees consistency)
+    hourlyRate = submission.regular_rate;
+    overtimeRate = submission.overtime_rate || hourlyRate * 1.5;
+    console.log('[invoice.controller] Using stored rates from submission:', { hourlyRate, overtimeRate });
+  } else {
+    // Fallback: fetch from contractors table (for legacy submissions without stored rates)
+    const { data: contractor, error: contractorError } = await supabase
+      .from('contractors')
+      .select('hourly_rate, overtime_rate')
+      .eq('contractor_id', contractorId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (contractorError) {
+      console.error('[invoice.controller] Error fetching contractor rates:', contractorError);
+    }
+
+    hourlyRate = contractor?.hourly_rate || 75;
+    overtimeRate = contractor?.overtime_rate || hourlyRate * 1.5;
+    console.log('[invoice.controller] Using rates from contractors table (legacy):', { hourlyRate, overtimeRate });
   }
 
   // Generate unique invoice number
@@ -185,10 +205,6 @@ async function generateInvoiceInternal(
     profile?.country,
   ].filter(Boolean);
   const contractorAddress = addressParts.join('\n') || 'Address not provided';
-
-  // Build line items
-  const hourlyRate = contractor?.hourly_rate || 75;
-  const overtimeRate = contractor?.overtime_rate || hourlyRate * 1.5;
 
   const lineItems: InvoiceData['lineItems'] = [];
 

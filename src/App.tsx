@@ -19,6 +19,7 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { Login } from "./pages/auth/Login";
+import { OAuthCallback } from "./pages/auth/OAuthCallback";
 import { AdminDashboard } from "./pages/admin/Dashboard";
 import { ManagerDashboard } from "./pages/manager/Dashboard";
 import { ManagerTeamView } from "./pages/manager/Team";
@@ -29,11 +30,11 @@ import { EmployeeDirectory } from "./pages/admin/EmployeeDirectory";
 import { UserAccessManagement } from "./pages/admin/UserAccessManagement";
 import { AdminCalendar } from "./pages/admin/Calendar";
 import { AdminProjects } from "./pages/admin/Projects";
+import { UnassignedDashboard } from "./pages/unassigned/Dashboard";
 import { NotificationBell } from "./components/shared/NotificationBell";
 import { NotificationDrawer } from "./components/shared/NotificationDrawer";
 import { ContractorDetailDrawer } from "./components/drawers/ContractorDetailDrawer";
 import { useAuth } from "./lib/hooks/useAuth";
-import type { UserRole as AuthUserRole } from "./lib/supabase/repos/auth.repo";
 import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 
 type Screen = "dashboard" | "directory" | "access" | "calendar" | "projects";
@@ -42,13 +43,15 @@ type ContractorScreen =
   | "dashboard"
   | "profile"
   | "submit-hours";
-type UserRole = "Admin" | "Manager" | "Contractor" | null;
+type UserRole = "Admin" | "Manager" | "Contractor" | "Unassigned" | null;
+type AppView = "login" | "oauth-callback" | "app";
 
 function App() {
   // Supabase auth for Contractor and Manager
   const { isAuthenticated, user, signIn, signOut, loading: authLoading } = useAuth();
 
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
+  const [currentView, setCurrentView] = React.useState<AppView>("login");
   const [currentScreen, setCurrentScreen] = React.useState<Screen>("dashboard");
   const [managerScreen, setManagerScreen] =
     React.useState<ManagerScreen>("dashboard");
@@ -80,7 +83,7 @@ function App() {
         const { data: appUser, error } = await supabase
           .from('profiles')
           .select('role, is_active')
-          .eq('id', user.id)
+          .eq('email', user.email)  // Use email instead of ID since Better Auth IDs don't match generated UUIDs
           .single();
 
         if (error) {
@@ -100,17 +103,19 @@ function App() {
           
           // Map database role to app role
           const roleMap: Record<string, UserRole> = {
+            'unassigned': 'Unassigned',
             'admin': 'Admin',
             'manager': 'Manager',
             'contractor': 'Contractor',
           };
-          // Handle both uppercase (DB) and lowercase
-          const userRole = roleMap[appUser.role.toLowerCase()] || 'Contractor';
+          // Handle both uppercase (DB) and lowercase - default to Unassigned for unknown roles
+          const userRole = roleMap[appUser.role.toLowerCase()] || 'Unassigned';
           
           // Validate that user is logging in through the correct option
           // This prevents admins from logging in through "Contractor" and vice versa
+          // Allow unassigned users to log in through any option - they'll be redirected appropriately
           const loginIntent = sessionStorage.getItem('loginIntent');
-          if (loginIntent && loginIntent !== userRole) {
+          if (loginIntent && loginIntent !== userRole && userRole !== 'Unassigned') {
             // User tried to log in through wrong option
             await signOut();
             alert(`You cannot log in as ${loginIntent}. Please use the ${userRole} login option.`);
@@ -129,27 +134,73 @@ function App() {
     fetchUserRole();
   }, [isAuthenticated, user, authLoading, signOut]);
 
-  // Handle Supabase login success (for all roles)
-  const handleSupabaseLogin = (authRole: AuthUserRole) => {
+  // Handle OAuth callback completion
+  const handleAuthComplete = (authRole: string) => {
     if (authRole === "ADMIN") {
       setCurrentUser("Admin");
     } else if (authRole === "MANAGER") {
       setCurrentUser("Manager");
     } else if (authRole === "CONTRACTOR") {
       setCurrentUser("Contractor");
+    } else if (authRole === "UNASSIGNED") {
+      setCurrentUser("Unassigned");
     }
+    setCurrentView("app");
   };
 
   // Handle logout for all user types
   const handleLogout = async () => {
-    if (currentUser === "Contractor" || currentUser === "Manager") {
-      // Sign out from Supabase for Contractors and Managers
+    if (currentUser === "Contractor" || currentUser === "Manager" || currentUser === "Unassigned" || currentUser === "Admin") {
+      // Sign out from Supabase for all authenticated users
       await signOut();
     }
     setCurrentUser(null);
     setCurrentScreen("dashboard");
     setManagerScreen("dashboard");
     setContractorScreen("dashboard");
+  };
+  
+  // Refresh status for unassigned users - refetch role from database
+  const [isRefreshingStatus, setIsRefreshingStatus] = React.useState(false);
+  
+  const handleRefreshStatus = async () => {
+    if (!user) return;
+    
+    setIsRefreshingStatus(true);
+    try {
+      const { getSupabaseClient } = await import('./lib/supabase/client');
+      const supabase = getSupabaseClient();
+      
+      const { data: appUser, error } = await supabase
+        .from('profiles')
+        .select('role, is_active')
+        .eq('email', user.email)  // Use email instead of ID
+        .single();
+      
+      if (error) {
+        console.error('Error refreshing user role:', error);
+        return;
+      }
+      
+      if (appUser) {
+        // Check if role has changed from unassigned
+        const roleMap: Record<string, UserRole> = {
+          'unassigned': 'Unassigned',
+          'admin': 'Admin',
+          'manager': 'Manager',
+          'contractor': 'Contractor',
+        };
+        const newRole = roleMap[appUser.role.toLowerCase()] || 'Unassigned';
+        
+        if (newRole !== 'Unassigned') {
+          setCurrentUser(newRole);
+        }
+      }
+    } catch (err) {
+      console.error('Error refreshing status:', err);
+    } finally {
+      setIsRefreshingStatus(false);
+    }
   };
 
   const handleEmployeeClick = (employee: EmployeeDirectoryRow) => {
@@ -202,13 +253,30 @@ function App() {
 
   const pageInfo = getPageInfo();
 
+  // Check URL for OAuth callback
+  React.useEffect(() => {
+    if (window.location.pathname === "/auth/callback") {
+      setCurrentView("oauth-callback");
+    }
+  }, []);
+
+  // Show OAuth callback screen
+  if (currentView === "oauth-callback") {
+    return <OAuthCallback onAuthComplete={handleAuthComplete} />;
+  }
+
   // Show login screen if not authenticated
   if (!currentUser) {
+    return <Login authLoading={authLoading} />;
+  }
+
+  // Unassigned User Portal - Users without a role assignment
+  if (currentUser === "Unassigned") {
     return (
-      <Login
-        onSupabaseLogin={handleSupabaseLogin}
-        signIn={signIn}
-        authLoading={authLoading}
+      <UnassignedDashboard
+        onLogout={handleLogout}
+        onRefreshStatus={handleRefreshStatus}
+        isRefreshing={isRefreshingStatus}
       />
     );
   }
