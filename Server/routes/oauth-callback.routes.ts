@@ -174,8 +174,27 @@ router.post('/supabase', async (req: Request, res: Response) => {
       });
     }
 
-    // Step 4: Generate session using magic link
-    // Better Auth handles authentication, we just need to create a session for Supabase
+    // Step 4: Ensure user exists in Supabase auth.users
+    // Better Auth handles OAuth, but we need a Supabase auth user for RLS and generateLink to work
+    // Try to create the user - if they already exist, this will fail gracefully
+    const { error: createAuthError } = await supabase.auth.admin.createUser({
+      email: email,
+      email_confirm: true, // Auto-confirm since they authenticated via Google
+      user_metadata: {
+        full_name: userProfile.full_name,
+      },
+    });
+    
+    // Only log if it's an error other than "user already exists"
+    if (createAuthError && !createAuthError.message?.includes('already been registered')) {
+      console.log('[OAuth Callback] Note: Could not create auth user:', createAuthError.message);
+      // Don't fail here - the user might already exist, which is fine
+    } else if (!createAuthError) {
+      console.log('[OAuth Callback] Created new Supabase auth user for:', email);
+    }
+
+    // Step 5: Generate session using magic link
+    // Now that user exists in auth.users, we can generate a magic link
     const { data: otpData, error: otpError} = await supabase.auth.admin.generateLink({
       type: 'magiclink',
       email: email,
