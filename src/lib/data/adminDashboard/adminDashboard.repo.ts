@@ -133,25 +133,19 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
 
   // Get all contractor IDs from submissions
   const contractorIds = [...new Set(data.map((s: any) => s.contractor_user_id).filter(Boolean))];
-  console.log('[AdminDashboard] Contractor IDs:', contractorIds);
 
   // Fetch manager assignments from manager_teams
-  const { data: managerTeams, error: mtError } = await supabase
+  const { data: managerTeams } = await supabase
     .from('manager_teams')
     .select('contractor_id, manager_id')
     .in('contractor_id', contractorIds);
 
-  console.log('[AdminDashboard] Manager teams:', managerTeams, 'Error:', mtError);
-
   // Get manager profile names
   const managerIds = [...new Set((managerTeams || []).map((mt: any) => mt.manager_id).filter(Boolean))];
-  console.log('[AdminDashboard] Manager IDs:', managerIds);
   
-  const { data: managerProfiles, error: mpError } = managerIds.length > 0 
+  const { data: managerProfiles } = managerIds.length > 0 
     ? await supabase.from('profiles').select('id, full_name').in('id', managerIds)
-    : { data: [], error: null };
-
-  console.log('[AdminDashboard] Manager profiles:', managerProfiles, 'Error:', mpError);
+    : { data: [] };
 
   // Build contractor -> manager name map
   const contractorManagerMap = new Map<string, string>();
@@ -161,7 +155,6 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
       contractorManagerMap.set(mt.contractor_id, manager.full_name);
     }
   });
-  console.log('[AdminDashboard] Contractor->Manager map:', Object.fromEntries(contractorManagerMap));
 
   // Map to domain type - using direct columns like Manager repo
   let submissions: AdminSubmission[] = data.map((sub: any) => {
