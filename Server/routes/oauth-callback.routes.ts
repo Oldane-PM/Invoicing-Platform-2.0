@@ -128,7 +128,26 @@ router.post('/supabase', async (req: Request, res: Response) => {
       userProfile = newProfile;
       console.log('[OAuth Callback] Profile created:', userProfile);
 
-      // If contractor, create contractor record
+      // Also create app_users record (required for contracts foreign key)
+      console.log('[OAuth Callback] Creating app_users record for:', email);
+      const { error: appUserError } = await supabase
+        .from('app_users')
+        .insert({
+          id: profileId,
+          role: roleToAssign.toLowerCase(),
+          full_name: fullName,
+          email: email,
+          is_active: true,
+        });
+
+      if (appUserError) {
+        console.error('[OAuth Callback] Error creating app_users record:', appUserError);
+        // Don't fail - app_users might have different constraints
+      } else {
+        console.log('[OAuth Callback] app_users record created');
+      }
+
+      // If contractor, create contractor record AND contracts record
       if (roleToAssign === 'CONTRACTOR' && contractStartDate && contractEndDate) {
         console.log('[OAuth Callback] Creating contractor record for:', email);
         
@@ -148,6 +167,26 @@ router.post('/supabase', async (req: Request, res: Response) => {
           // Don't fail the whole login, just log the error
         } else {
           console.log('[OAuth Callback] Contractor record created');
+        }
+
+        // Also create a contracts record (required for submissions)
+        console.log('[OAuth Callback] Creating contracts record for:', email);
+        const { error: contractError } = await supabase
+          .from('contracts')
+          .insert({
+            contractor_user_id: profileId,
+            project_name: 'General Work',
+            contract_type: 'hourly',
+            start_date: contractStartDate,
+            end_date: contractEndDate,
+            is_active: true,
+          });
+
+        if (contractError) {
+          console.error('[OAuth Callback] Error creating contracts record:', contractError);
+          // Don't fail the whole login, just log the error
+        } else {
+          console.log('[OAuth Callback] Contracts record created');
         }
       }
 
