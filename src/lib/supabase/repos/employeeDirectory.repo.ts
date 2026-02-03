@@ -18,7 +18,7 @@ export async function getUniqueRoles(): Promise<string[]> {
   const { data: profiles, error } = await supabase
     .from("profiles")
     .select("role")
-    .eq("role", "CONTRACTOR");
+    .eq("role", "contractor");
 
   if (error) {
     console.error("[employeeDirectory.repo] getUniqueRoles error:", error);
@@ -39,7 +39,7 @@ export async function getUniqueRoles(): Promise<string[]> {
 
   // Also check contractor_profiles table if it has position/role field
   // For now, we'll use common roles as a baseline and add any found
-  const commonRoles = ["CONTRACTOR", "Engineer", "Designer", "QA", "DevOps", "Product Manager"];
+  const commonRoles = ["contractor", "Engineer", "Designer", "QA", "DevOps", "Product Manager"];
   commonRoles.forEach((role) => rolesSet.add(role));
 
   return Array.from(rolesSet).sort((a, b) => a.localeCompare(b));
@@ -76,7 +76,7 @@ export async function listEmployees({
   let query = supabase
     .from("profiles")
     .select("id, full_name, email, created_at, role", { count: "exact" })
-    .eq("role", "CONTRACTOR");
+    .eq("role", "contractor");
 
   // Apply search if provided
   if (search) {
