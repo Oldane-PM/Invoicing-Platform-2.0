@@ -7,7 +7,12 @@
 
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listProjects, createProject, updateProject } from "../../supabase/repos/projects.repo";
+import {
+  listProjects,
+  createProject,
+  updateProject,
+  setProjectEnabled,
+} from "../../supabase/repos/projects.repo";
 import type { ProjectRow, CreateProjectInput, UpdateProjectInput } from "../../types";
 import { QUERY_KEYS } from "../queryKeys";
 
@@ -26,6 +31,8 @@ interface UseProjectsResult {
   setSortBy: (sortBy: SortField) => void;
   sortDir: "asc" | "desc";
   setSortDir: (sortDir: "asc" | "desc") => void;
+  enabledFilter: boolean | undefined;
+  setEnabledFilter: (enabled: boolean | undefined) => void;
   refetch: () => void;
   createProject: (input: CreateProjectInput) => Promise<ProjectRow>;
   creating: boolean;
@@ -33,6 +40,10 @@ interface UseProjectsResult {
   updateProject: (input: UpdateProjectInput) => Promise<ProjectRow>;
   updating: boolean;
   updateError: Error | null;
+  enableProject: (projectId: string) => Promise<ProjectRow>;
+  disableProject: (projectId: string) => Promise<ProjectRow>;
+  toggling: boolean;
+  toggleError: Error | null;
 }
 
 export function useProjects(): UseProjectsResult {
@@ -41,6 +52,7 @@ export function useProjects(): UseProjectsResult {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [enabledFilter, setEnabledFilter] = useState<boolean | undefined>(undefined);
 
   // Debounced search (300ms)
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -58,10 +70,11 @@ export function useProjects(): UseProjectsResult {
 
   // Fetch projects query
   const query = useQuery({
-    queryKey: [QUERY_KEYS.ADMIN_PROJECTS, debouncedSearch, page, sortBy, sortDir],
+    queryKey: [QUERY_KEYS.ADMIN_PROJECTS, debouncedSearch, page, sortBy, sortDir, enabledFilter],
     queryFn: () =>
       listProjects({
         search: debouncedSearch,
+        enabled: enabledFilter,
         page,
         pageSize: 20,
         sortBy,
@@ -95,6 +108,32 @@ export function useProjects(): UseProjectsResult {
     },
   });
 
+  // Enable project mutation
+  const enableMutation = useMutation({
+    mutationFn: (projectId: string) => setProjectEnabled(projectId, true),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.ADMIN_PROJECTS] });
+      // Also invalidate contractor projects since enabled status affects their dropdown
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CONTRACTOR_PROJECTS] });
+    },
+    onError: (error: Error) => {
+      console.error("[useProjects] enableProject error:", error.message);
+    },
+  });
+
+  // Disable project mutation
+  const disableMutation = useMutation({
+    mutationFn: (projectId: string) => setProjectEnabled(projectId, false),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.ADMIN_PROJECTS] });
+      // Also invalidate contractor projects since enabled status affects their dropdown
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CONTRACTOR_PROJECTS] });
+    },
+    onError: (error: Error) => {
+      console.error("[useProjects] disableProject error:", error.message);
+    },
+  });
+
   return {
     rows: query.data?.rows || [],
     total: query.data?.total || 0,
@@ -108,6 +147,8 @@ export function useProjects(): UseProjectsResult {
     setSortBy,
     sortDir,
     setSortDir,
+    enabledFilter,
+    setEnabledFilter,
     refetch: query.refetch,
     createProject: createMutation.mutateAsync,
     creating: createMutation.isPending,
@@ -115,5 +156,9 @@ export function useProjects(): UseProjectsResult {
     updateProject: updateMutation.mutateAsync,
     updating: updateMutation.isPending,
     updateError: updateMutation.error as Error | null,
+    enableProject: enableMutation.mutateAsync,
+    disableProject: disableMutation.mutateAsync,
+    toggling: enableMutation.isPending || disableMutation.isPending,
+    toggleError: (enableMutation.error || disableMutation.error) as Error | null,
   };
 }

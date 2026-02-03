@@ -269,7 +269,8 @@ export interface SubmissionDraft {
   description: string;
   overtimeHours: number;
   overtimeDescription?: string | null;
-  projectName?: string; // optional for now if app doesn't have project selection
+  projectName?: string; // optional for backwards compatibility
+  projectId: string; // Required - UUID reference to projects table
 }
 
 export interface EmployeeDirectoryRow {
@@ -304,6 +305,27 @@ export interface ProjectRow {
   startDate: string;
   endDate: string | null;
   createdAt: string;
+  // New fields for assignments and status
+  managerId: string | null;
+  managerName: string | null;
+  managerEmail: string | null;
+  isEnabled: boolean;
+  contractorCount: number;
+}
+
+// Contractor assigned to a project (for admin assignment dialog)
+export interface ProjectContractor {
+  id: string;
+  fullName: string;
+  email: string;
+  assignedAt: string;
+}
+
+// Project available to contractor (for dropdown in Submit Hours)
+export interface ContractorProject {
+  id: string;
+  name: string;
+  client: string;
 }
 
 export interface CreateProjectInput {

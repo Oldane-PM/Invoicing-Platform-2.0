@@ -332,7 +332,8 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       .insert({
         contractor_user_id: contractorUserId,
         contract_id: contractId,
-        project_name: projectName,
+        project_name: draft.projectName || projectName,
+        project_id: draft.projectId || null, // Link to projects table if provided
         description: draft.description,
         period_start: periodStart,
         period_end: periodEnd,
