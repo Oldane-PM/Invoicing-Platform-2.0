@@ -22,5 +22,7 @@ export function mapDbUserToUserAccessUser(dbUser: any): UserAccessUser {
     email: dbUser.email,
     role,
     isActive: dbUser.is_active,
+    invitedAt: dbUser.invited_at,
+    activatedAt: dbUser.activated_at ?? null,
   };
 }
