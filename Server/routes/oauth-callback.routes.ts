@@ -137,49 +137,62 @@ router.post('/supabase', async (req: Request, res: Response) => {
         console.log('[OAuth Callback] Created auth user with ID:', profileId);
       }
       
-      // Now create profile with the auth.users ID
-      console.log('[OAuth Callback] Creating profile with ID:', profileId);
+      // Try to create/update profile with the auth.users ID
+      // Note: The handle_new_user trigger may have already created a profile
+      console.log('[OAuth Callback] Creating/updating profile with ID:', profileId);
       
       const { data: newProfile, error: createError } = await supabase
         .from('profiles')
-        .insert({
+        .upsert({
           id: profileId,
           email: email,
           role: roleToAssign,
           full_name: fullName,
           is_active: true,
-        })
+        }, { onConflict: 'id' })
         .select('id, email, role, full_name, is_active')
         .single();
 
       if (createError) {
-        console.error('[OAuth Callback] Error creating profile:', createError);
-        return res.status(500).json({ 
-          success: false, 
-          error: 'Failed to create user profile' 
-        });
+        console.error('[OAuth Callback] Error creating/updating profile:', createError);
+        // Try to fetch the existing profile instead
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id, email, role, full_name, is_active')
+          .eq('id', profileId)
+          .single();
+        
+        if (existingProfile) {
+          userProfile = existingProfile;
+          console.log('[OAuth Callback] Using existing profile:', userProfile);
+        } else {
+          return res.status(500).json({ 
+            success: false, 
+            error: 'Failed to create user profile' 
+          });
+        }
+      } else {
+        userProfile = newProfile;
+        console.log('[OAuth Callback] Profile created/updated:', userProfile);
       }
 
-      userProfile = newProfile;
-      console.log('[OAuth Callback] Profile created:', userProfile);
-
-      // Create app_users record - now auth.users exists, FK will succeed
-      console.log('[OAuth Callback] Creating app_users record for:', email);
+      // Create/update app_users record - use upsert for robustness
+      console.log('[OAuth Callback] Creating/updating app_users record for:', email);
       const { error: appUserError } = await supabase
         .from('app_users')
-        .insert({
+        .upsert({
           id: profileId,
           role: roleToAssign,
           full_name: fullName,
           email: email,
           is_active: true,
-        });
+        }, { onConflict: 'id' });
 
       if (appUserError) {
         console.error('[OAuth Callback] Error creating app_users record:', appUserError);
         // Don't fail - app_users might have different constraints
       } else {
-        console.log('[OAuth Callback] app_users record created');
+        console.log('[OAuth Callback] app_users record created/updated');
       }
 
       // If contractor, create contractor record AND contracts record
@@ -188,14 +201,14 @@ router.post('/supabase', async (req: Request, res: Response) => {
         
         const { error: contractorError } = await supabase
           .from('contractors')
-          .insert({
+          .upsert({
             contractor_id: profileId,
             contract_start: contractStartDate,
             contract_end: contractEndDate,
             hourly_rate: 75.0,
             overtime_rate: 112.5,
             is_active: true,
-          });
+          }, { onConflict: 'contractor_id' });
 
         if (contractorError) {
           console.error('[OAuth Callback] Error creating contractor record:', contractorError);
@@ -203,23 +216,36 @@ router.post('/supabase', async (req: Request, res: Response) => {
           console.log('[OAuth Callback] Contractor record created');
         }
 
-        // Create contracts record - now app_users exists, FK will succeed
+        // Create contracts record - check if one exists first (contractor can have multiple contracts)
         console.log('[OAuth Callback] Creating contracts record for:', email);
-        const { error: contractError } = await supabase
+        
+        // Check if an active contract already exists
+        const { data: existingContract } = await supabase
           .from('contracts')
-          .insert({
-            contractor_user_id: profileId,
-            project_name: 'General Work',
-            contract_type: 'hourly',
-            start_date: contractStartDate,
-            end_date: contractEndDate,
-            is_active: true,
-          });
+          .select('id')
+          .eq('contractor_user_id', profileId)
+          .eq('is_active', true)
+          .single();
+        
+        if (!existingContract) {
+          const { error: contractError } = await supabase
+            .from('contracts')
+            .insert({
+              contractor_user_id: profileId,
+              project_name: 'General Work',
+              contract_type: 'hourly',
+              start_date: contractStartDate,
+              end_date: contractEndDate,
+              is_active: true,
+            });
 
-        if (contractError) {
-          console.error('[OAuth Callback] Error creating contracts record:', contractError);
+          if (contractError) {
+            console.error('[OAuth Callback] Error creating contracts record:', contractError);
+          } else {
+            console.log('[OAuth Callback] Contracts record created');
+          }
         } else {
-          console.log('[OAuth Callback] Contracts record created');
+          console.log('[OAuth Callback] Active contract already exists, skipping creation');
         }
       }
 
