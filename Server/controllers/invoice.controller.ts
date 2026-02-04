@@ -16,10 +16,10 @@ import {
   type InvoiceData,
 } from '../services/invoices';
 
-// Default company info (Bill To) - should be configured via env or database
+// Default company info (Bill To) - configured via env vars
 const DEFAULT_COMPANY_INFO = {
-  companyName: process.env.COMPANY_NAME || 'Client Company',
-  address: process.env.COMPANY_ADDRESS || '123 Business Street',
+  companyName: process.env.COMPANY_NAME || 'Intelligent Business Platforms',
+  address: process.env.COMPANY_ADDRESS || '12020 Sunrise Valley Dr. Reston, VA, 20191',
   country: process.env.COMPANY_COUNTRY || 'United States',
 };
 

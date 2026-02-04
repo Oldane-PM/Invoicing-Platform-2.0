@@ -80,37 +80,72 @@ router.post('/supabase', async (req: Request, res: Response) => {
         .is('used_at', null)
         .single();
 
-      let roleToAssign = 'UNASSIGNED';
+      let roleToAssign = 'unassigned';
       let contractStartDate = null;
       let contractEndDate = null;
       let fullName = name || email.split('@')[0];
 
       if (invitation && !invitationError) {
         console.log('[OAuth Callback] Found invitation for:', email, 'with role:', invitation.role);
-        roleToAssign = invitation.role;
+        roleToAssign = invitation.role.toLowerCase();
         contractStartDate = invitation.contract_start_date;
         contractEndDate = invitation.contract_end_date;
         fullName = invitation.first_name && invitation.last_name 
           ? `${invitation.first_name} ${invitation.last_name}` 
           : fullName;
       } else {
-        console.log('[OAuth Callback] No invitation found, assigning UNASSIGNED role');
+        console.log('[OAuth Callback] No invitation found, assigning unassigned role');
       }
 
-      // Generate a UUID for the profile
-      // Note: Better Auth handles authentication, we just need a UUID for our profile
-      const { data: uuidData } = await supabase.rpc('gen_random_uuid');
-      const profileId = uuidData || crypto.randomUUID();
+      // IMPORTANT: Create auth.users FIRST - app_users has FK to auth.users
+      console.log('[OAuth Callback] Creating Supabase auth user for:', email);
+      const { data: authUserData, error: createAuthError } = await supabase.auth.admin.createUser({
+        email: email,
+        email_confirm: true,
+        user_metadata: {
+          full_name: fullName,
+        },
+      });
       
+      let profileId: string;
+      
+      if (createAuthError) {
+        if (createAuthError.message?.includes('already been registered')) {
+          console.log('[OAuth Callback] Auth user already exists, fetching ID...');
+          // User already exists in auth.users, get their ID
+          const { data: existingUsers } = await supabase.auth.admin.listUsers();
+          const existingUser = existingUsers?.users?.find(u => u.email === email);
+          if (existingUser) {
+            profileId = existingUser.id;
+            console.log('[OAuth Callback] Found existing auth user ID:', profileId);
+          } else {
+            console.error('[OAuth Callback] Could not find existing auth user');
+            return res.status(500).json({ 
+              success: false, 
+              error: 'Failed to find existing user' 
+            });
+          }
+        } else {
+          console.error('[OAuth Callback] Error creating auth user:', createAuthError);
+          return res.status(500).json({ 
+            success: false, 
+            error: 'Failed to create user account' 
+          });
+        }
+      } else {
+        profileId = authUserData.user.id;
+        console.log('[OAuth Callback] Created auth user with ID:', profileId);
+      }
+      
+      // Now create profile with the auth.users ID
       console.log('[OAuth Callback] Creating profile with ID:', profileId);
       
-      // Create profile
       const { data: newProfile, error: createError } = await supabase
         .from('profiles')
         .insert({
           id: profileId,
           email: email,
-          role: roleToAssign.toLowerCase(), // Convert to lowercase to match DB constraint
+          role: roleToAssign,
           full_name: fullName,
           is_active: true,
         })
@@ -128,8 +163,27 @@ router.post('/supabase', async (req: Request, res: Response) => {
       userProfile = newProfile;
       console.log('[OAuth Callback] Profile created:', userProfile);
 
-      // If contractor, create contractor record
-      if (roleToAssign === 'CONTRACTOR' && contractStartDate && contractEndDate) {
+      // Create app_users record - now auth.users exists, FK will succeed
+      console.log('[OAuth Callback] Creating app_users record for:', email);
+      const { error: appUserError } = await supabase
+        .from('app_users')
+        .insert({
+          id: profileId,
+          role: roleToAssign,
+          full_name: fullName,
+          email: email,
+          is_active: true,
+        });
+
+      if (appUserError) {
+        console.error('[OAuth Callback] Error creating app_users record:', appUserError);
+        // Don't fail - app_users might have different constraints
+      } else {
+        console.log('[OAuth Callback] app_users record created');
+      }
+
+      // If contractor, create contractor record AND contracts record
+      if (roleToAssign === 'contractor' && contractStartDate && contractEndDate) {
         console.log('[OAuth Callback] Creating contractor record for:', email);
         
         const { error: contractorError } = await supabase
@@ -138,16 +192,34 @@ router.post('/supabase', async (req: Request, res: Response) => {
             contractor_id: profileId,
             contract_start: contractStartDate,
             contract_end: contractEndDate,
-            hourly_rate: 75.0, // Default rate
-            overtime_rate: 112.5, // Default overtime rate
+            hourly_rate: 75.0,
+            overtime_rate: 112.5,
             is_active: true,
           });
 
         if (contractorError) {
           console.error('[OAuth Callback] Error creating contractor record:', contractorError);
-          // Don't fail the whole login, just log the error
         } else {
           console.log('[OAuth Callback] Contractor record created');
+        }
+
+        // Create contracts record - now app_users exists, FK will succeed
+        console.log('[OAuth Callback] Creating contracts record for:', email);
+        const { error: contractError } = await supabase
+          .from('contracts')
+          .insert({
+            contractor_user_id: profileId,
+            project_name: 'General Work',
+            contract_type: 'hourly',
+            start_date: contractStartDate,
+            end_date: contractEndDate,
+            is_active: true,
+          });
+
+        if (contractError) {
+          console.error('[OAuth Callback] Error creating contracts record:', contractError);
+        } else {
+          console.log('[OAuth Callback] Contracts record created');
         }
       }
 
@@ -174,23 +246,19 @@ router.post('/supabase', async (req: Request, res: Response) => {
       });
     }
 
-    // Step 4: Ensure user exists in Supabase auth.users
-    // Better Auth handles OAuth, but we need a Supabase auth user for RLS and generateLink to work
-    // Try to create the user - if they already exist, this will fail gracefully
-    const { error: createAuthError } = await supabase.auth.admin.createUser({
-      email: email,
-      email_confirm: true, // Auto-confirm since they authenticated via Google
-      user_metadata: {
-        full_name: userProfile.full_name,
-      },
-    });
-    
-    // Only log if it's an error other than "user already exists"
-    if (createAuthError && !createAuthError.message?.includes('already been registered')) {
-      console.log('[OAuth Callback] Note: Could not create auth user:', createAuthError.message);
-      // Don't fail here - the user might already exist, which is fine
-    } else if (!createAuthError) {
-      console.log('[OAuth Callback] Created new Supabase auth user for:', email);
+    // For existing users, ensure they have an auth.users entry
+    // This handles users created before this flow was updated
+    const { data: existingAuthUser } = await supabase.auth.admin.getUserById(userProfile.id);
+    if (!existingAuthUser?.user) {
+      console.log('[OAuth Callback] Creating missing auth user for existing profile:', email);
+      const { error: createAuthErr } = await supabase.auth.admin.createUser({
+        email: email,
+        email_confirm: true,
+        user_metadata: { full_name: userProfile.full_name },
+      });
+      if (createAuthErr && !createAuthErr.message?.includes('already been registered')) {
+        console.error('[OAuth Callback] Error creating auth user for existing profile:', createAuthErr);
+      }
     }
 
     // Step 5: Generate session using magic link

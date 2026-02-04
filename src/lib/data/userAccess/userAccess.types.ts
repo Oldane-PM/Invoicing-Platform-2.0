@@ -13,6 +13,10 @@ export interface UserAccessUser {
   email: string;
   role: UserRole;
   isActive: boolean;
+  /** Timestamp when admin pre-registered the user */
+  invitedAt: string;
+  /** Timestamp of first login. Null means pending activation. */
+  activatedAt: string | null;
 }
 
 export interface UpdateUserRoleParams {
