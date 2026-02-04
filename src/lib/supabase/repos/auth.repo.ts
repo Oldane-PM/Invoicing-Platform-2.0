@@ -6,6 +6,7 @@
  */
 
 import { getSupabaseClient, supabase } from "../client";
+import { markUserActivated } from "../../data/userAccess";
 
 export type UserRole = "UNASSIGNED" | "ADMIN" | "MANAGER" | "CONTRACTOR";
 
@@ -45,6 +46,11 @@ export async function signInWithEmail(
   if (!data.session || !data.user) {
     throw new Error("No session returned");
   }
+
+  // Mark user as activated on successful login (first login tracking)
+  markUserActivated(data.user.id).catch((err) => {
+    console.error("[auth.repo] Failed to mark user activated:", err);
+  });
 
   return {
     userId: data.user.id,

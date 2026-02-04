@@ -11,7 +11,7 @@ import {
 } from "../../components/ui/table";
 import { Combobox } from "../../components/shared/Combobox";
 import { Switch } from "../../components/ui/switch";
-import { ShieldAlert, Lock, Loader2, AlertCircle, UserX, UserPlus } from "lucide-react";
+import { ShieldAlert, Lock, Loader2, AlertCircle, UserX, UserPlus, Clock, CheckCircle2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import {
   Tooltip,
@@ -246,6 +246,9 @@ export function UserAccessManagement() {
                     Email Address
                   </TableHead>
                   <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                    Status
+                  </TableHead>
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
                     Role
                   </TableHead>
                   <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
@@ -257,13 +260,17 @@ export function UserAccessManagement() {
                 {users.map((user) => {
                   const isCurrentUser = user.id === currentUserId;
                   const isUnassigned = user.role === "unassigned";
+                  const isPendingActivation = user.activatedAt === null;
+                  const isInvitation = user.id.startsWith("invitation_");
 
                   return (
                     <TableRow
                       key={user.id}
                       className={`h-16 border-b border-gray-100 last:border-0 ${
                         !user.isActive ? "opacity-60" : ""
-                      } ${isUnassigned ? "bg-amber-50/50" : ""}`}
+                      } ${isUnassigned ? "bg-amber-50/50" : ""} ${
+                        isPendingActivation ? "bg-amber-50/30 border-l-4 border-l-amber-400" : ""
+                      }`}
                     >
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -293,33 +300,63 @@ export function UserAccessManagement() {
                       </TableCell>
                       <TableCell className="text-gray-600">{user.email}</TableCell>
                       <TableCell>
-                        <Combobox
-                          value={getDropdownValue(user)}
-                          onValueChange={(value) =>
-                            handleRoleChange(user.id, user.fullName, value, user.role)
-                          }
-                          options={ROLE_OPTIONS}
-                          placeholder="Select role"
-                          className="w-48"
-                        />
+                        {isPendingActivation ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 font-medium cursor-help">
+                                <Clock className="w-3.5 h-3.5" />
+                                Pending Activation
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{isInvitation ? "User needs to sign in with Google" : "User hasn't logged in yet"}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Active
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            checked={user.isActive}
-                            onCheckedChange={(checked) =>
-                              handleToggleAccess(user.id, user.fullName, checked)
+                        {isInvitation ? (
+                          <span className="text-sm text-gray-400 italic">
+                            {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                          </span>
+                        ) : (
+                          <Combobox
+                            value={getDropdownValue(user)}
+                            onValueChange={(value) =>
+                              handleRoleChange(user.id, user.fullName, value, user.role)
                             }
-                            disabled={isCurrentUser && user.isActive}
-                            className="data-[state=checked]:bg-green-500"
+                            options={ROLE_OPTIONS}
+                            placeholder="Select role"
+                            className="w-48"
                           />
-                          {isCurrentUser && user.isActive && (
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <ShieldAlert className="w-3.5 h-3.5" />
-                              <span>Cannot disable yourself</span>
-                            </div>
-                          )}
-                        </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isInvitation ? (
+                          <span className="text-sm text-gray-400 italic">—</span>
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <Switch
+                              checked={user.isActive}
+                              onCheckedChange={(checked) =>
+                                handleToggleAccess(user.id, user.fullName, checked)
+                              }
+                              disabled={isCurrentUser && user.isActive}
+                              className="data-[state=checked]:bg-green-500"
+                            />
+                            {isCurrentUser && user.isActive && (
+                              <div className="flex items-center gap-1 text-xs text-gray-500">
+                                <ShieldAlert className="w-3.5 h-3.5" />
+                                <span>Cannot disable yourself</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
