@@ -48,7 +48,7 @@ type AppView = "login" | "oauth-callback" | "app";
 
 function App() {
   // Supabase auth for Contractor and Manager
-  const { isAuthenticated, user, signIn, signOut, loading: authLoading } = useAuth();
+  const { isAuthenticated, user, profile, signIn, signOut, loading: authLoading } = useAuth();
 
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
   const [currentView, setCurrentView] = React.useState<AppView>("login");
@@ -70,7 +70,21 @@ function App() {
   // const managers: string[] = []; // Unused - kept for future use
   // const months: string[] = []; // Unused - kept for future use
 
-
+  // Get user's display name and initials for all portals
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+  
+  const displayName = profile?.fullName 
+    || user?.user_metadata?.full_name 
+    || user?.email?.split('@')[0] 
+    || 'User';
+  
+  const userInitials = getInitials(displayName);
 
   // Sync Supabase auth state with currentUser and fetch role from database
   React.useEffect(() => {
@@ -222,8 +236,8 @@ function App() {
     switch (currentScreen) {
       case "dashboard":
         return {
-          title: "Admin Dashboard",
-          subtitle: "System overview and financial monitoring",
+          title: `Welcome, ${displayName}`,
+          subtitle: "Admin Dashboard — System overview and financial monitoring",
         };
       case "directory":
         return {
@@ -293,10 +307,10 @@ function App() {
             <div className="flex items-start justify-between">
               <div>
                 <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
-                  Manager Portal
+                  Welcome, {displayName}
                 </h1>
                 <p className="text-xs md:text-sm text-gray-600">
-                  Review and approve team submissions
+                  Manager Portal — Review and approve team submissions
                 </p>
               </div>
               <div className="flex items-center gap-2 md:gap-3">
@@ -319,7 +333,7 @@ function App() {
                     >
                       <Avatar className="w-7 h-7 md:w-8 md:h-8 bg-blue-100">
                         <AvatarFallback className="bg-blue-100 text-blue-700 font-semibold text-xs md:text-sm">
-                          MG
+                          {userInitials}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
@@ -393,8 +407,6 @@ function App() {
 
   // Contractor Portal - Simple View
   if (currentUser === "Contractor") {
-    const lastLogin = "Jan 31, 2026 at 9:14 AM";
-
     return (
       <div className="min-h-screen bg-[#F9FAFB]">
         <Toaster position="top-right" />
@@ -405,10 +417,7 @@ function App() {
             {/* Left Section */}
             <div>
               <p className="font-semibold text-gray-900 text-sm md:text-base">
-                Welcome, Sarah
-              </p>
-              <p className="text-xs md:text-sm text-gray-500 hidden sm:block">
-                Last login: {lastLogin}
+                Welcome, {displayName}
               </p>
             </div>
 
@@ -445,7 +454,7 @@ function App() {
                   >
                     <Avatar className="w-8 h-8 md:w-10 md:h-10 bg-purple-100">
                       <AvatarFallback className="bg-purple-100 text-purple-700 font-semibold text-xs md:text-sm">
-                        SJ
+                        {userInitials}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -551,7 +560,7 @@ function App() {
                   >
                     <Avatar className="w-7 h-7 md:w-8 md:h-8 bg-purple-100">
                       <AvatarFallback className="bg-purple-100 text-purple-700 font-semibold text-xs md:text-sm">
-                        JA
+                        {userInitials}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
