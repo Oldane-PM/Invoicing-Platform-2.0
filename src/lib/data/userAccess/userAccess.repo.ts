@@ -30,24 +30,15 @@ export async function getUsers(): Promise<UserAccessUser[]> {
   }
 
   // Fetch pending invitations (users who haven't signed in yet)
-  // DEBUG: Fetching ALL invitations first to check if any exist
-  console.log('[UserAccess] Attempting to fetch invitations...');
   const { data: invitations, error: invitationsError } = await supabase
     .from('user_invitations')
     .select('id, first_name, last_name, email, role, created_at, used_at')
-    // .is('used_at', null) // Temporarily commented for debugging
+    .is('used_at', null) // Only pending invitations
     .order('created_at', { ascending: false });
 
   if (invitationsError) {
-    console.error('[UserAccess] Error fetching invitations:', {
-      message: invitationsError.message,
-      details: invitationsError.details,
-      hint: invitationsError.hint,
-      code: invitationsError.code,
-    });
+    console.error('[UserAccess] Error fetching invitations:', invitationsError.message);
     // Don't throw - invitations are optional enhancement
-  } else {
-    console.log('[UserAccess] Fetched invitations:', invitations?.length || 0, invitations);
   }
 
   // Map profiles
