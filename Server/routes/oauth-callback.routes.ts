@@ -51,11 +51,11 @@ router.post('/supabase', async (req: Request, res: Response) => {
       });
     }
 
-    // Step 2: Check if user exists in Supabase profiles
+    // Step 2: Check if user exists in Supabase profiles (case-insensitive email match)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, email, role, full_name, is_active')
-      .eq('email', email)
+      .ilike('email', email) // Case-insensitive email matching
       .single();
 
     if (profileError && profileError.code !== 'PGRST116') {
@@ -72,11 +72,11 @@ router.post('/supabase', async (req: Request, res: Response) => {
     if (!userProfile) {
       console.log('[OAuth Callback] Creating new profile for:', email);
       
-      // Check for invitation first
+      // Check for invitation first (case-insensitive email match)
       const { data: invitation, error: invitationError } = await supabase
         .from('user_invitations')
         .select('*')
-        .eq('email', email)
+        .ilike('email', email) // Case-insensitive email matching
         .is('used_at', null)
         .single();
 
@@ -149,8 +149,9 @@ router.post('/supabase', async (req: Request, res: Response) => {
           role: roleToAssign,
           full_name: fullName,
           is_active: true,
+          activated_at: new Date().toISOString(), // Mark as activated on first sign-in
         }, { onConflict: 'id' })
-        .select('id, email, role, full_name, is_active')
+        .select('id, email, role, full_name, is_active, activated_at')
         .single();
 
       if (createError) {
@@ -260,6 +261,38 @@ router.post('/supabase', async (req: Request, res: Response) => {
           .eq('id', invitation.id);
         
         console.log('[OAuth Callback] Invitation marked as used');
+      }
+    } else {
+      // Existing user signing in - update activated_at if not already set
+      console.log('[OAuth Callback] Updating activation status for existing user:', email);
+      
+      const { error: activationError } = await supabase
+        .from('profiles')
+        .update({ activated_at: new Date().toISOString() })
+        .eq('id', userProfile.id)
+        .is('activated_at', null); // Only update if not already activated
+      
+      if (!activationError) {
+        console.log('[OAuth Callback] User marked as activated');
+      }
+
+      // Also mark any pending invitation as used (case-insensitive email match)
+      const { data: pendingInvite } = await supabase
+        .from('user_invitations')
+        .select('id')
+        .ilike('email', email) // Case-insensitive email matching
+        .is('used_at', null)
+        .single();
+      
+      if (pendingInvite) {
+        await supabase
+          .from('user_invitations')
+          .update({ 
+            used_at: new Date().toISOString(),
+            used_by_user_id: userProfile.id 
+          })
+          .eq('id', pendingInvite.id);
+        console.log('[OAuth Callback] Pending invitation marked as used');
       }
     }
 
