@@ -8,6 +8,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../../components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Alert, AlertDescription } from "../../components/ui/alert";
 import { toast } from "sonner";
 import {
   CalendarIcon,
@@ -16,6 +24,7 @@ import {
   ChevronRight,
   ArrowLeft,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   format,
@@ -30,6 +39,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useCreateSubmission } from "../../lib/hooks/contractor/useCreateSubmission";
 import { useSubmittedPeriods } from "../../lib/hooks/contractor/useSubmittedPeriods";
 import { useContractorProfile } from "../../lib/hooks/contractor/useContractorProfile";
+import { useContractorProjects } from "../../lib/hooks/contractor/useContractorProjects";
 import { useNonWorkingDays } from "../../lib/hooks/adminCalendar";
 import type { SubmissionDraft, ContractorSubmission } from "../../lib/types";
 
@@ -77,7 +87,11 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   const [description, setDescription] = React.useState("");
   const [overtimeHours, setOvertimeHours] = React.useState("");
   const [overtimeDescription, setOvertimeDescription] = React.useState("");
+  const [selectedProjectId, setSelectedProjectId] = React.useState<string>("");
   const isPrePopulatingRef = React.useRef(false);
+
+  // Get projects assigned to this contractor
+  const { projects, isLoading: loadingProjects, hasProjects } = useContractorProjects();
 
   // Use the create submission hook
   const { create, loading: isSubmitting } = useCreateSubmission();
@@ -261,6 +275,11 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   };
 
   const handleSubmit = async () => {
+    if (!selectedProjectId) {
+      toast.error("Please select a project");
+      return;
+    }
+
     if (selectedMonth === null) {
       toast.error("Please select a work period");
       return;
@@ -287,6 +306,9 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       format(d, "yyyy-MM-dd")
     );
 
+    // Get project name from selected project
+    const selectedProject = projects.find(p => p.id === selectedProjectId);
+
     const draft: SubmissionDraft = {
       workPeriod,
       excludedDates: excludedDatesStrings,
@@ -294,7 +316,8 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       description: description.trim(),
       overtimeHours: parseInt(overtimeHours) || 0,
       overtimeDescription: overtimeDescription.trim() || null,
-      projectName: "General Work", // Could be enhanced with project selection later
+      projectName: selectedProject?.name || "General Work",
+      projectId: selectedProjectId,
     };
 
 
@@ -354,6 +377,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     setDescription("");
     setOvertimeHours("");
     setOvertimeDescription("");
+    setSelectedProjectId("");
     onCancel();
   };
 
@@ -388,7 +412,44 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
 
         {/* Form Content */}
         <div className="bg-white rounded-[14px] border border-gray-200 p-4 md:p-6">
+          {/* No Projects Warning */}
+          {!loadingProjects && !hasProjects && (
+            <Alert variant="destructive" className="mb-5">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>No projects assigned.</strong> You cannot submit hours until a project is assigned to you. 
+                Please contact your manager or admin.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-5">
+            {/* Project Dropdown */}
+            <div>
+              <Label
+                htmlFor="project"
+                className="text-sm font-medium text-gray-900 mb-1.5 block"
+              >
+                Project <span className="text-red-600">*</span>
+              </Label>
+              <Select
+                value={selectedProjectId}
+                onValueChange={setSelectedProjectId}
+                disabled={loadingProjects || !hasProjects}
+              >
+                <SelectTrigger id="project" className="w-full h-11 bg-white border-gray-300 rounded-lg">
+                  <SelectValue placeholder={loadingProjects ? "Loading projects..." : "Select a project"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name} ({project.client})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Work Period - Month & Year Picker */}
             <div>
               <Label
@@ -748,7 +809,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !hasProjects}
               className="h-11 px-6 rounded-lg bg-purple-600 hover:bg-purple-700"
             >
               {isSubmitting ? (
