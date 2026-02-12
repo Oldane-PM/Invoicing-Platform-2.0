@@ -6,7 +6,7 @@ const router = Router();
 
 // Initialize Supabase client with service role key for admin operations
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
+  process.env.VITE_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   {
     auth: {
@@ -34,9 +34,9 @@ router.post('/supabase', async (req: Request, res: Response) => {
 
     if (!session || !session.user) {
       console.error('[OAuth Callback] No Better Auth session found');
-      return res.status(401).json({ 
-        success: false, 
-        error: 'No active session' 
+      return res.status(401).json({
+        success: false,
+        error: 'No active session'
       });
     }
 
@@ -45,9 +45,9 @@ router.post('/supabase', async (req: Request, res: Response) => {
 
     if (!email) {
       console.error('[OAuth Callback] No email in session');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Email not found in session' 
+      return res.status(400).json({
+        success: false,
+        error: 'Email not found in session'
       });
     }
 
@@ -60,9 +60,9 @@ router.post('/supabase', async (req: Request, res: Response) => {
 
     if (profileError && profileError.code !== 'PGRST116') {
       console.error('[OAuth Callback] Error fetching profile:', profileError);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Failed to fetch user profile' 
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch user profile'
       });
     }
 
@@ -71,7 +71,7 @@ router.post('/supabase', async (req: Request, res: Response) => {
     // Step 3: Create profile if doesn't exist
     if (!userProfile) {
       console.log('[OAuth Callback] Creating new profile for:', email);
-      
+
       // Check for invitation first (case-insensitive email match)
       const { data: invitation, error: invitationError } = await supabase
         .from('user_invitations')
@@ -90,8 +90,8 @@ router.post('/supabase', async (req: Request, res: Response) => {
         roleToAssign = invitation.role.toLowerCase();
         contractStartDate = invitation.contract_start_date;
         contractEndDate = invitation.contract_end_date;
-        fullName = invitation.first_name && invitation.last_name 
-          ? `${invitation.first_name} ${invitation.last_name}` 
+        fullName = invitation.first_name && invitation.last_name
+          ? `${invitation.first_name} ${invitation.last_name}`
           : fullName;
       } else {
         console.log('[OAuth Callback] No invitation found, assigning unassigned role');
@@ -106,9 +106,9 @@ router.post('/supabase', async (req: Request, res: Response) => {
           full_name: fullName,
         },
       });
-      
+
       let profileId: string;
-      
+
       if (createAuthError) {
         if (createAuthError.message?.includes('already been registered')) {
           console.log('[OAuth Callback] Auth user already exists, fetching ID...');
@@ -120,27 +120,27 @@ router.post('/supabase', async (req: Request, res: Response) => {
             console.log('[OAuth Callback] Found existing auth user ID:', profileId);
           } else {
             console.error('[OAuth Callback] Could not find existing auth user');
-            return res.status(500).json({ 
-              success: false, 
-              error: 'Failed to find existing user' 
+            return res.status(500).json({
+              success: false,
+              error: 'Failed to find existing user'
             });
           }
         } else {
           console.error('[OAuth Callback] Error creating auth user:', createAuthError);
-          return res.status(500).json({ 
-            success: false, 
-            error: 'Failed to create user account' 
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to create user account'
           });
         }
       } else {
         profileId = authUserData.user.id;
         console.log('[OAuth Callback] Created auth user with ID:', profileId);
       }
-      
+
       // Try to create/update profile with the auth.users ID
       // Note: The handle_new_user trigger may have already created a profile
       console.log('[OAuth Callback] Creating/updating profile with ID:', profileId);
-      
+
       const { data: newProfile, error: createError } = await supabase
         .from('profiles')
         .upsert({
@@ -162,14 +162,14 @@ router.post('/supabase', async (req: Request, res: Response) => {
           .select('id, email, role, full_name, is_active')
           .eq('id', profileId)
           .single();
-        
+
         if (existingProfile) {
           userProfile = existingProfile;
           console.log('[OAuth Callback] Using existing profile:', userProfile);
         } else {
-          return res.status(500).json({ 
-            success: false, 
-            error: 'Failed to create user profile' 
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to create user profile'
           });
         }
       } else {
@@ -199,7 +199,7 @@ router.post('/supabase', async (req: Request, res: Response) => {
       // If contractor, create contractor record AND contracts record
       if (roleToAssign === 'contractor' && contractStartDate && contractEndDate) {
         console.log('[OAuth Callback] Creating contractor record for:', email);
-        
+
         const { error: contractorError } = await supabase
           .from('contractors')
           .upsert({
@@ -219,7 +219,7 @@ router.post('/supabase', async (req: Request, res: Response) => {
 
         // Create contracts record - check if one exists first (contractor can have multiple contracts)
         console.log('[OAuth Callback] Creating contracts record for:', email);
-        
+
         // Check if an active contract already exists
         const { data: existingContract } = await supabase
           .from('contracts')
@@ -227,7 +227,7 @@ router.post('/supabase', async (req: Request, res: Response) => {
           .eq('contractor_user_id', profileId)
           .eq('is_active', true)
           .single();
-        
+
         if (!existingContract) {
           const { error: contractError } = await supabase
             .from('contracts')
@@ -254,24 +254,24 @@ router.post('/supabase', async (req: Request, res: Response) => {
       if (invitation) {
         await supabase
           .from('user_invitations')
-          .update({ 
+          .update({
             used_at: new Date().toISOString(),
-            used_by_user_id: profileId 
+            used_by_user_id: profileId
           })
           .eq('id', invitation.id);
-        
+
         console.log('[OAuth Callback] Invitation marked as used');
       }
     } else {
       // Existing user signing in - update activated_at if not already set
       console.log('[OAuth Callback] Updating activation status for existing user:', email);
-      
+
       const { error: activationError } = await supabase
         .from('profiles')
         .update({ activated_at: new Date().toISOString() })
         .eq('id', userProfile.id)
         .is('activated_at', null); // Only update if not already activated
-      
+
       if (!activationError) {
         console.log('[OAuth Callback] User marked as activated');
       }
@@ -283,13 +283,13 @@ router.post('/supabase', async (req: Request, res: Response) => {
         .ilike('email', email) // Case-insensitive email matching
         .is('used_at', null)
         .single();
-      
+
       if (pendingInvite) {
         await supabase
           .from('user_invitations')
-          .update({ 
+          .update({
             used_at: new Date().toISOString(),
-            used_by_user_id: userProfile.id 
+            used_by_user_id: userProfile.id
           })
           .eq('id', pendingInvite.id);
         console.log('[OAuth Callback] Pending invitation marked as used');
@@ -299,9 +299,9 @@ router.post('/supabase', async (req: Request, res: Response) => {
     // Step 4: Check if user is active
     if (!userProfile.is_active) {
       console.log('[OAuth Callback] User is disabled:', email);
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Account is disabled. Please contact an administrator.' 
+      return res.status(403).json({
+        success: false,
+        error: 'Account is disabled. Please contact an administrator.'
       });
     }
 
@@ -322,16 +322,16 @@ router.post('/supabase', async (req: Request, res: Response) => {
 
     // Step 5: Generate session using magic link
     // Now that user exists in auth.users, we can generate a magic link
-    const { data: otpData, error: otpError} = await supabase.auth.admin.generateLink({
+    const { data: otpData, error: otpError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
       email: email,
     });
 
     if (otpError || !otpData) {
       console.error('[OAuth Callback] Error generating magic link:', otpError);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Failed to generate session' 
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate session'
       });
     }
 
@@ -344,9 +344,9 @@ router.post('/supabase', async (req: Request, res: Response) => {
 
     if (!token) {
       console.error('[OAuth Callback] No token in magic link');
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Failed to extract session token' 
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to extract session token'
       });
     }
 
@@ -369,9 +369,9 @@ router.post('/supabase', async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('[OAuth Callback] Unexpected error:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error'
     });
   }
 });

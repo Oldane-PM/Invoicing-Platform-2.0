@@ -21,7 +21,7 @@ async function requireAdmin(req: Request, res: Response, next: Function) {
     // Note: Better Auth user IDs are not UUIDs, so we need to look up by email
     const { createClient } = await import("@supabase/supabase-js");
     const supabase = createClient(
-      process.env.SUPABASE_URL!,
+      process.env.VITE_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 

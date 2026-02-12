@@ -9,7 +9,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Create server-side Supabase client with service role
@@ -25,7 +25,7 @@ if (supabaseUrl && supabaseServiceRoleKey) {
   console.log('[supabase.server] Client initialized successfully');
 } else {
   console.error('[supabase.server] Missing environment variables:');
-  if (!supabaseUrl) console.error('  - SUPABASE_URL not set');
+  if (!supabaseUrl) console.error('  - VITE_SUPABASE_URL not set');
   if (!supabaseServiceRoleKey) console.error('  - SUPABASE_SERVICE_ROLE_KEY not set');
 }
 
@@ -37,7 +37,7 @@ export function getSupabaseAdmin(): SupabaseClient {
   if (!supabaseAdmin) {
     throw new Error(
       'Supabase server client not configured. ' +
-      'Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.'
+      'Please set VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.'
     );
   }
   return supabaseAdmin;
