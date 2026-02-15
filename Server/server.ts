@@ -16,6 +16,7 @@ app.use(
     origin: process.env.CORS_ORIGIN?.split(",") ?? [
       "http://localhost:5173",
       "http://localhost:5001",
+      "https://invoicing-platform-2-0.vercel.app/"
     ],
     credentials: true,
   })
