@@ -39,12 +39,14 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: [
-    "http://localhost:5173",
-    "http://localhost:5174", // Added for when Vite uses alternate port
-    "http://localhost:5001",
-    "http://localhost:3000",
-  ],
+  trustedOrigins:
+    process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://localhost:5001",
+      "http://localhost:3000",
+      "https://invoicing-platform-2-0.vercel.app",
+    ],
 
   advanced: {
     useSecureCookies: process.env.NODE_ENV === "production",

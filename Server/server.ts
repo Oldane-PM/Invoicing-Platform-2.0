@@ -11,13 +11,14 @@ const app = express();
 const port = Number(process.env.PORT ?? 5001);
 
 // CORS configuration for cross-origin requests
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [
+  "http://localhost:5173",
+  "http://localhost:5001",
+  "https://invoicing-platform-2-0.vercel.app",
+];
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN?.split(",") ?? [
-      "http://localhost:5173",
-      "http://localhost:5001",
-      "https://invoicing-platform-2-0.vercel.app/"
-    ],
+    origin: allowedOrigins,
     credentials: true,
   })
 );

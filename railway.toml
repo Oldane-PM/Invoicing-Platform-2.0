@@ -1,0 +1,11 @@
+# Railway Configuration - Backend API
+# https://docs.railway.com/guides/config-as-code
+# Railway sets PORT automatically; the server reads process.env.PORT
+
+[build]
+buildCommand = "npm install"
+
+[deploy]
+startCommand = "npm run start:server"
+healthcheckPath = "/health"
+healthcheckTimeout = 100

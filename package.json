@@ -11,6 +11,7 @@
     "build:server": "tsc --project tsconfig.server.json",
     "preview": "vite preview",
     "start": "node dist/index.js",
+    "start:server": "tsx Server/server.ts",
     "lint": "echo 'Linting not configured'",
     "type-check": "tsc --noEmit"
   },
@@ -80,7 +81,8 @@
     "sonner": "2.0.3",
     "tailwind-merge": "3.2.0",
     "tw-animate-css": "1.3.8",
-    "vaul": "1.1.2"
+    "vaul": "1.1.2",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.12",
@@ -96,7 +98,6 @@
     "nodemon": "^3.1.11",
     "tailwindcss": "4.1.12",
     "ts-node": "^1.7.1",
-    "tsx": "^4.21.0",
     "vite": "^6.4.1"
   },
   "peerDependencies": {

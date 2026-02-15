@@ -124,7 +124,8 @@ export function NewUserModal({
         payload.contractEndDate = format(contractEndDate, "yyyy-MM-dd");
       }
 
-      const response = await fetch("http://localhost:5001/api/users", {
+      const apiBase = import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001";
+      const response = await fetch(`${apiBase}/api/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -1,0 +1,34 @@
+# Render Blueprint - Backend API only
+# https://render.com/docs/blueprint-spec
+# Deploy: Connect repo and Render will use this, or create service manually using the values below.
+
+services:
+  - type: web
+    name: invoice-app-api
+    runtime: node
+
+    # Build
+    buildCommand: npm install
+
+    # Start - runs the Express server
+    startCommand: npm run start:server
+
+    # Render sets PORT automatically; server reads process.env.PORT
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BETTER_AUTH_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # Add other vars from .env as needed (COMPANY_NAME, INVOICE_CURRENCY, etc.)

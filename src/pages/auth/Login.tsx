@@ -19,7 +19,7 @@ export function Login({ authLoading }: LoginProps) {
       await signIn.social(
         {
           provider: "google",
-          callbackURL: "http://localhost:5173/auth/callback",
+          callbackURL: `${window.location.origin}/auth/callback`,
         },
         {
           onRequest: () => {

@@ -40,7 +40,8 @@ export function OAuthCallback({ onAuthComplete }: OAuthCallbackProps) {
         console.log("[OAuth Callback] Better Auth session found:", session.user.email);
 
         // Call backend to create Supabase session
-        const response = await fetch("http://localhost:5001/api/callback/supabase", {
+        const apiBase = import.meta.env.VITE_AUTH_BASE_URL || "http://localhost:5001";
+        const response = await fetch(`${apiBase}/api/callback/supabase`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
