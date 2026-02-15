@@ -10,7 +10,7 @@
     "build": "vite build",
     "build:server": "tsc --project tsconfig.server.json",
     "preview": "vite preview",
-    "start": "node dist/index.js",
+    "start": "tsx Server/server.ts",
     "start:server": "tsx Server/server.ts",
     "lint": "echo 'Linting not configured'",
     "type-check": "tsc --noEmit"
