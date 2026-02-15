@@ -123,7 +123,7 @@ router.post('/supabase', async (req: Request, res: Response) => {
       .select('*')
       .eq('email', email.toLowerCase())
       .is('used_at', null)
-      .single();
+      .maybeSingle();
 
     // If no unused invitation, check for any invitation (may have been used already)
     const { data: anyInvitation } = !unusedInvitation

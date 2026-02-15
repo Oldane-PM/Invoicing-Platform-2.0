@@ -131,6 +131,31 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
     return [];
   }
 
+  // Get all contractor IDs from submissions
+  const contractorIds = [...new Set(data.map((s: any) => s.contractor_user_id).filter(Boolean))];
+
+  // Fetch manager assignments from manager_teams
+  const { data: managerTeams } = await supabase
+    .from('manager_teams')
+    .select('contractor_id, manager_id')
+    .in('contractor_id', contractorIds);
+
+  // Get manager profile names
+  const managerIds = [...new Set((managerTeams || []).map((mt: any) => mt.manager_id).filter(Boolean))];
+  
+  const { data: managerProfiles } = managerIds.length > 0 
+    ? await supabase.from('profiles').select('id, full_name').in('id', managerIds)
+    : { data: [] };
+
+  // Build contractor -> manager name map
+  const contractorManagerMap = new Map<string, string>();
+  (managerTeams || []).forEach((mt: any) => {
+    const manager = (managerProfiles || []).find((p: any) => p.id === mt.manager_id);
+    if (manager) {
+      contractorManagerMap.set(mt.contractor_id, manager.full_name);
+    }
+  });
+
   // Map to domain type - using direct columns like Manager repo
   let submissions: AdminSubmission[] = data.map((sub: any) => {
     // Handle potential array or object return from joins
@@ -147,12 +172,15 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
       displayStatus = 'paid';
     }
 
+    // Get manager name from lookup
+    const managerName = contractorManagerMap.get(sub.contractor_user_id) || 'Unknown Manager';
+
     return {
       id: sub.id,
       contractorName: profile?.full_name || 'Unknown Contractor',
       contractorType: 'Hourly' as const, // Default, could be enhanced with contract lookup
       projectName: sub.project_name || 'Unknown Project',
-      managerName: 'Unknown Manager', // Would need contract join to get manager
+      managerName,
       regularHours,
       overtimeHours,
       totalAmount,
@@ -277,13 +305,33 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
     displayStatus = 'paid';
   }
 
+  // Fetch manager name from manager_teams
+  let managerName = 'Unknown Manager';
+  const { data: managerTeam } = await supabase
+    .from('manager_teams')
+    .select('manager_id')
+    .eq('contractor_id', data.contractor_user_id)
+    .maybeSingle();
+
+  if (managerTeam?.manager_id) {
+    const { data: managerProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', managerTeam.manager_id)
+      .maybeSingle();
+    
+    if (managerProfile?.full_name) {
+      managerName = managerProfile.full_name;
+    }
+  }
+
   return {
     id: data.id,
     contractorName: profile?.full_name || 'Unknown Contractor',
     contractorEmail: profile?.email || '',
     contractorType: 'Hourly' as const, // Default, could be enhanced with contract lookup
     projectName: data.project_name || 'Unknown Project',
-    managerName: 'Unknown Manager', // Would need contract join to get manager
+    managerName,
     regularHours,
     overtimeHours,
     totalAmount,

@@ -2,6 +2,7 @@ import * as React from "react";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
+import { Switch } from "../../components/ui/switch";
 import {
   Table,
   TableBody,
@@ -11,10 +12,21 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { ProjectDialog } from "../../components/modals/ProjectDialog";
+import { ProjectAssignmentsDialog } from "../../components/modals/ProjectAssignmentsDialog";
 import { useProjects } from "../../lib/hooks/admin/useProjects";
 import { format } from "date-fns";
-import { Search, FolderPlus, AlertCircle, FolderOpen, Pencil } from "lucide-react";
+import {
+  Search,
+  FolderPlus,
+  AlertCircle,
+  FolderOpen,
+  Pencil,
+  Users,
+  User,
+} from "lucide-react";
 import { Alert, AlertDescription } from "../../components/ui/alert";
+import { Badge } from "../../components/ui/badge";
+import { toast } from "sonner";
 import type { ProjectRow, CreateProjectInput, UpdateProjectInput } from "../../lib/types";
 
 type SortField = "name" | "client" | "start_date" | "created_at";
@@ -36,11 +48,16 @@ export function AdminProjects() {
     creating,
     updateProject,
     updating,
+    enableProject,
+    disableProject,
+    toggling,
   } = useProjects();
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [dialogMode, setDialogMode] = React.useState<DialogMode>("create");
   const [editingProject, setEditingProject] = React.useState<ProjectRow | null>(null);
+  const [assignmentsDialogOpen, setAssignmentsDialogOpen] = React.useState(false);
+  const [selectedProject, setSelectedProject] = React.useState<ProjectRow | null>(null);
 
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
@@ -63,11 +80,30 @@ export function AdminProjects() {
     setDialogOpen(true);
   };
 
+  const handleOpenAssignmentsDialog = (project: ProjectRow) => {
+    setSelectedProject(project);
+    setAssignmentsDialogOpen(true);
+  };
+
   const handleDialogSubmit = async (input: CreateProjectInput | UpdateProjectInput) => {
     if (dialogMode === "edit" && "id" in input) {
       await updateProject(input as UpdateProjectInput);
     } else {
       await createProject(input as CreateProjectInput);
+    }
+  };
+
+  const handleToggleEnabled = async (project: ProjectRow) => {
+    try {
+      if (project.isEnabled) {
+        await disableProject(project.id);
+        toast.success(`Project "${project.name}" disabled`);
+      } else {
+        await enableProject(project.id);
+        toast.success(`Project "${project.name}" enabled`);
+      }
+    } catch (error) {
+      toast.error(`Failed to ${project.isEnabled ? "disable" : "enable"} project`);
     }
   };
 
@@ -80,7 +116,7 @@ export function AdminProjects() {
     }
   };
 
-  const truncateDescription = (desc: string | null, maxLength = 50) => {
+  const truncateDescription = (desc: string | null, maxLength = 40) => {
     if (!desc) return "-";
     if (desc.length <= maxLength) return desc;
     return desc.slice(0, maxLength) + "...";
@@ -157,8 +193,11 @@ export function AdminProjects() {
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
                   Description
                 </TableHead>
+                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                  Manager
+                </TableHead>
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium text-center">
-                  # Resources
+                  Contractors
                 </TableHead>
                 <TableHead
                   className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium cursor-pointer hover:bg-gray-100 transition-colors"
@@ -175,6 +214,9 @@ export function AdminProjects() {
                   End Date
                 </TableHead>
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium text-center">
+                  Enabled
+                </TableHead>
+                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium text-center">
                   Actions
                 </TableHead>
               </TableRow>
@@ -182,7 +224,7 @@ export function AdminProjects() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-64 text-center">
+                  <TableCell colSpan={9} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
                       <div className="text-gray-600 font-medium mt-3">
@@ -193,7 +235,7 @@ export function AdminProjects() {
                 </TableRow>
               ) : projects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-64 text-center">
+                  <TableCell colSpan={9} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <FolderOpen className="w-16 h-16 mb-3" strokeWidth={1.5} />
                       <div className="text-gray-600 font-medium">
@@ -220,7 +262,9 @@ export function AdminProjects() {
                 projects.map((project) => (
                   <TableRow
                     key={project.id}
-                    className="h-16 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                    className={`h-16 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 ${
+                      !project.isEnabled ? "opacity-60" : ""
+                    }`}
                   >
                     <TableCell>
                       <div className="font-medium text-gray-900">
@@ -230,13 +274,38 @@ export function AdminProjects() {
                     <TableCell className="text-gray-700">
                       {project.client}
                     </TableCell>
-                    <TableCell className="text-gray-600 max-w-[200px]">
+                    <TableCell className="text-gray-600 max-w-[180px]">
                       <span title={project.description || undefined}>
                         {truncateDescription(project.description)}
                       </span>
                     </TableCell>
-                    <TableCell className="text-center text-gray-700">
-                      {project.resourceCount}
+                    <TableCell>
+                      {project.managerName ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center">
+                            <User className="w-3 h-3 text-purple-600" />
+                          </div>
+                          <span className="text-gray-700 text-sm">
+                            {project.managerName}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm italic">
+                          Unassigned
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        variant="secondary"
+                        className={`${
+                          project.contractorCount > 0
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {project.contractorCount}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-gray-700">
                       {formatDate(project.startDate)}
@@ -245,15 +314,36 @@ export function AdminProjects() {
                       {formatDate(project.endDate)}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenEditDialog(project)}
-                        className="text-gray-600 hover:text-purple-600 hover:bg-purple-50"
-                      >
-                        <Pencil className="w-4 h-4" />
-                        <span className="sr-only">Edit {project.name}</span>
-                      </Button>
+                      <Switch
+                        checked={project.isEnabled}
+                        onCheckedChange={() => handleToggleEnabled(project)}
+                        disabled={toggling}
+                        className="data-[state=checked]:bg-green-500"
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenEditDialog(project)}
+                          className="text-gray-600 hover:text-purple-600 hover:bg-purple-50"
+                          title="Edit project"
+                        >
+                          <Pencil className="w-4 h-4" />
+                          <span className="sr-only">Edit {project.name}</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenAssignmentsDialog(project)}
+                          className="text-gray-600 hover:text-purple-600 hover:bg-purple-50"
+                          title="Manage assignments"
+                        >
+                          <Users className="w-4 h-4" />
+                          <span className="sr-only">Manage assignments for {project.name}</span>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -271,6 +361,13 @@ export function AdminProjects() {
         initialValues={editingProject}
         onSubmit={handleDialogSubmit}
         submitting={dialogMode === "edit" ? updating : creating}
+      />
+
+      {/* Assignments Dialog */}
+      <ProjectAssignmentsDialog
+        open={assignmentsDialogOpen}
+        onOpenChange={setAssignmentsDialogOpen}
+        project={selectedProject}
       />
     </div>
   );

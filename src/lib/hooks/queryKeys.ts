@@ -11,10 +11,12 @@ export const QUERY_KEYS = {
   ADMIN_DASHBOARD: "adminDashboard",
   ADMIN_SUBMISSIONS: "adminSubmissions",
   ADMIN_PROJECTS: "adminProjects",
+  PROJECT_ASSIGNMENTS: "projectAssignments",
   
   // Contractor views
   CONTRACTOR_PROFILE: "contractorProfile",
   CONTRACTOR_SUBMISSIONS: "contractorSubmissions",
+  CONTRACTOR_PROJECTS: "contractorProjects",
   
   // Manager views
   MANAGER_DASHBOARD: "managerDashboard",

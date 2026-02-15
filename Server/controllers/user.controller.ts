@@ -133,7 +133,8 @@ export async function createUser(req: Request, res: Response) {
 
     console.log(`[createUser] Invitation created for: ${email}`);
 
-    // Success!
+    // Success! User will appear in Admin User Access list from invitations table
+    // When they sign in with Google, their profile will be created automatically
     return res.status(201).json({
       success: true,
       invitation: {
@@ -142,8 +143,9 @@ export async function createUser(req: Request, res: Response) {
         firstName,
         lastName,
         role,
+        status: "pending_activation",
       },
-      message: `User ${firstName} ${lastName} has been pre-registered. They will be assigned the ${role} role when they sign in with Google.`,
+      message: `User ${firstName} ${lastName} has been pre-registered. They will be activated when they sign in with Google.`,
     });
   } catch (error) {
     console.error("[createUser] Unexpected error:", error);
