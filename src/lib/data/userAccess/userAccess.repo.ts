@@ -60,36 +60,62 @@ export async function getUsers(): Promise<UserAccessUser[]> {
 }
 
 /**
- * Update user role in profiles table
+ * Update user role in profiles table AND app_users table
+ * Both tables are kept in sync to prevent role mismatch issues
  */
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
   const supabase = getSupabaseClient();
 
+  // Update profiles table (primary source of truth for the app)
   const { error } = await supabase
     .from('profiles')
     .update({ role })
     .eq('id', userId);
 
   if (error) {
-    console.error('[UserAccess] Error updating user role:', error);
+    console.error('[UserAccess] Error updating user role in profiles:', error);
     throw error;
+  }
+
+  // Also update app_users table to keep in sync
+  const { error: appUserError } = await supabase
+    .from('app_users')
+    .update({ role })
+    .eq('id', userId);
+
+  if (appUserError) {
+    console.error('[UserAccess] Error syncing role to app_users:', appUserError);
+    // Non-fatal — don't throw, profiles is the primary source
   }
 }
 
 /**
- * Enable or disable user in profiles table
+ * Enable or disable user in profiles table AND app_users table
+ * Both tables are kept in sync to prevent status mismatch issues
  */
 export async function setUserEnabled(userId: string, isActive: boolean): Promise<void> {
   const supabase = getSupabaseClient();
 
+  // Update profiles table (primary source of truth)
   const { error } = await supabase
     .from('profiles')
     .update({ is_active: isActive })
     .eq('id', userId);
 
   if (error) {
-    console.error('[UserAccess] Error updating user status:', error);
+    console.error('[UserAccess] Error updating user status in profiles:', error);
     throw error;
+  }
+
+  // Also update app_users table to keep in sync
+  const { error: appUserError } = await supabase
+    .from('app_users')
+    .update({ is_active: isActive })
+    .eq('id', userId);
+
+  if (appUserError) {
+    console.error('[UserAccess] Error syncing is_active to app_users:', appUserError);
+    // Non-fatal — don't throw, profiles is the primary source
   }
 }
 
