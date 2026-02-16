@@ -160,6 +160,65 @@ router.post('/supabase', async (req: Request, res: Response) => {
 
     console.log('[OAuth Callback] Using auth user:', authUserId);
 
+    // Step 3.5: Check if user already has a role and is_active status in profiles or app_users
+    // This prevents overwriting an admin/manager/contractor role with 'unassigned' on re-login
+    // and prevents re-enabling a disabled user
+    let existingIsActive = true; // Default for new users
+
+    if (roleToAssign === 'unassigned') {
+      // Check existing profile first
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('role, full_name, is_active')
+        .eq('id', authUserId)
+        .maybeSingle();
+
+      if (existingProfile) {
+        existingIsActive = existingProfile.is_active !== false; // Preserve disabled status
+        if (existingProfile.role && existingProfile.role !== 'unassigned') {
+          console.log('[OAuth Callback] User already has role in profiles:', existingProfile.role);
+          roleToAssign = existingProfile.role;
+          fullName = existingProfile.full_name || fullName;
+        } else {
+          // Fallback: check app_users table for role
+          const { data: appUser } = await supabase
+            .from('app_users')
+            .select('role, full_name, is_active')
+            .eq('email', email.toLowerCase())
+            .maybeSingle();
+
+          if (appUser?.role && appUser.role !== 'unassigned' && appUser.role !== null) {
+            console.log('[OAuth Callback] Found role in app_users:', appUser.role);
+            roleToAssign = appUser.role.toLowerCase();
+            fullName = appUser.full_name || fullName;
+          }
+          if (appUser && appUser.is_active === false) {
+            existingIsActive = false;
+          }
+        }
+      }
+    } else {
+      // Even with an invitation role, check if user was previously disabled
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('is_active')
+        .eq('id', authUserId)
+        .maybeSingle();
+
+      if (existingProfile && existingProfile.is_active === false) {
+        existingIsActive = false;
+      }
+    }
+
+    // Step 3.6: Block disabled users BEFORE upserting (don't re-enable them)
+    if (!existingIsActive) {
+      console.log('[OAuth Callback] User is disabled, blocking login:', email);
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Account is disabled. Please contact an administrator.' 
+      });
+    }
+
     // Step 4: Ensure profile is up to date (upsert pattern)
     const { error: profileError } = await supabase
       .from('profiles')
@@ -188,6 +247,24 @@ router.post('/supabase', async (req: Request, res: Response) => {
       if (updateError) {
         console.error('[OAuth Callback] Error updating profile:', updateError);
       }
+    }
+
+    // Step 4.5: Sync app_users with the same role (keep tables in sync)
+    const { error: appUserSyncError } = await supabase
+      .from('app_users')
+      .upsert({
+        id: authUserId,
+        email: email.toLowerCase(),
+        role: roleToAssign,
+        full_name: fullName,
+        is_active: true,
+      }, { onConflict: 'id' });
+
+    if (appUserSyncError) {
+      console.error('[OAuth Callback] Error syncing app_users:', appUserSyncError);
+      // Non-fatal - don't block login
+    } else {
+      console.log('[OAuth Callback] app_users synced with role:', roleToAssign);
     }
 
     // Step 5: If contractor from invitation, ensure contractor record exists (idempotent)
