@@ -9,8 +9,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-// API base URL - defaults to localhost in development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+// API base URL - use same backend as auth (VITE_AUTH_BASE_URL on Vercel), fallback to VITE_API_URL or localhost
+const API_BASE_URL = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/+$/, '');
 
 export interface InvoiceData {
   invoiceUrl: string;
