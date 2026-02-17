@@ -11,11 +11,12 @@ const app = express();
 const port = Number(process.env.PORT ?? 5001);
 
 // CORS configuration for cross-origin requests
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [
+// Origin is scheme + host only (no path, no wildcards) - browser sends e.g. https://invoicing-platform-2-0.vercel.app
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim().replace(/\/+$/, "")).filter(Boolean) ?? [
   "http://localhost:5173",
   "http://localhost:5001",
-  "https://invoicing-platform-2-0.vercel.app/*",
-  "https://invoicing-platform-20-production.up.railway.app/*"
+  "https://invoicing-platform-2-0.vercel.app",
+  "https://invoicing-platform-20-production.up.railway.app",
 ];
 app.use(
   cors({
