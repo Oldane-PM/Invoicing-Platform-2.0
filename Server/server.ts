@@ -35,6 +35,14 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+// Redirect root to frontend (e.g. when OAuth redirects here with ?error=...)
+const frontendUrl = process.env.FRONTEND_URL || process.env.ALLOWED_ORIGINS?.split(",")[0]?.trim() || "https://invoicing-platform-2-0.vercel.app";
+app.get("/", (req, res) => {
+  const url = new URL("/auth/callback", frontendUrl);
+  req.query && Object.entries(req.query).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+  res.redirect(302, url.toString());
+});
+
 // Invoice routes
 app.use("/api/invoices", invoiceRoutes);
 

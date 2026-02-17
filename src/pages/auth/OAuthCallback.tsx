@@ -7,14 +7,33 @@ interface OAuthCallbackProps {
   onAuthComplete: (role: string) => void;
 }
 
+const ERROR_MESSAGES: Record<string, string> = {
+  please_restart_the_process: "Sign-in was interrupted or the session expired. Please try again from the login page.",
+  state_mismatch: "Sign-in session expired. Please try again from the login page.",
+};
+
 export function OAuthCallback({ onAuthComplete }: OAuthCallbackProps) {
   const [error, setError] = React.useState<string | null>(null);
   const { data: session, isPending } = useSession();
   const hasProcessed = React.useRef(false); // Prevent multiple executions
 
+  // Show error from URL (e.g. redirect from backend with ?error=please_restart_the_process)
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get("error");
+    if (errorParam) {
+      setError(ERROR_MESSAGES[errorParam] || "Sign-in failed. Please try again from the login page.");
+    }
+  }, []);
+
   React.useEffect(() => {
     async function handleCallback() {
       try {
+        // If backend redirected here with ?error=, we already showed it; don't overwrite
+        if (new URLSearchParams(window.location.search).get("error")) {
+          return;
+        }
+
         console.log("[OAuth Callback] Processing OAuth callback...");
 
         // Prevent multiple executions
