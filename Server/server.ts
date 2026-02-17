@@ -14,7 +14,8 @@ const port = Number(process.env.PORT ?? 5001);
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [
   "http://localhost:5173",
   "http://localhost:5001",
-  "https://invoicing-platform-2-0.vercel.app",
+  "https://invoicing-platform-2-0.vercel.app/*",
+  "https://invoicing-platform-20-production.up.railway.app/*"
 ];
 app.use(
   cors({
