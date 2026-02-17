@@ -124,7 +124,7 @@ export function NewUserModal({
         payload.contractEndDate = format(contractEndDate, "yyyy-MM-dd");
       }
 
-      const apiBase = import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001";
+      const apiBase = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
       const response = await fetch(`${apiBase}/api/users`, {
         method: "POST",
         headers: {
