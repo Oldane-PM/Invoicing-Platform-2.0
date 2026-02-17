@@ -39,19 +39,27 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins:
-    process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [
+  trustedOrigins: (() => {
+    const list = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim().replace(/\/+$/, "")).filter(Boolean) ?? [
       "http://localhost:5173",
       "http://localhost:5174",
       "http://localhost:5001",
       "http://localhost:3000",
       "https://invoicing-platform-2-0.vercel.app",
-    ],
+      "https://invoicing-platform-20-production.up.railway.app",
+    ];
+    return list;
+  })(),
 
   advanced: {
     useSecureCookies: process.env.NODE_ENV === "production",
     crossSubDomainCookies: {
       enabled: true,
     },
+    // Required for cross-origin OAuth when frontend (Vercel) and backend (Railway) differ
+    defaultCookieAttributes:
+      process.env.NODE_ENV === "production"
+        ? { sameSite: "none" as const, secure: true }
+        : undefined,
   },
 });
