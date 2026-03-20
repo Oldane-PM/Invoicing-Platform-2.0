@@ -3,7 +3,7 @@ export type CalendarEntryType = 'Holiday' | 'Special Time Off' | 'Company Event'
 export type CalendarAppliesTo = 'All' | 'Contractors' | 'Employees';
 
 // New scope types for role-based time-off
-export type TimeOffScopeType = 'ALL' | 'ROLES';
+export type TimeOffScopeType = 'ALL' | 'ROLES' | 'PROJECTS';
 
 export interface TimeOffEntry {
   id: string;
@@ -19,6 +19,7 @@ export interface TimeOffEntry {
   // New role-based scope fields
   appliesToType: TimeOffScopeType;
   appliesToRoles: string[];
+  appliesToProjects: string[];
 }
 
 export interface CreateTimeOffEntryParams {
@@ -34,6 +35,7 @@ export interface CreateTimeOffEntryParams {
   // New role-based scope fields
   appliesToType: TimeOffScopeType;
   appliesToRoles: string[];
+  appliesToProjects: string[];
 }
 
 export interface UpdateTimeOffEntryParams extends Partial<CreateTimeOffEntryParams> {

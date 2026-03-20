@@ -14,11 +14,10 @@ import type { EmployeeDirectoryRow } from "../../types";
 export async function getUniqueRoles(): Promise<string[]> {
   const supabase = getSupabaseClient();
 
-  // Get all contractor profiles with their roles
+  // Get all profiles with their roles
   const { data: profiles, error } = await supabase
     .from("profiles")
-    .select("role")
-    .eq("role", "contractor");
+    .select("role");
 
   if (error) {
     console.error("[employeeDirectory.repo] getUniqueRoles error:", error);
@@ -39,7 +38,7 @@ export async function getUniqueRoles(): Promise<string[]> {
 
   // Also check contractor_profiles table if it has position/role field
   // For now, we'll use common roles as a baseline and add any found
-  const commonRoles = ["contractor", "Engineer", "Designer", "QA", "DevOps", "Product Manager"];
+  const commonRoles = ["contractor", "admin", "manager", "Engineer", "Designer", "QA", "DevOps", "Product Manager"];
   commonRoles.forEach((role) => rolesSet.add(role));
 
   return Array.from(rolesSet).sort((a, b) => a.localeCompare(b));
@@ -72,11 +71,10 @@ export async function listEmployees({
   const start = (page - 1) * pageSize;
   const end = start + pageSize - 1;
 
-  // Step 1: Base query on profiles table for role='CONTRACTOR'
+  // Step 1: Base query on profiles table to get all users
   let query = supabase
     .from("profiles")
-    .select("id, full_name, email, created_at, role", { count: "exact" })
-    .eq("role", "contractor");
+    .select("id, full_name, email, created_at, role", { count: "exact" });
 
   // Apply search if provided
   if (search) {
@@ -169,6 +167,9 @@ export async function listEmployees({
     const contractor = contractorMap.get(profile.id);
     const managerData = managerMap.get(profile.id);
 
+    const isAdmin = profile.role?.toLowerCase() === "admin";
+    const isStaff = profile.role && profile.role.toLowerCase() !== "contractor";
+
     return {
       contractor_id: profile.id, // ID is used as contractor_id in UI
       full_name: profile.full_name,
@@ -176,14 +177,14 @@ export async function listEmployees({
       role: profile.role,
       status: contractor?.is_active === false ? "Inactive" : "Active",
       joined_at: profile.created_at,
-      reporting_manager_id: managerData?.managerId,
-      reporting_manager_name: managerData?.managerName,
-      contract_start: contractor?.contract_start,
-      contract_end: contractor?.contract_end,
-      hourly_rate: contractor?.hourly_rate,
+      reporting_manager_id: isAdmin ? undefined : managerData?.managerId,
+      reporting_manager_name: isAdmin ? undefined : managerData?.managerName,
+      contract_start: isStaff ? undefined : contractor?.contract_start,
+      contract_end: isStaff ? undefined : contractor?.contract_end,
+      hourly_rate: isStaff ? undefined : contractor?.hourly_rate,
       fixed_rate: undefined, // Not currently stored in contractors table
-      rate_type: contractor?.hourly_rate ? "Hourly" : undefined, // Inferred from hourly_rate presence
-      contract_type: "Contractor",
+      rate_type: isStaff ? undefined : (contractor?.hourly_rate ? "Hourly" : undefined), 
+      contract_type: isStaff ? "Employee" : "Contractor",
       position: undefined, // Not currently stored in contractors table
       department: undefined, // Not currently stored in contractors table
     };

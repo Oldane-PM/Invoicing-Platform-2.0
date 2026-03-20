@@ -37,6 +37,7 @@ import {
   useUpcomingDaysOff 
 } from "../../lib/hooks/adminCalendar";
 import { useEmployeeRoles } from "../../lib/hooks/admin/useEmployeeRoles";
+import { useProjects } from "../../lib/hooks/admin/useProjects";
 import { TimeOffEntry, CalendarEntryType, CalendarAppliesTo, TimeOffScopeType } from "../../lib/data/adminCalendar";
 
 type ViewMode = "month" | "year";
@@ -50,6 +51,7 @@ export function AdminCalendar() {
   const [isReadMode, setIsReadMode] = React.useState(false);
   const [dateRangeMode, setDateRangeMode] = React.useState<DateRangeMode>("single");
   const [rolePickerOpen, setRolePickerOpen] = React.useState(false);
+  const [projectPickerOpen, setProjectPickerOpen] = React.useState(false);
   const [formData, setFormData] = React.useState({
     name: "",
     type: "Holiday" as CalendarEntryType,
@@ -62,10 +64,12 @@ export function AdminCalendar() {
     // New role-based scope fields
     appliesToType: "ALL" as TimeOffScopeType,
     appliesToRoles: [] as string[],
+    appliesToProjects: [] as string[],
   });
 
   // Get unique roles from employee directory
   const { roles: availableRoles, isLoading: rolesLoading } = useEmployeeRoles();
+  const { rows: availableProjects, isLoading: projectsLoading } = useProjects();
 
   // Data fetching - fetch current month + 3 months ahead for upcoming list
   const queryStart = React.useMemo(() => subMonths(startOfMonth(currentDate), 1), [currentDate]);
@@ -114,6 +118,8 @@ export function AdminCalendar() {
       // For ROLES scope, show total count as approximation
       // (accurate count would require matching roles to contractors)
       return totalContractorCount;
+    } else if (formData.appliesToType === 'PROJECTS' && formData.appliesToProjects.length > 0) {
+      return totalContractorCount;
     }
     return 0;
   }, [formData.appliesToType, formData.appliesToRoles, totalContractorCount]);
@@ -144,9 +150,11 @@ export function AdminCalendar() {
       appliesTo: "All" as CalendarAppliesTo,
       appliesToType: "ALL" as TimeOffScopeType,
       appliesToRoles: [],
+      appliesToProjects: [],
     });
     setDateRangeMode("single");
     setRolePickerOpen(false);
+    setProjectPickerOpen(false);
     setDrawerOpen(true);
   };
 
@@ -164,9 +172,11 @@ export function AdminCalendar() {
       appliesTo: entry.appliesTo,
       appliesToType: entry.appliesToType || "ALL",
       appliesToRoles: entry.appliesToRoles || [],
+      appliesToProjects: entry.appliesToProjects || [],
     });
     setDateRangeMode(entry.startDate.getTime() !== entry.endDate.getTime() ? "range" : "single");
     setRolePickerOpen(false);
+    setProjectPickerOpen(false);
     setDrawerOpen(true);
   };
 
@@ -185,6 +195,10 @@ export function AdminCalendar() {
       toast.error("Please select at least one role");
       return;
     }
+    if (formData.appliesToType === "PROJECTS" && formData.appliesToProjects.length === 0) {
+      toast.error("Please select at least one project");
+      return;
+    }
 
     const entryData = {
       name: formData.name,
@@ -198,6 +212,7 @@ export function AdminCalendar() {
       affectedCount: affectedCount,
       appliesToType: formData.appliesToType,
       appliesToRoles: formData.appliesToType === "ROLES" ? formData.appliesToRoles : [],
+      appliesToProjects: formData.appliesToType === "PROJECTS" ? formData.appliesToProjects : [],
     };
 
     if (editingEntry) {
@@ -454,9 +469,12 @@ export function AdminCalendar() {
                       ? format(entry.startDate, "MMM d, yyyy")
                       : `${format(entry.startDate, "MMM d")} - ${format(entry.endDate, "MMM d, yyyy")}`;
 
-                    const scopeLabel = entry.appliesToType === "ROLES" 
-                      ? `${entry.appliesToRoles?.length || 0} Role${(entry.appliesToRoles?.length || 0) !== 1 ? "s" : ""}`
-                      : "All Employees";
+                    let scopeLabel = "All Employees";
+                    if (entry.appliesToType === "ROLES") {
+                      scopeLabel = `${entry.appliesToRoles?.length || 0} Role${(entry.appliesToRoles?.length || 0) !== 1 ? "s" : ""}`;
+                    } else if (entry.appliesToType === "PROJECTS") {
+                      scopeLabel = `${entry.appliesToProjects?.length || 0} Project${(entry.appliesToProjects?.length || 0) !== 1 ? "s" : ""}`;
+                    }
 
                     return (
                       <div
@@ -546,7 +564,7 @@ export function AdminCalendar() {
                         <Users className="w-4 h-4 text-gray-500" />
                         All Employees
                       </span>
-                    ) : (
+                    ) : editingEntry.appliesToType === "ROLES" ? (
                       <div className="space-y-2">
                         <span className="text-gray-900 font-medium">Specific Roles:</span>
                         <div className="flex flex-wrap gap-1.5">
@@ -557,6 +575,21 @@ export function AdminCalendar() {
                               className="bg-purple-100 text-purple-700 px-2 py-0.5 text-xs"
                             >
                               {role}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <span className="text-gray-900 font-medium">Specific Projects:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(editingEntry.appliesToProjects || []).map((project) => (
+                            <Badge
+                              key={project}
+                              variant="secondary"
+                              className="bg-purple-100 text-purple-700 px-2 py-0.5 text-xs"
+                            >
+                              {project}
                             </Badge>
                           ))}
                         </div>
@@ -708,12 +741,12 @@ export function AdminCalendar() {
                 <div className="space-y-4">
                   <Label className="text-sm font-medium text-gray-900 block">Applies To</Label>
                   
-                  {/* Toggle: All vs Specific Roles */}
-                  <div className="bg-gray-50 p-1 rounded-lg inline-flex w-full">
+                  {/* Toggle: All vs Specific Roles vs Projects */}
+                  <div className="bg-gray-50 p-1 rounded-lg flex flex-wrap w-full gap-1">
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, appliesToType: "ALL", appliesToRoles: [] })}
-                      className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                      onClick={() => setFormData({ ...formData, appliesToType: "ALL", appliesToRoles: [], appliesToProjects: [] })}
+                      className={`flex-1 min-w-[100px] px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                         formData.appliesToType === "ALL"
                           ? "bg-white text-gray-900 shadow-sm"
                           : "text-gray-600 hover:text-gray-900"
@@ -725,13 +758,24 @@ export function AdminCalendar() {
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, appliesToType: "ROLES" })}
-                      className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                      className={`flex-1 min-w-[100px] px-3 py-2 rounded-md text-sm font-medium transition-all ${
                         formData.appliesToType === "ROLES"
                           ? "bg-white text-gray-900 shadow-sm"
                           : "text-gray-600 hover:text-gray-900"
                       }`}
                     >
                       Specific Roles
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, appliesToType: "PROJECTS" })}
+                      className={`flex-1 min-w-[100px] px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                        formData.appliesToType === "PROJECTS"
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Projects
                     </button>
                   </div>
 
@@ -829,6 +873,105 @@ export function AdminCalendar() {
                       {formData.appliesToRoles.length === 0 && (
                         <p className="text-xs text-amber-600">
                           Please select at least one role this time off applies to.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Projects Multi-Select (only shown when PROJECTS is selected) */}
+                  {formData.appliesToType === "PROJECTS" && (
+                    <div className="space-y-3">
+                      {/* Project Picker */}
+                      <Popover open={projectPickerOpen} onOpenChange={setProjectPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={projectPickerOpen}
+                            className={cn(
+                              "w-full h-10 justify-between bg-white border-gray-200 rounded-md text-sm font-normal",
+                              formData.appliesToProjects.length === 0 && "text-gray-500"
+                            )}
+                          >
+                            {formData.appliesToProjects.length > 0
+                              ? `${formData.appliesToProjects.length} project${formData.appliesToProjects.length > 1 ? "s" : ""} selected`
+                              : "Select projects..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent 
+                          className="w-[--radix-popover-trigger-width] p-0" 
+                          align="start"
+                        >
+                          <Command>
+                            <CommandInput placeholder="Search projects..." />
+                            <CommandList>
+                              <CommandEmpty>
+                                {projectsLoading ? "Loading projects..." : "No projects found."}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {availableProjects.map((project) => (
+                                  <CommandItem
+                                    key={project.id}
+                                    value={project.name}
+                                    onSelect={() => {
+                                      const isSelected = formData.appliesToProjects.includes(project.name);
+                                      setFormData({
+                                        ...formData,
+                                        appliesToProjects: isSelected
+                                          ? formData.appliesToProjects.filter(p => p !== project.name)
+                                          : [...formData.appliesToProjects, project.name],
+                                      });
+                                    }}
+                                  >
+                                    <div className={cn(
+                                      "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-purple-600",
+                                      formData.appliesToProjects.includes(project.name)
+                                        ? "bg-purple-600 text-white"
+                                        : "opacity-50 [&_svg]:invisible"
+                                    )}>
+                                      <Check className="h-3 w-3" />
+                                    </div>
+                                    {project.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+
+                      {/* Selected Projects as Badges */}
+                      {formData.appliesToProjects.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {formData.appliesToProjects.map((project) => (
+                            <Badge
+                              key={project}
+                              variant="secondary"
+                              className="bg-purple-100 text-purple-700 hover:bg-purple-200 px-2.5 py-1 text-xs font-medium"
+                            >
+                              {project}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormData({
+                                    ...formData,
+                                    appliesToProjects: formData.appliesToProjects.filter(p => p !== project),
+                                  });
+                                }}
+                                className="ml-1.5 hover:text-purple-900"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Validation message */}
+                      {formData.appliesToProjects.length === 0 && (
+                        <p className="text-xs text-amber-600">
+                          Please select at least one project this time off applies to.
                         </p>
                       )}
                     </div>

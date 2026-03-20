@@ -44,17 +44,13 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
     .select('*', { count: 'exact', head: true })
     .eq('status', 'submitted');
 
-  // Get total invoice value (sum of all approved submissions this month)
+  // Get total invoice value (sum of all approved submissions awaiting payment)
   // IMPORTANT: Use stored total_amount for consistency - never recalculate
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-
   const { data: approvedSubmissions } = await supabase
     .from('submissions')
     .select('total_amount')
     .eq('status', 'approved')
-    .gte('submitted_at', startOfMonth.toISOString());
+    .is('paid_at', null);
 
   // Sum the stored total_amount values for consistency
   // This ensures metrics match actual submission/invoice totals
@@ -112,8 +108,8 @@ export async function getSubmissions(filters: SubmissionFilters = {}): Promise<A
   if (filters.status) {
     const dbStatus = filters.status.toLowerCase();
     if (dbStatus === 'paid') {
-      // PAID filter: approved submissions with paid_at
-      query = query.eq('status', 'approved').not('paid_at', 'is', null);
+      // PAID filter: submissions with status 'paid' OR (status 'approved' and paid_at not null)
+      query = query.or('status.eq.paid,and(status.eq.approved,paid_at.not.is.null)');
     } else {
       query = query.eq('status', dbStatus);
     }

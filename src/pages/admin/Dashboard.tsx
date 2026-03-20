@@ -123,13 +123,6 @@ export function AdminDashboard() {
     toast.success("All filters cleared");
   };
 
-  const handleMetricClick = (metric: string) => {
-    if (metric === "pending") {
-      setFilters({ ...filters, status: "submitted" });
-      toast.info("Filtered to pending submissions");
-    }
-  };
-
   const handleSubmissionClick = (submissionId: string) => {
     setSelectedSubmissionId(submissionId);
     setDrawerOpen(true);
@@ -179,7 +172,6 @@ export function AdminDashboard() {
               subtitle="Active contractors"
               icon={Users}
               accentColor="purple"
-              onClick={() => handleMetricClick("total")}
             />
             <MetricCard
               title="Pending Submissions"
@@ -187,15 +179,13 @@ export function AdminDashboard() {
               subtitle="Needs attention"
               icon={FileText}
               accentColor="yellow"
-              onClick={() => handleMetricClick("pending")}
             />
             <MetricCard
               title="Total Invoice Value"
               value={`$${(metrics?.totalInvoiceValue || 0).toLocaleString()}`}
-              subtitle="Approved this month"
+              subtitle="Awaiting payment"
               icon={DollarSign}
               accentColor="green"
-              onClick={() => handleMetricClick("payout")}
             />
             <MetricCard
               title="Active Contracts"
@@ -203,7 +193,6 @@ export function AdminDashboard() {
               subtitle="Currently active"
               icon={TrendingUp}
               accentColor="blue"
-              onClick={() => handleMetricClick("contracts")}
             />
           </>
         )}

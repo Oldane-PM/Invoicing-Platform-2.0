@@ -114,6 +114,11 @@ export function ContractorDetailDrawer({
       return;
     }
 
+    if (formData.contract_start && formData.contract_end && formData.contract_end < formData.contract_start) {
+      toast.error("End date cannot be earlier than start date");
+      return;
+    }
+
     if (formData.rate_type === "Hourly" && !formData.hourly_rate) {
       toast.error("Hourly rate is required for hourly contractors");
       return;
@@ -380,7 +385,7 @@ export function ContractorDetailDrawer({
                         </div>
                         <div className="font-medium text-sm text-gray-900">
                           {formData.contract_start
-                            ? format(new Date(formData.contract_start), "MMM d, yyyy")
+                            ? format(new Date(formData.contract_start.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")
                             : "-"}
                         </div>
                       </div>
@@ -391,7 +396,7 @@ export function ContractorDetailDrawer({
                         </div>
                         <div className="font-medium text-sm text-gray-900">
                           {formData.contract_end
-                            ? format(new Date(formData.contract_end), "MMM d, yyyy")
+                            ? format(new Date(formData.contract_end.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")
                             : "Ongoing"}
                         </div>
                       </div>
@@ -436,15 +441,17 @@ export function ContractorDetailDrawer({
                         {formData.department}
                       </div>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-                        <User className="w-3.5 h-3.5" />
-                        <span>Reporting Manager</span>
+                    {formData.role?.toLowerCase() !== "admin" && (
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+                          <User className="w-3.5 h-3.5" />
+                          <span>Reporting Manager</span>
+                        </div>
+                        <div className="font-medium text-sm text-gray-900">
+                          {formData.reporting_manager_name || "-"}
+                        </div>
                       </div>
-                      <div className="font-medium text-sm text-gray-900">
-                        {formData.reporting_manager_name || "-"}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -457,7 +464,7 @@ export function ContractorDetailDrawer({
                       <Input
                         id="startDate"
                         type="date"
-                        value={formData.contract_start ? format(new Date(formData.contract_start), "yyyy-MM-dd") : ""}
+                        value={formData.contract_start ? formData.contract_start.toString().substring(0, 10) : ""}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
@@ -474,7 +481,8 @@ export function ContractorDetailDrawer({
                       <Input
                         id="endDate"
                         type="date"
-                        value={formData.contract_end ? format(new Date(formData.contract_end), "yyyy-MM-dd") : ""}
+                        min={formData.contract_start ? formData.contract_start.toString().substring(0, 10) : undefined}
+                        value={formData.contract_end ? formData.contract_end.toString().substring(0, 10) : ""}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
@@ -570,25 +578,27 @@ export function ContractorDetailDrawer({
                       className="bg-gray-50 border-gray-200 rounded-lg h-10 text-sm"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="manager" className="text-xs text-gray-700 mb-1.5 block">
-                      Reporting Manager
-                    </Label>
-                    <Combobox
-                      value={formData.reporting_manager_id || ""}
-                      onValueChange={(value) =>
-                        setFormData({
-                          ...formData,
-                          reporting_manager_id: value || undefined,
-                          reporting_manager_name: managerOptions.find((m) => m.id === value)?.label,
-                        })
-                      }
-                      options={managerOptions.map((m) => ({ value: m.id, label: m.label }))}
-                      placeholder={isLoadingManagers ? "Loading managers..." : "Select a manager"}
-                      searchPlaceholder="Search managers..."
-                      emptyText="No managers found."
-                    />
-                  </div>
+                  {formData.role?.toLowerCase() !== "admin" && (
+                    <div>
+                      <Label htmlFor="manager" className="text-xs text-gray-700 mb-1.5 block">
+                        Reporting Manager
+                      </Label>
+                      <Combobox
+                        value={formData.reporting_manager_id || ""}
+                        onValueChange={(value) =>
+                          setFormData({
+                            ...formData,
+                            reporting_manager_id: value || undefined,
+                            reporting_manager_name: managerOptions.find((m) => m.id === value)?.label,
+                          })
+                        }
+                        options={managerOptions.map((m) => ({ value: m.id, label: m.label }))}
+                        placeholder={isLoadingManagers ? "Loading managers..." : "Select a manager"}
+                        searchPlaceholder="Search managers..."
+                        emptyText="No managers found."
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

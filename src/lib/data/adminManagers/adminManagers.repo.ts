@@ -20,7 +20,7 @@ export async function getManagerOptions(): Promise<ManagerOption[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select('id, full_name')
-    .eq('role', 'MANAGER')
+    .in('role', ['manager', 'MANAGER', 'Manager'])
     .order('full_name', { ascending: true });
 
   if (error) {
