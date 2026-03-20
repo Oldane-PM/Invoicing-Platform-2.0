@@ -48,8 +48,8 @@ export function ProjectDialog({
         setName(initialValues.name);
         setClient(initialValues.client);
         setDescription(initialValues.description ?? "");
-        setStartDate(initialValues.startDate);
-        setEndDate(initialValues.endDate ?? "");
+        setStartDate(initialValues.startDate ? initialValues.startDate.split('T')[0] : "");
+        setEndDate(initialValues.endDate ? initialValues.endDate.split('T')[0] : "");
         setResourceCount(String(initialValues.resourceCount));
       } else {
         setName("");
@@ -105,8 +105,8 @@ export function ProjectDialog({
           name: name.trim(),
           client: client.trim(),
           description: description.trim() || null,
-          startDate,
-          endDate: endDate || null,
+          startDate: startDate ? startDate.split('T')[0] : "",
+          endDate: endDate ? endDate.split('T')[0] : null,
           resourceCount: resourceCount ? Number(resourceCount) : 0,
         };
         await onSubmit(updateInput);
@@ -117,8 +117,8 @@ export function ProjectDialog({
           name: name.trim(),
           client: client.trim(),
           description: description.trim() || null,
-          startDate,
-          endDate: endDate || null,
+          startDate: startDate ? startDate.split('T')[0] : "",
+          endDate: endDate ? endDate.split('T')[0] : null,
           resourceCount: resourceCount ? Number(resourceCount) : 0,
         };
         await onSubmit(createInput);
@@ -223,6 +223,7 @@ export function ProjectDialog({
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 className={errors.endDate ? "border-red-500" : ""}
+                min={startDate || undefined}
               />
               {errors.endDate && <p className="text-sm text-red-500 mt-1">{errors.endDate}</p>}
             </div>

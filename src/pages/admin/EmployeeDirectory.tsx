@@ -221,14 +221,14 @@ export function EmployeeDirectory({ onEmployeeClick }: EmployeeDirectoryProps) {
                     <TableCell className="text-gray-700">
                       {employee.contract_start
                         ? format(
-                            new Date(employee.contract_start),
+                            new Date(employee.contract_start.toString().substring(0,10) + "T12:00:00Z"),
                             "MMM d, yyyy"
                           )
                         : "-"}
                     </TableCell>
                     <TableCell className="text-gray-700">
                       {employee.contract_end
-                        ? format(new Date(employee.contract_end), "MMM d, yyyy")
+                        ? format(new Date(employee.contract_end.toString().substring(0,10) + "T12:00:00Z"), "MMM d, yyyy")
                         : "-"}
                     </TableCell>
                     <TableCell className="text-gray-700">

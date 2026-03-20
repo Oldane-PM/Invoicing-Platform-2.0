@@ -15,5 +15,6 @@ export function mapCalendarEntryToDomain(data: any): TimeOffEntry {
     // New role-based scope fields
     appliesToType: (data.applies_to_type || 'ALL') as TimeOffScopeType,
     appliesToRoles: data.applies_to_roles || [],
+    appliesToProjects: data.team && data.team[0] !== 'all' ? data.team : [],
   };
 }

@@ -43,10 +43,17 @@ export async function createCalendarEntry(params: CreateTimeOffEntryParams): Pro
     end_date: params.endDate,
     country: params.country || ['all'],
     team: params.team || ['all'],
-    // Map 'ROLES' scope to 'Contractors' for backward compatibility with 017 schema
-    applies_to: params.appliesToType === 'ROLES' ? 'Contractors' : params.appliesTo,
+    // Map 'ROLES' to 'Contractors', 'PROJECTS' to 'Contractors' (or All if needed) 
+    applies_to: params.appliesToType !== 'ALL' ? 'Contractors' : params.appliesTo,
     affected_count: params.affectedCount || 0,
+    applies_to_type: params.appliesToType,
+    applies_to_roles: params.appliesToRoles || [],
   };
+  
+  // If PROJECTS scope, set the team column to the selected projects
+  if (params.appliesToType === 'PROJECTS' && params.appliesToProjects && params.appliesToProjects.length > 0) {
+    insertData.team = params.appliesToProjects;
+  }
 
   console.log('[AdminCalendar] Creating entry with data:', insertData);
 
@@ -86,8 +93,18 @@ export async function updateCalendarEntry(params: UpdateTimeOffEntryParams): Pro
   if (params.endDate) updateData.end_date = params.endDate;
   if (params.country) updateData.country = params.country;
   if (params.appliesTo) updateData.applies_to = params.appliesTo;
-  // Map 'ROLES' scope to 'Contractors'
-  if (params.appliesToType === 'ROLES') updateData.applies_to = 'Contractors';
+  if (params.appliesToType !== undefined) {
+    updateData.applies_to_type = params.appliesToType;
+    if (params.appliesToType !== 'ALL') updateData.applies_to = 'Contractors';
+  }
+  if (params.appliesToRoles) updateData.applies_to_roles = params.appliesToRoles;
+  
+  if (params.appliesToType === 'PROJECTS' && params.appliesToProjects) {
+    updateData.team = params.appliesToProjects.length > 0 ? params.appliesToProjects : ['all'];
+  } else if (params.appliesToType === 'ALL' || params.appliesToType === 'ROLES') {
+    updateData.team = ['all'];
+  }
+
   if (params.affectedCount !== undefined) updateData.affected_count = params.affectedCount;
   updateData.updated_at = new Date().toISOString();
 
@@ -254,7 +271,7 @@ export async function getTotalContractorCount(): Promise<number> {
     const { count, error } = await supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('role', 'CONTRACTOR');
+      .eq('role', 'contractor');
 
     if (error) {
       console.error('[AdminCalendar] Error getting total contractor count:', error);

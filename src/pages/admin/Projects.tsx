@@ -110,7 +110,8 @@ export function AdminProjects() {
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "-";
     try {
-      return format(new Date(dateStr), "MMM d, yyyy");
+      const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      return format(new Date(`${dateOnly}T12:00:00`), "MMM d, yyyy");
     } catch {
       return dateStr;
     }
