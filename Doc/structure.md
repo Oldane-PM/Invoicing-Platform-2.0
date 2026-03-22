@@ -1,247 +1,301 @@
-# Invoice App v2.0 - Project Structure
-
-## 📂 Directory Tree
+# Invoicing Platform 2.0 — File Structure
 
 ```
-Invoice-App-v2.0/
+Invoicing-Platform-2.0/
+├── .env                          # Environment variables
+├── .env.example                  # Env template
+├── .gitignore
+├── index.html                    # Vite entry HTML
+├── package.json
+├── package-lock.json
+├── tsconfig.json                 # Frontend TS config
+├── tsconfig.node.json            # Node TS config
+├── tsconfig.server.json          # Server TS config
+├── vite.config.ts                # Vite build config
+├── postcss.config.mjs            # PostCSS config
+├── nodemon.json                  # Dev server auto-reload
+├── TODO.md
 │
-├── 🖥️  Server/                          # Backend (Express.js)
-│   ├── index.ts                         # Main server entry
+├── # ── Deployment ──────────────────────────────────
+├── netlify.toml                  # Netlify deploy config
+├── railway.toml                  # Railway deploy config
+├── render.yaml                   # Render deploy config
+├── vercel.json                   # Vercel deploy config
+│
+├── Doc/                          # Project documentation
+│   ├── ATTRIBUTIONS.md
+│   ├── DEPLOYMENT.md
+│   ├── Guidelines.md
+│   ├── PRODUCTION_CHECKLIST.md
+│   ├── QUICK_START.md
+│   ├── RAILWAY_DEPLOYMENT.md
+│   ├── README.md
+│   ├── RENDER_DEPLOYMENT.md
+│   ├── SERVER_SETUP.md
+│   └── structure.md              # ← This file
+│
+├── docs/
+│   └── audits/
+│       └── hardcoded-data-audit.md
+│
+├── Server/                       # Express backend
+│   ├── env.ts                    # Server env config
+│   ├── server.ts                 # Express app entry
+│   ├── clients/
+│   │   └── supabase.server.ts    # Server-side Supabase client
+│   ├── controllers/
+│   │   ├── invoice.controller.ts
+│   │   └── user.controller.ts
 │   ├── routes/
-│   │   └── example.routes.ts            # API route example
-│   ├── controllers/                     # Business logic
-│   ├── middleware/                      # Custom middleware
-│   ├── models/                          # Data models
-│   └── README.md                        # Server documentation
+│   │   ├── invoice.routes.ts
+│   │   ├── oauth-callback.routes.ts
+│   │   └── user.routes.ts
+│   └── services/
+│       └── invoices/
+│           ├── index.ts
+│           ├── generateInvoicePdf.ts
+│           ├── invoiceNumber.ts
+│           └── invoiceStorage.ts
 │
-├── 🎨 src/                              # Frontend (React + Vite)
-│   │
-│   ├── App.tsx                          # Root component
-│   ├── main.tsx                         # Entry point
-│   │
-│   ├── 📄 pages/                        # Page Components
-│   │   ├── Login.tsx                    # Authentication
-│   │   ├── AdminDashboard.tsx           # Admin overview
-│   │   ├── AdminCalendar.tsx            # Calendar management
-│   │   ├── ManagerDashboard.tsx         # Manager view
-│   │   ├── ManagerTeamView.tsx          # Team management
-│   │   ├── ContractorDashboard.tsx      # Contractor home
-│   │   ├── ContractorProfile.tsx        # Profile settings
-│   │   ├── SubmitHoursPage.tsx          # Time submission
-│   │   ├── EmployeeDirectory.tsx        # Employee list
-│   │   ├── UserAccessManagement.tsx     # Access control
-│   │   ├── ErrorBoundary.tsx            # Error handling
-│   │   └── ... (drawers, modals, etc.)
-│   │
-│   ├── 🧩 components/                   # Reusable Components
-│   │   │
-│   │   ├── ui/                          # UI Library (shadcn/ui)
-│   │   │   ├── index.ts                 # ✨ Barrel export
-│   │   │   ├── button.tsx
-│   │   │   ├── card.tsx
-│   │   │   ├── input.tsx
-│   │   │   ├── table.tsx
-│   │   │   ├── dialog.tsx
-│   │   │   ├── drawer.tsx
-│   │   │   ├── badge.tsx
-│   │   │   ├── avatar.tsx
-│   │   │   └── ... (40+ components)
-│   │   │
-│   │   └── shared/                      # Shared Components
-│   │       └── figma/
-│   │           └── ImageWithFallback.tsx
-│   │
-│   ├── 📚 lib/                          # Library Code
-│   │   │
-│   │   ├── data/                        # Data Layer
-│   │   │   ├── mockData.ts              # Mock data
-│   │   │   └── index.ts                 # Data exports
-│   │   │
-│   │   ├── types/                       # TypeScript Types
-│   │   │   └── index.ts                 # Type definitions
-│   │   │
-│   │   └── utils/                       # Utilities
-│   │       ├── cn.ts                    # Tailwind utility
-│   │       └── index.ts                 # Util exports
-│   │
-│   └── 🎨 styles/                       # Global Styles
-│       ├── index.css                    # Main stylesheet
-│       ├── tailwind.css                 # Tailwind directives
-│       ├── theme.css                    # Theme variables
-│       └── fonts.css                    # Font definitions
+├── supabase/                     # Supabase project config
+│   └── migrations/               # 41 SQL migration files
 │
-├── 📦 public/                           # Static Assets
-│   └── (images, icons, etc.)
-│
-├── 🏗️  dist/                            # Build Output
-│   └── (generated files)
-│
-├── ⚙️  Configuration Files
-│   ├── package.json                     # Dependencies & scripts
-│   ├── tsconfig.json                    # TS config (frontend)
-│   ├── tsconfig.server.json             # TS config (backend)
-│   ├── tsconfig.node.json               # TS config (build tools)
-│   ├── vite.config.ts                   # Vite configuration
-│   ├── tailwind.config.ts               # Tailwind config
-│   ├── postcss.config.mjs               # PostCSS config
-│   ├── nodemon.json                     # Nodemon config
-│   ├── .env                             # Environment variables
-│   ├── env.example                      # Env template
-│   └── .gitignore                       # Git ignore rules
-│
-└── 📖 Documentation
-    ├── README.md                        # Main documentation
-    ├── REFACTORING_NOTES.md             # Refactoring details
-    ├── STRUCTURE.md                     # This file
-    ├── QUICK_START.md                   # Quick start guide
-    ├── DEPLOYMENT.md                    # Deployment guide
-    ├── PRODUCTION_CHECKLIST.md          # Production checklist
-    └── guidelines/
-        └── Guidelines.md                # Development guidelines
+└── src/                          # React frontend (Vite + TypeScript)
+    ├── App.tsx                   # Root app + router
+    ├── main.tsx                  # Vite entry point
+    ├── vite-env.d.ts
+    │
+    ├── styles/
+    │   ├── fonts.css
+    │   ├── index.css
+    │   ├── tailwind.css
+    │   └── theme.css
+    │
+    ├── pages/
+    │   ├── auth/
+    │   │   ├── Login.tsx
+    │   │   └── OAuthCallback.tsx
+    │   ├── admin/
+    │   │   ├── Calendar.tsx
+    │   │   ├── Dashboard.tsx
+    │   │   ├── EmployeeDirectory.tsx
+    │   │   ├── Projects.tsx
+    │   │   └── UserAccessManagement.tsx
+    │   ├── contractor/
+    │   │   ├── Dashboard.tsx
+    │   │   ├── Profile.tsx
+    │   │   ├── Submissions.tsx
+    │   │   └── SubmitHours.tsx
+    │   ├── manager/
+    │   │   ├── Dashboard.tsx
+    │   │   └── Team.tsx
+    │   └── unassigned/
+    │       └── Dashboard.tsx
+    │
+    ├── components/
+    │   ├── sign-in.tsx
+    │   ├── drawers/
+    │   │   ├── ContractorDetailDrawer.tsx
+    │   │   ├── ContractorSubmissionDrawer.tsx
+    │   │   ├── ManagerSubmissionDrawer.tsx
+    │   │   ├── NotificationsDrawer.tsx
+    │   │   └── SubmissionReviewDrawer.tsx
+    │   ├── modals/
+    │   │   ├── AddContractorDialog.tsx
+    │   │   ├── AddProjectDialog.tsx
+    │   │   ├── NewUserModal.tsx
+    │   │   ├── ProjectAssignmentsDialog.tsx
+    │   │   ├── ProjectDialog.tsx
+    │   │   ├── SubmitHoursModal.tsx
+    │   │   └── SuccessModal.tsx
+    │   ├── pdf/
+    │   │   └── PDFInvoiceViewer.tsx
+    │   ├── shared/
+    │   │   ├── Combobox.tsx
+    │   │   ├── ErrorBoundary.tsx
+    │   │   ├── InvoiceButton.tsx
+    │   │   ├── MetricCard.tsx
+    │   │   ├── MultiMonthSelector.tsx
+    │   │   ├── NotificationBell.tsx
+    │   │   ├── NotificationDrawer.tsx
+    │   │   ├── RoleChangeConfirmationModal.tsx
+    │   │   ├── SubmissionCard.tsx
+    │   │   ├── SubmissionStatusPill.tsx
+    │   │   └── figma/
+    │   │       └── ImageWithFallback.tsx
+    │   └── ui/                   # shadcn/ui primitives (48 files)
+    │       ├── index.ts
+    │       ├── accordion.tsx
+    │       ├── alert-dialog.tsx
+    │       ├── alert.tsx
+    │       ├── aspect-ratio.tsx
+    │       ├── avatar.tsx
+    │       ├── badge.tsx
+    │       ├── breadcrumb.tsx
+    │       ├── button.tsx
+    │       ├── calendar.tsx
+    │       ├── card.tsx
+    │       ├── carousel.tsx
+    │       ├── chart.tsx
+    │       ├── checkbox.tsx
+    │       ├── collapsible.tsx
+    │       ├── command.tsx
+    │       ├── context-menu.tsx
+    │       ├── dialog.tsx
+    │       ├── drawer.tsx
+    │       ├── dropdown-menu.tsx
+    │       ├── form.tsx
+    │       ├── hover-card.tsx
+    │       ├── input-otp.tsx
+    │       ├── input.tsx
+    │       ├── label.tsx
+    │       ├── menubar.tsx
+    │       ├── navigation-menu.tsx
+    │       ├── pagination.tsx
+    │       ├── popover.tsx
+    │       ├── progress.tsx
+    │       ├── radio-group.tsx
+    │       ├── resizable.tsx
+    │       ├── scroll-area.tsx
+    │       ├── select.tsx
+    │       ├── separator.tsx
+    │       ├── sheet.tsx
+    │       ├── sidebar.tsx
+    │       ├── skeleton.tsx
+    │       ├── slider.tsx
+    │       ├── sonner.tsx
+    │       ├── switch.tsx
+    │       ├── table.tsx
+    │       ├── tabs.tsx
+    │       ├── textarea.tsx
+    │       ├── toggle-group.tsx
+    │       ├── toggle.tsx
+    │       ├── tooltip.tsx
+    │       └── use-mobile.ts
+    │
+    └── lib/
+        ├── auth.ts               # Auth helpers
+        ├── auth-client.ts        # Auth client init
+        │
+        ├── calculations/
+        │   ├── index.ts
+        │   ├── submissions.ts
+        │   └── __tests__/
+        │       └── submissions.test.ts
+        │
+        ├── helpers/
+        │   └── auth-helpers.ts
+        │
+        ├── types/
+        │   └── index.ts          # Shared TypeScript types
+        │
+        ├── utils/
+        │   ├── cn.ts             # className merge utility
+        │   └── index.ts          # General utilities
+        │
+        ├── supabase/
+        │   ├── client.ts         # Browser Supabase client
+        │   └── repos/            # Data-access repositories
+        │       ├── index.ts
+        │       ├── auth.repo.ts
+        │       ├── contractorProfile.repo.ts
+        │       ├── employeeDirectory.repo.ts
+        │       ├── managerDashboard.repo.ts
+        │       ├── managerSubmissions.repo.ts
+        │       ├── projectAssignments.repo.ts
+        │       ├── projects.repo.ts
+        │       ├── submissions.repo.ts
+        │       └── team.repo.ts
+        │
+        ├── data/                 # Domain data layers (repos + types + mappers)
+        │   ├── index.ts
+        │   ├── submissionsDataSource.ts
+        │   ├── adminCalendar/
+        │   │   ├── index.ts
+        │   │   ├── adminCalendar.repo.ts
+        │   │   ├── adminCalendar.types.ts
+        │   │   └── adminCalendar.mappers.ts
+        │   ├── adminDashboard/
+        │   │   ├── index.ts
+        │   │   ├── adminDashboard.repo.ts
+        │   │   ├── adminDashboard.types.ts
+        │   │   └── adminDashboard.mappers.ts
+        │   ├── adminManagers/
+        │   │   ├── index.ts
+        │   │   ├── adminManagers.repo.ts
+        │   │   └── adminManagers.types.ts
+        │   ├── contractInfo/
+        │   │   ├── index.ts
+        │   │   ├── contractInfo.repo.ts
+        │   │   └── contractInfo.types.ts
+        │   ├── notifications/
+        │   │   ├── index.ts
+        │   │   ├── notifications.repo.ts
+        │   │   ├── notifications.types.ts
+        │   │   └── notifications.mappers.ts
+        │   └── userAccess/
+        │       ├── index.ts
+        │       ├── userAccess.repo.ts
+        │       ├── userAccess.types.ts
+        │       └── userAccess.mappers.ts
+        │
+        └── hooks/                # React Query hooks
+            ├── queryKeys.ts
+            ├── useAuth.ts
+            ├── admin/
+            │   ├── useContractorSubmissions.ts
+            │   ├── useEmployeeDirectory.ts
+            │   ├── useEmployeeRoles.ts
+            │   ├── useManagerOptions.ts
+            │   ├── useProjectAssignments.ts
+            │   ├── useProjects.ts
+            │   ├── useUpdateContractInfo.ts
+            │   └── useUpdateManagerAssignment.ts
+            ├── adminCalendar/
+            │   ├── index.ts
+            │   ├── useAdminCalendar.ts
+            │   ├── useAdminCalendarState.ts
+            │   ├── useAffectedCount.ts
+            │   ├── useCalendarEntries.ts
+            │   ├── useCreateCalendarEntry.ts
+            │   ├── useDeleteCalendarEntry.ts
+            │   ├── useUpcomingDaysOff.ts
+            │   └── useUpdateCalendarEntry.ts
+            ├── adminDashboard/
+            │   ├── index.ts
+            │   ├── useAdminMetrics.ts
+            │   ├── useAdminSubmissions.ts
+            │   ├── useSubmissionActions.ts
+            │   └── useSubmissionDetails.ts
+            ├── contractor/
+            │   ├── index.ts
+            │   ├── useContractorProfile.ts
+            │   ├── useContractorProjects.ts
+            │   ├── useCreateSubmission.ts
+            │   ├── useDeleteSubmission.ts
+            │   ├── useSubmissions.ts
+            │   └── useSubmittedPeriods.ts
+            ├── invoices/
+            │   ├── index.ts
+            │   └── useInvoice.ts
+            ├── manager/
+            │   ├── index.ts
+            │   ├── useAvailableContractors.ts
+            │   ├── useManagerDashboard.ts
+            │   ├── useManagerSubmissions.ts
+            │   ├── useSubmissionActions.ts
+            │   ├── useSubmissionDetails.ts
+            │   └── useTeam.ts
+            ├── notifications/
+            │   ├── index.ts
+            │   ├── useMarkAllNotificationsRead.ts
+            │   ├── useMarkNotificationRead.ts
+            │   ├── useNotifications.ts
+            │   └── useUnreadNotificationCount.ts
+            └── userAccess/
+                ├── index.ts
+                ├── useCurrentUserId.ts
+                ├── useSetUserEnabled.ts
+                ├── useUpdateUserRole.ts
+                └── useUserAccessUsers.ts
 ```
-
-## 🎯 Key Directories Explained
-
-### `/Server` - Backend API
-Express.js server handling all backend operations:
-- REST API endpoints
-- Authentication & authorization
-- Database operations
-- Business logic
-
-**Port:** 5001  
-**Tech:** Express, TypeScript, Node.js
-
-### `/src/pages` - Page Components
-Top-level components representing full pages/views:
-- Each file = one page/screen
-- Contains page-specific logic
-- Imports from components/ui and lib
-
-**Examples:**
-- `Login.tsx` - Authentication page
-- `AdminDashboard.tsx` - Admin overview
-- `ContractorDashboard.tsx` - Contractor home
-
-### `/src/components/ui` - UI Components
-Reusable UI components from shadcn/ui:
-- Low-level components (buttons, inputs, cards)
-- Styled with Tailwind CSS
-- Accessible and customizable
-- Exported via `index.ts` for clean imports
-
-**Usage:**
-```typescript
-import { Button, Card, Input } from "../components/ui";
-```
-
-### `/src/components/shared` - Shared Components
-Custom reusable components:
-- Business-specific components
-- Composed from UI components
-- Used across multiple pages
-
-### `/src/lib` - Library Code
-Core utilities, types, and data:
-
-**`lib/data/`** - Data layer
-- Mock data for development
-- API response types
-- Data transformation utilities
-
-**`lib/types/`** - TypeScript types
-- Interface definitions
-- Type aliases
-- Shared types across app
-
-**`lib/utils/`** - Utility functions
-- Helper functions
-- Common operations
-- Reusable logic
-
-## 🔄 Import Patterns
-
-### ✅ Correct Import Patterns
-
-```typescript
-// Pages
-import { Login } from "./pages/Login";
-import { AdminDashboard } from "./pages/AdminDashboard";
-
-// UI Components (with barrel export)
-import { Button, Card, Input } from "./components/ui";
-
-// UI Components (direct import)
-import { Button } from "./components/ui/button";
-
-// Data & Types
-import { mockData } from "./lib/data";
-import type { User, Employee } from "./lib/types";
-
-// Utils
-import { cn } from "./lib/utils";
-```
-
-### ❌ Avoid These Patterns
-
-```typescript
-// Don't use old paths
-import { Login } from "./app/components/pages/Login"; // ❌
-import { Button } from "./app/components/ui/button"; // ❌
-
-// Don't skip proper structure
-import { mockData } from "./data/mockData"; // ❌
-import type { User } from "./types"; // ❌
-```
-
-## 🚀 Development Workflow
-
-### Starting Development
-```bash
-# Start both frontend and backend
-npm run dev
-
-# Or start separately
-npm run dev:client   # Frontend only (port 5173)
-npm run dev:server   # Backend only (port 5001)
-```
-
-### Building for Production
-```bash
-# Build frontend
-npm run build
-
-# Build backend
-npm run build:server
-
-# Preview production build
-npm run preview
-```
-
-### File Organization Tips
-
-1. **Pages** - One page per file, named after the route
-2. **Components** - Small, reusable, single responsibility
-3. **Lib** - Pure functions, no React dependencies
-4. **Types** - Shared types in lib/types, local types in same file
-
-## 📊 File Count Summary
-
-- **Pages:** 20 components
-- **UI Components:** 45+ components
-- **Server Routes:** 1 example (expandable)
-- **Total TypeScript Files:** 70+
-
-## 🔗 Related Documentation
-
-- [REFACTORING_NOTES.md](./REFACTORING_NOTES.md) - Detailed refactoring changes
-- [Server/README.md](./Server/README.md) - Backend documentation
-- [QUICK_START.md](./QUICK_START.md) - Getting started guide
-- [DEPLOYMENT.md](./DEPLOYMENT.md) - Deployment instructions
-
----
-
-**Last Updated:** January 6, 2026  
-**Structure Version:** 2.0  
-**Based on:** [Blank-React-Repo](https://github.com/erinskieasy/Blank-React-Repo)
-
