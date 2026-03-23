@@ -132,7 +132,7 @@ export function ManagerDashboard() {
   } = useManagerSubmissions({
     status: statusFilter || undefined,
   });
-  const { approve, reject } = useSubmissionActions();
+  const { approve, reject, respondClarification } = useSubmissionActions();
 
   const handleSubmissionClick = (submission: ManagerSubmission) => {
     setSelectedSubmission(submission);
@@ -148,14 +148,8 @@ export function ManagerDashboard() {
 
     if (newStatus === "Approved") {
       success = await approve(submissionId);
-      if (success) {
-        toast.success("Submission approved successfully");
-      }
     } else if (newStatus === "Rejected") {
       success = await reject(submissionId, reason || "No reason provided");
-      if (success) {
-        toast.success("Submission rejected");
-      }
     }
 
     if (success) {
@@ -163,8 +157,19 @@ export function ManagerDashboard() {
       refetchSubmissions();
       refetchMetrics();
       setDrawerOpen(false);
-    } else {
-      toast.error("Failed to update submission status");
+    }
+  };
+
+  const handleClarificationResponse = async (
+    submissionId: string,
+    action: "RESUBMIT" | "REJECT_TO_CONTRACTOR",
+    note: string
+  ) => {
+    const success = await respondClarification(submissionId, action, note);
+    if (success) {
+      refetchSubmissions();
+      refetchMetrics();
+      setDrawerOpen(false);
     }
   };
 
@@ -233,8 +238,21 @@ export function ManagerDashboard() {
 
   // Calculate metrics from live data or use defaults
   const pendingCount = metrics?.pendingApprovals ?? 0;
-  const totalHours = metrics?.totalHours ?? 0;
-  const totalInvoice = metrics?.totalInvoiced ?? 0;
+  
+  // Calculate dynamic totals from filtered submissions
+  const totalHours = React.useMemo(() => {
+    return filteredSubmissions.reduce(
+      (sum, sub) => sum + (sub.regularHours || 0) + (sub.overtimeHours || 0),
+      0
+    );
+  }, [filteredSubmissions]);
+
+  const totalInvoice = React.useMemo(() => {
+    return filteredSubmissions.reduce(
+      (sum, sub) => sum + (sub.totalAmount || 0),
+      0
+    );
+  }, [filteredSubmissions]);
 
   const handleRefresh = () => {
     refetchSubmissions();
@@ -280,14 +298,14 @@ export function ManagerDashboard() {
           <MetricCard
             title="Total Hours"
             value={totalHours}
-            subtitle="This period"
+            subtitle="Based on filters"
             icon={FileText}
             accentColor="blue"
           />
           <MetricCard
             title="Total Invoice"
             value={`$${totalInvoice.toLocaleString()}`}
-            subtitle="This period"
+            subtitle="Based on filters"
             icon={DollarSign}
             accentColor="green"
           />
@@ -492,6 +510,7 @@ export function ManagerDashboard() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         onStatusUpdate={handleStatusUpdate}
+        onClarificationResponse={handleClarificationResponse}
       />
     </>
   );

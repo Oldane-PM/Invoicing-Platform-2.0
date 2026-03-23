@@ -102,9 +102,6 @@ export function ManagerSubmissionDrawer({
   const handleApprove = () => {
     if (!submission) return;
     onStatusUpdate(submission.id, "Approved");
-    toast.success(`${submission.employeeName}'s submission approved`, {
-      icon: <CheckCircle className="w-4 h-4 text-green-600" />,
-    });
   };
 
   const handleReject = () => {
@@ -118,9 +115,6 @@ export function ManagerSubmissionDrawer({
     onStatusUpdate(submission.id, "Rejected", rejectReason);
     setRejectModalOpen(false);
     setRejectReason("");
-    toast.error(`${submission.employeeName}'s submission rejected`, {
-      icon: <XCircle className="w-4 h-4 text-red-600" />,
-    });
   };
 
   const handleClarificationResponse = () => {
@@ -134,16 +128,6 @@ export function ManagerSubmissionDrawer({
     onClarificationResponse(submission.id, clarificationResponseType, clarificationNote);
     setClarificationResponseModalOpen(false);
     setClarificationNote("");
-
-    if (clarificationResponseType === "RESUBMIT") {
-      toast.success("Response sent to admin", {
-        icon: <CheckCircle className="w-4 h-4 text-green-600" />,
-      });
-    } else {
-      toast.error("Submission rejected to contractor", {
-        icon: <XCircle className="w-4 h-4 text-red-600" />,
-      });
-    }
   };
 
   const openClarificationModal = (type: "RESUBMIT" | "REJECT_TO_CONTRACTOR") => {
