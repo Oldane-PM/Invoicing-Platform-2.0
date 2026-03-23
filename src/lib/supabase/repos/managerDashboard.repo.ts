@@ -79,15 +79,15 @@ export async function getDashboardMetrics(
   let approvedThisMonth = 0;
   let paidThisMonth = 0;
 
-  const pendingStatuses = ["draft", "submitted", "pending", "pending_manager", "pending_review"];
-
   (submissions || []).forEach((s: any) => {
-    // Count pending and sum hours/amounts only for pending items
-    if (pendingStatuses.includes(s.status)) {
+    // Count pending - database stores as 'submitted' for pending manager review
+    if (s.status === "submitted" || s.status === "pending_review") {
       pendingApprovals++;
-      totalHours += (s.regular_hours || 0) + (s.overtime_hours || 0);
-      totalInvoiced += s.total_amount || 0;
     }
+
+    // Sum hours and amounts
+    totalHours += (s.regular_hours || 0) + (s.overtime_hours || 0);
+    totalInvoiced += s.total_amount || 0;
 
     // Count this month's approvals and payments
     if (s.approved_at && s.approved_at.startsWith(currentMonth)) {

@@ -34,11 +34,11 @@ export interface ManagerSubmission {
 
 // Map DB status to filter values (lowercase)
 const statusFilterMap: Record<string, string[]> = {
-  PENDING: ["draft", "submitted", "pending", "pending_manager", "pending_review"],
-  APPROVED: ["approved", "awaiting_admin_payment"],
-  REJECTED: ["rejected", "rejected_contractor"],
-  PAID: ["paid"], // Paid submissions might also just be approved with paid_at
-  NEEDS_CLARIFICATION: ["needs_clarification", "clarification_requested"],
+  PENDING: ["submitted"],
+  APPROVED: ["approved"],
+  REJECTED: ["rejected"],
+  PAID: ["paid"], // Query logic also handles 'paid_at' is not null
+  NEEDS_CLARIFICATION: ["needs_clarification"],
 };
 
 export interface SubmissionFilters {
@@ -109,7 +109,7 @@ export async function listTeamSubmissions(
     const dbStatuses = statusFilterMap[filters.status] || [filters.status.toLowerCase()];
     if (filters.status === "PAID") {
       // PAID filter: paid_at is not null OR status is 'paid'
-      query = query.or(`status.in.(${dbStatuses.join(",")}),paid_at.not.is.null`);
+      query = query.or("status.eq.paid,paid_at.not.is.null");
     } else {
       query = query.in("status", dbStatuses);
       // If filtering for APPROVED, exclude those that are actually PAID (paid_at is not null)
@@ -167,10 +167,16 @@ export async function listTeamSubmissions(
     const statusMap: Record<string, string> = {
       draft: "PENDING",
       submitted: "PENDING",
+      pending: "PENDING",
+      pending_manager: "PENDING",
       pending_review: "PENDING",
       approved: "APPROVED",
+      awaiting_admin_payment: "APPROVED",
       rejected: "REJECTED",
+      rejected_contractor: "REJECTED",
       needs_clarification: "NEEDS_CLARIFICATION",
+      clarification_requested: "NEEDS_CLARIFICATION",
+      paid: "PAID",
     };
     return statusMap[dbStatus] || "PENDING";
   };

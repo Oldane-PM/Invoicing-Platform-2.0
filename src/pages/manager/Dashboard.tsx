@@ -238,8 +238,21 @@ export function ManagerDashboard() {
 
   // Calculate metrics from live data or use defaults
   const pendingCount = metrics?.pendingApprovals ?? 0;
-  const totalHours = metrics?.totalHours ?? 0;
-  const totalInvoice = metrics?.totalInvoiced ?? 0;
+  
+  // Calculate dynamic totals from filtered submissions
+  const totalHours = React.useMemo(() => {
+    return filteredSubmissions.reduce(
+      (sum, sub) => sum + (sub.regularHours || 0) + (sub.overtimeHours || 0),
+      0
+    );
+  }, [filteredSubmissions]);
+
+  const totalInvoice = React.useMemo(() => {
+    return filteredSubmissions.reduce(
+      (sum, sub) => sum + (sub.totalAmount || 0),
+      0
+    );
+  }, [filteredSubmissions]);
 
   const handleRefresh = () => {
     refetchSubmissions();
@@ -285,14 +298,14 @@ export function ManagerDashboard() {
           <MetricCard
             title="Total Hours"
             value={totalHours}
-            subtitle="Pending review"
+            subtitle="Based on filters"
             icon={FileText}
             accentColor="blue"
           />
           <MetricCard
             title="Total Invoice"
             value={`$${totalInvoice.toLocaleString()}`}
-            subtitle="Pending review"
+            subtitle="Based on filters"
             icon={DollarSign}
             accentColor="green"
           />
