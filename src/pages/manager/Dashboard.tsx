@@ -132,7 +132,7 @@ export function ManagerDashboard() {
   } = useManagerSubmissions({
     status: statusFilter || undefined,
   });
-  const { approve, reject } = useSubmissionActions();
+  const { approve, reject, respondClarification } = useSubmissionActions();
 
   const handleSubmissionClick = (submission: ManagerSubmission) => {
     setSelectedSubmission(submission);
@@ -154,6 +154,19 @@ export function ManagerDashboard() {
 
     if (success) {
       // Refetch data to update UI
+      refetchSubmissions();
+      refetchMetrics();
+      setDrawerOpen(false);
+    }
+  };
+
+  const handleClarificationResponse = async (
+    submissionId: string,
+    action: "RESUBMIT" | "REJECT_TO_CONTRACTOR",
+    note: string
+  ) => {
+    const success = await respondClarification(submissionId, action, note);
+    if (success) {
       refetchSubmissions();
       refetchMetrics();
       setDrawerOpen(false);
@@ -484,6 +497,7 @@ export function ManagerDashboard() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         onStatusUpdate={handleStatusUpdate}
+        onClarificationResponse={handleClarificationResponse}
       />
     </>
   );
