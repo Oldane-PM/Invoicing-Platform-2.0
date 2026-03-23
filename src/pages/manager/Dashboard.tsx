@@ -148,14 +148,8 @@ export function ManagerDashboard() {
 
     if (newStatus === "Approved") {
       success = await approve(submissionId);
-      if (success) {
-        toast.success("Submission approved successfully");
-      }
     } else if (newStatus === "Rejected") {
       success = await reject(submissionId, reason || "No reason provided");
-      if (success) {
-        toast.success("Submission rejected");
-      }
     }
 
     if (success) {
@@ -163,8 +157,6 @@ export function ManagerDashboard() {
       refetchSubmissions();
       refetchMetrics();
       setDrawerOpen(false);
-    } else {
-      toast.error("Failed to update submission status");
     }
   };
 
