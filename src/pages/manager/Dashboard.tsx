@@ -285,14 +285,14 @@ export function ManagerDashboard() {
           <MetricCard
             title="Total Hours"
             value={totalHours}
-            subtitle="This period"
+            subtitle="Pending review"
             icon={FileText}
             accentColor="blue"
           />
           <MetricCard
             title="Total Invoice"
             value={`$${totalInvoice.toLocaleString()}`}
-            subtitle="This period"
+            subtitle="Pending review"
             icon={DollarSign}
             accentColor="green"
           />
