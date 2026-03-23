@@ -33,12 +33,12 @@ export interface ManagerSubmission {
 }
 
 // Map DB status to filter values (lowercase)
-const statusFilterMap: Record<string, string> = {
-  PENDING: "submitted",
-  APPROVED: "approved",
-  REJECTED: "rejected",
-  PAID: "approved", // Paid submissions have approved status + paid_at
-  NEEDS_CLARIFICATION: "needs_clarification",
+const statusFilterMap: Record<string, string[]> = {
+  PENDING: ["draft", "submitted", "pending", "pending_manager", "pending_review"],
+  APPROVED: ["approved", "awaiting_admin_payment"],
+  REJECTED: ["rejected", "rejected_contractor"],
+  PAID: ["paid"], // Paid submissions might also just be approved with paid_at
+  NEEDS_CLARIFICATION: ["needs_clarification", "clarification_requested"],
 };
 
 export interface SubmissionFilters {
@@ -106,12 +106,16 @@ export async function listTeamSubmissions(
 
   // Apply filters - convert uppercase frontend status to lowercase DB status
   if (filters?.status && filters.status !== "ALL") {
-    const dbStatus = statusFilterMap[filters.status] || filters.status.toLowerCase();
+    const dbStatuses = statusFilterMap[filters.status] || [filters.status.toLowerCase()];
     if (filters.status === "PAID") {
-      // PAID filter: approved submissions with paid_at
-      query = query.eq("status", "approved").not("paid_at", "is", null);
+      // PAID filter: paid_at is not null OR status is 'paid'
+      query = query.or(`status.in.(${dbStatuses.join(",")}),paid_at.not.is.null`);
     } else {
-      query = query.eq("status", dbStatus);
+      query = query.in("status", dbStatuses);
+      // If filtering for APPROVED, exclude those that are actually PAID (paid_at is not null)
+      if (filters.status === "APPROVED") {
+        query = query.is("paid_at", null);
+      }
     }
   }
 
