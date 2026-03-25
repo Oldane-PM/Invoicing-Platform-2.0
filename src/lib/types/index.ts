@@ -76,6 +76,8 @@ export interface ContractorSubmission {
   id: string;
   submissionDate: string;
   projectName: string;
+  /** UUID from `submissions.project_id`; null/undefined if legacy row has no project link */
+  projectId?: string | null;
   description: string;
   regularHours: number;
   overtimeHours: number;
