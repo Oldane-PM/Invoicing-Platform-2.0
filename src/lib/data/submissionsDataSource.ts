@@ -204,7 +204,8 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         rejection_reason,
         invoice_number,
         invoice_url,
-        invoice_generated_at
+        invoice_generated_at,
+        project_id
       `
       )
       .eq("contractor_user_id", contractorUserId)
@@ -242,6 +243,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         id: sub.id,
         submissionDate: sub.submitted_at || sub.created_at,
         projectName: sub.project_name || "General Work",
+        projectId: sub.project_id ?? null,
         description: sub.description || "",
         regularHours: sub.regular_hours || 0,
         overtimeHours: sub.overtime_hours || 0,
@@ -370,6 +372,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       id: submission.id,
       submissionDate: submission.submitted_at || submission.created_at,
       projectName: submission.project_name,
+      projectId: submission.project_id ?? null,
       description: submission.description,
       regularHours: submission.regular_hours,
       overtimeHours: submission.overtime_hours,
@@ -497,7 +500,13 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     if (updatedData?.excludedDates !== undefined) {
       updatePayload.excluded_dates = updatedData.excludedDates;
     }
-    
+    if (updatedData?.projectId !== undefined) {
+      updatePayload.project_id = updatedData.projectId || null;
+    }
+    if (updatedData?.projectName !== undefined) {
+      updatePayload.project_name = updatedData.projectName;
+    }
+
     // Recalculate total if hours were updated - fetch actual contractor rates
     if (updatedData?.hoursSubmitted !== undefined || updatedData?.overtimeHours !== undefined) {
       const regularHours = updatedData?.hoursSubmitted ?? existing.regular_hours ?? 0;
@@ -546,6 +555,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       id: updated.id,
       submissionDate: updated.submitted_at || updated.created_at,
       projectName: updated.project_name || "General Work",
+      projectId: updated.project_id ?? null,
       description: updated.description || "",
       regularHours: updated.regular_hours || 0,
       overtimeHours: updated.overtime_hours || 0,
@@ -555,7 +565,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       invoiceNumber: updated.invoice_number ?? null,
       invoiceGeneratedAt: updated.invoice_generated_at ?? null,
       workPeriod: updated.work_period,
-      excludedDates: [],
+      excludedDates: updated.excluded_dates || [],
       overtimeDescription: updated.overtime_description,
       rejectionReason: null,
       adminNote: null,

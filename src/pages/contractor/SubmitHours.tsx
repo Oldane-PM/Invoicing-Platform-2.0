@@ -96,6 +96,22 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   // Get projects assigned to this contractor
   const { projects, isLoading: loadingProjects, hasProjects } = useContractorProjects();
 
+  /** Include the submission’s saved project if it is not in the current assignment list (so the select can show a label). */
+  const projectsForDropdown = React.useMemo(() => {
+    const list = [...projects];
+    const pid = editingSubmission?.projectId;
+    if (isEditMode && pid && !list.some((p) => p.id === pid)) {
+      list.unshift({
+        id: pid,
+        name: editingSubmission?.projectName || "Project",
+        client: "—",
+      });
+    }
+    return list;
+  }, [projects, isEditMode, editingSubmission?.projectId, editingSubmission?.projectName]);
+
+  const hasProjectsForDropdown = projectsForDropdown.length > 0;
+
   const queryClient = useQueryClient();
 
   // Use the create submission hook
@@ -139,6 +155,13 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     return !isNaN(hours) && hours > 0;
   }, [overtimeHours]);
 
+  // Clear project when leaving edit mode (e.g. parent clears editingSubmission)
+  React.useEffect(() => {
+    if (!editingSubmission) {
+      setSelectedProjectId("");
+    }
+  }, [editingSubmission]);
+
   // Pre-populate form when editing a submission
   React.useEffect(() => {
     if (editingSubmission && editingSubmission.workPeriod) {
@@ -162,7 +185,11 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
         setOvertimeHours(editingSubmission.overtimeHours?.toString() || "");
         setOvertimeDescription(editingSubmission.overtimeDescription || "");
         setIsHoursManuallyEdited(true); // Prevent auto-calculation from overwriting
-        
+
+        if (editingSubmission.projectId) {
+          setSelectedProjectId(editingSubmission.projectId);
+        }
+
         // Load excluded dates if they exist
         console.log('[SubmitHours] editingSubmission.excludedDates:', editingSubmission.excludedDates);
         if (editingSubmission.excludedDates && editingSubmission.excludedDates.length > 0) {
@@ -186,6 +213,13 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       }
     }
   }, [editingSubmission]);
+
+  // If submission details arrive with projectId after first paint (cache refresh / async), keep the dropdown in sync
+  React.useEffect(() => {
+    const pid = editingSubmission?.projectId;
+    if (!isEditMode || !pid) return;
+    setSelectedProjectId((prev) => (prev === pid ? prev : pid));
+  }, [isEditMode, editingSubmission?.id, editingSubmission?.projectId]);
 
   // Clear overtime description when overtime hours is cleared or set to 0
   // Don't clear during initial pre-population
@@ -312,7 +346,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     );
 
     // Get project name from selected project
-    const selectedProject = projects.find(p => p.id === selectedProjectId);
+    const selectedProject = projectsForDropdown.find((p) => p.id === selectedProjectId);
 
     const draft: SubmissionDraft = {
       workPeriod,
@@ -429,7 +463,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
         {/* Form Content */}
         <div className="bg-white rounded-[14px] border border-gray-200 p-4 md:p-6">
           {/* No Projects Warning */}
-          {!loadingProjects && !hasProjects && (
+          {!loadingProjects && !hasProjectsForDropdown && (
             <Alert variant="destructive" className="mb-5">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
@@ -449,15 +483,15 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
                 Project <span className="text-red-600">*</span>
               </Label>
               <Select
-                value={selectedProjectId}
+                value={selectedProjectId || undefined}
                 onValueChange={setSelectedProjectId}
-                disabled={loadingProjects || !hasProjects}
+                disabled={loadingProjects || !hasProjectsForDropdown}
               >
                 <SelectTrigger id="project" className="w-full h-11 bg-white border-gray-300 rounded-lg">
                   <SelectValue placeholder={loadingProjects ? "Loading projects..." : "Select a project"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {projects.map((project) => (
+                  {projectsForDropdown.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name} ({project.client})
                     </SelectItem>
@@ -825,7 +859,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !hasProjects}
+              disabled={isSubmitting || !hasProjectsForDropdown}
               className="h-11 px-6 rounded-lg bg-purple-600 hover:bg-purple-700"
             >
               {isSubmitting ? (
