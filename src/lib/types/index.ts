@@ -82,6 +82,9 @@ export interface ContractorSubmission {
   totalAmount: number;
   status: SubmissionStatus;
   invoiceUrl?: string | null;
+  /** Set when an invoice PDF exists in storage (storage path, not a public URL) */
+  invoiceNumber?: string | null;
+  invoiceGeneratedAt?: string | null;
   workPeriod?: string; // "YYYY-MM"
   excludedDates?: string[]; // ["YYYY-MM-DD", ...]
   overtimeDescription?: string | null;

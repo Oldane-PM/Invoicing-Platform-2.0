@@ -31,7 +31,9 @@ export const INVOICE_QUERY_KEY = 'invoice';
  * The backend will generate the invoice on-demand if it doesn't exist.
  */
 async function fetchInvoice(submissionId: string): Promise<InvoiceData> {
-  const response = await fetch(`${API_BASE_URL}/api/invoices/${submissionId}`);
+  const response = await fetch(`${API_BASE_URL}/api/invoices/${submissionId}`, {
+    credentials: "include",
+  });
   
   if (!response.ok) {
     const errorData: InvoiceError = await response.json().catch(() => ({
@@ -68,7 +70,8 @@ export function useInvoice(submissionId: string | undefined): UseInvoiceResult {
     queryKey: [INVOICE_QUERY_KEY, submissionId],
     queryFn: () => fetchInvoice(submissionId!),
     enabled: false, // Don't auto-fetch, wait for manual trigger
-    staleTime: 60000, // Cache for 1 minute (signed URLs expire)
+    // Always refetch on open so we never show a cached invoice after submission edits (server also checks staleness).
+    staleTime: 0,
     retry: false,
   });
 

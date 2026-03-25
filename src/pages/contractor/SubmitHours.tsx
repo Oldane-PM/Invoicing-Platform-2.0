@@ -36,7 +36,10 @@ import {
   endOfMonth,
 } from "date-fns";
 import { motion, AnimatePresence } from "motion/react";
-import { useCreateSubmission } from "../../lib/hooks/contractor/useCreateSubmission";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCreateSubmission, SUBMISSIONS_QUERY_KEY } from "../../lib/hooks/contractor/useCreateSubmission";
+import { INVOICE_QUERY_KEY } from "../../lib/hooks/invoices";
+import { replaceInvoiceAfterSubmissionEditApi } from "../../lib/api/invoiceClient";
 import { useSubmittedPeriods } from "../../lib/hooks/contractor/useSubmittedPeriods";
 import { useContractorProfile } from "../../lib/hooks/contractor/useContractorProfile";
 import { useContractorProjects } from "../../lib/hooks/contractor/useContractorProjects";
@@ -92,6 +95,8 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
 
   // Get projects assigned to this contractor
   const { projects, isLoading: loadingProjects, hasProjects } = useContractorProjects();
+
+  const queryClient = useQueryClient();
 
   // Use the create submission hook
   const { create, loading: isSubmitting } = useCreateSubmission();
@@ -330,6 +335,17 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
         const { getSubmissionsDataSource } = await import('../../lib/data/submissionsDataSource');
         const dataSource = getSubmissionsDataSource();
         result = await dataSource.resubmitAfterRejection(editingSubmission.id, draft);
+        try {
+          await replaceInvoiceAfterSubmissionEditApi(editingSubmission.id);
+        } catch (replaceErr) {
+          console.error("[SubmitHours] Invoice replace after edit failed:", replaceErr);
+          toast.error("Hours saved, but the invoice could not be refreshed", {
+            description:
+              replaceErr instanceof Error ? replaceErr.message : "Try opening your invoice again later.",
+          });
+        }
+        queryClient.invalidateQueries({ queryKey: [INVOICE_QUERY_KEY, editingSubmission.id] });
+        queryClient.invalidateQueries({ queryKey: [SUBMISSIONS_QUERY_KEY] });
       } else {
         // Otherwise, create a new submission
         result = await create(draft);
