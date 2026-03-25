@@ -201,7 +201,10 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         created_at,
         updated_at,
         paid_at,
-        rejection_reason
+        rejection_reason,
+        invoice_number,
+        invoice_url,
+        invoice_generated_at
       `
       )
       .eq("contractor_user_id", contractorUserId)
@@ -244,7 +247,9 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         overtimeHours: sub.overtime_hours || 0,
         totalAmount: sub.total_amount || 0,
         status,
-        invoiceUrl: null, // Invoices table does not exist
+        invoiceUrl: sub.invoice_url ?? null,
+        invoiceNumber: sub.invoice_number ?? null,
+        invoiceGeneratedAt: sub.invoice_generated_at ?? null,
         workPeriod,
         excludedDates: sub.excluded_dates || [],
         overtimeDescription: sub.overtime_description,
@@ -534,6 +539,9 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
 
     console.log("[SupabaseSubmissionsDataSource] Resubmitted submission:", submissionId);
 
+    SupabaseSubmissionsDataSource.cachedResult = null;
+    SupabaseSubmissionsDataSource.cacheTimestamp = 0;
+
     return {
       id: updated.id,
       submissionDate: updated.submitted_at || updated.created_at,
@@ -543,7 +551,9 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       overtimeHours: updated.overtime_hours || 0,
       totalAmount: updated.total_amount || 0,
       status: "PENDING_MANAGER" as SubmissionStatus,
-      invoiceUrl: null,
+      invoiceUrl: updated.invoice_url ?? null,
+      invoiceNumber: updated.invoice_number ?? null,
+      invoiceGeneratedAt: updated.invoice_generated_at ?? null,
       workPeriod: updated.work_period,
       excludedDates: [],
       overtimeDescription: updated.overtime_description,

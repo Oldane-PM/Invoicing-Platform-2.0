@@ -5,7 +5,11 @@
  */
 
 import { Router } from 'express';
-import { getOrCreateInvoice, generateInvoice } from '../controllers/invoice.controller';
+import {
+  getOrCreateInvoice,
+  generateInvoice,
+  replaceInvoiceAfterSubmissionEditHandler,
+} from '../controllers/invoice.controller';
 
 const router = Router();
 
@@ -32,5 +36,11 @@ router.get('/:submissionId', getOrCreateInvoice);
  * - 404: Submission not found
  */
 router.post('/:submissionId/generate', generateInvoice);
+
+/**
+ * POST /api/invoices/:submissionId/replace-after-edit
+ * Authenticated contractor only — replaces invoice after submission hours were edited.
+ */
+router.post('/:submissionId/replace-after-edit', replaceInvoiceAfterSubmissionEditHandler);
 
 export default router;

@@ -10,6 +10,8 @@ import type { ContractorSubmission, SubmissionDraft } from "../../types";
 import { getSubmissionsDataSource } from "../../data/submissionsDataSource";
 import { SUBMISSIONS_QUERY_KEY } from "./useSubmissions";
 import { SUBMITTED_PERIODS_QUERY_KEY } from "./useSubmittedPeriods";
+import { INVOICE_QUERY_KEY } from "../invoices";
+import { replaceInvoiceAfterSubmissionEditApi } from "../../api/invoiceClient";
 
 // Re-export query key for use in other hooks
 export { SUBMISSIONS_QUERY_KEY };
@@ -89,11 +91,15 @@ export function useResubmitSubmission(): UseResubmitSubmissionResult {
       const dataSource = getSubmissionsDataSource();
       return dataSource.resubmitAfterRejection(submissionId, updatedData);
     },
-    onSuccess: (result) => {
+    onSuccess: async (result, variables) => {
       console.log("[useResubmitSubmission] Resubmission successful:", result.id);
-      // Invalidate all submission queries to trigger refetch
+      try {
+        await replaceInvoiceAfterSubmissionEditApi(variables.submissionId);
+      } catch (e) {
+        console.error("[useResubmitSubmission] Invoice replace after edit:", e);
+      }
+      queryClient.invalidateQueries({ queryKey: [INVOICE_QUERY_KEY, variables.submissionId] });
       queryClient.invalidateQueries({ queryKey: [SUBMISSIONS_QUERY_KEY] });
-      // Also invalidate submitted periods cache
       queryClient.invalidateQueries({ queryKey: [SUBMITTED_PERIODS_QUERY_KEY] });
     },
     onError: (err) => {
