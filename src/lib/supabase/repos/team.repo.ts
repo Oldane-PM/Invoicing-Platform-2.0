@@ -74,7 +74,8 @@ export async function listTeamContractors(
   const { data: profilesData, error: profilesError } = await supabase
     .from("profiles")
     .select("id, full_name, email")
-    .in("id", contractorIds);
+    .in("id", contractorIds)
+    .ilike("role", "contractor");
 
   if (profilesError) {
     logSupabaseError("listTeamContractors - profiles query", profilesError);
@@ -186,7 +187,7 @@ export async function getAvailableContractors(
   const { data: profilesData, error: profilesError } = await supabase
     .from("profiles")
     .select("id, full_name, email, role")
-    .eq("role", "CONTRACTOR")
+    .ilike("role", "contractor")
     .limit(25);
 
   if (profilesError) {
@@ -247,7 +248,7 @@ export async function searchContractors(
   let profilesQuery = supabase
     .from("profiles")
     .select("id, full_name, email, role")
-    .eq("role", "CONTRACTOR");
+    .ilike("role", "contractor");
 
   // Add search filter if query provided
   if (query.trim()) {

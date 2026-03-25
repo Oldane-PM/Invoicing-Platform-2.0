@@ -10,7 +10,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   listTeamContractors,
-  getTeamSize,
   getAvailableContractors,
   searchContractors,
   addContractorToTeam,
@@ -60,11 +59,10 @@ export function useTeam(): UseTeamResult {
     queryKey: [MANAGER_TEAM_KEY, managerId],
     queryFn: async () => {
       if (!managerId) return { contractors: [] as TeamContractor[], size: 0 };
-      const [contractorsData, sizeData] = await Promise.all([
-        listTeamContractors(managerId),
-        getTeamSize(managerId),
+      const [contractorsData] = await Promise.all([
+        listTeamContractors(managerId)
       ]);
-      return { contractors: contractorsData, size: sizeData };
+      return { contractors: contractorsData, size: contractorsData.length };
     },
     enabled: !!managerId,
     staleTime: 30000,
