@@ -60,33 +60,26 @@ export async function getUsers(): Promise<UserAccessUser[]> {
 }
 
 /**
- * Update user role in profiles table AND app_users table
- * Both tables are kept in sync to prevent role mismatch issues
+ * Update user role via server-side API endpoint
+ * Uses the service role key on the server to bypass RLS
+ * This guarantees the role update actually persists in the database
  */
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
-  const supabase = getSupabaseClient();
+  const response = await fetch(`/api/users/${userId}/role`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', // Send Better Auth session cookie
+    body: JSON.stringify({ role }),
+  });
 
-  // Update profiles table (primary source of truth for the app)
-  const { error } = await supabase
-    .from('profiles')
-    .update({ role })
-    .eq('id', userId);
-
-  if (error) {
-    console.error('[UserAccess] Error updating user role in profiles:', error);
-    throw error;
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    console.error('[UserAccess] Error updating user role:', errorData);
+    throw new Error(errorData.error || `Failed to update role (HTTP ${response.status})`);
   }
 
-  // Also update app_users table to keep in sync
-  const { error: appUserError } = await supabase
-    .from('app_users')
-    .update({ role })
-    .eq('id', userId);
-
-  if (appUserError) {
-    console.error('[UserAccess] Error syncing role to app_users:', appUserError);
-    // Non-fatal — don't throw, profiles is the primary source
-  }
+  const result = await response.json();
+  console.log('[UserAccess] Role updated via API:', result);
 }
 
 /**

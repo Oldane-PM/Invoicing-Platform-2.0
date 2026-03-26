@@ -86,67 +86,101 @@ function App() {
   
   const userInitials = getInitials(displayName);
 
-  // Sync Supabase auth state with currentUser and fetch role from database
-  React.useEffect(() => {
-    async function fetchUserRole() {
-      if (isAuthenticated && user) {
-        // User is authenticated via Supabase - fetch their role and is_active status from profiles table
-        const { getSupabaseClient } = await import('./lib/supabase/client');
-        const supabase = getSupabaseClient();
-        
-        const { data: appUser, error } = await supabase
-          .from('profiles')
-          .select('role, is_active')
-          .eq('email', user.email)  // Use email instead of ID since Better Auth IDs don't match generated UUIDs
-          .single();
-
-        if (error) {
-          console.error('Error fetching user role:', error);
-          // Sign out and show error
-          await signOut();
-          alert('Unable to fetch user role. Please try again.');
-        } else if (appUser) {
-          // Double-check is_active status (belt and suspenders approach)
-          // This catches any disabled users who briefly got authenticated
-          if (appUser.is_active === false) {
-            console.log('[App] Disabled user detected, signing out');
-            await signOut();
-            // Don't set currentUser - keep them on login page
-            return;
-          }
-          
-          // Map database role to app role
-          const roleMap: Record<string, UserRole> = {
-            'unassigned': 'Unassigned',
-            'admin': 'Admin',
-            'manager': 'Manager',
-            'contractor': 'Contractor',
-          };
-          // Handle both uppercase (DB) and lowercase - default to Unassigned for unknown roles
-          const userRole = roleMap[appUser.role.toLowerCase()] || 'Unassigned';
-          
-          // Validate that user is logging in through the correct option
-          // This prevents admins from logging in through "Contractor" and vice versa
-          // Allow unassigned users to log in through any option - they'll be redirected appropriately
-          const loginIntent = sessionStorage.getItem('loginIntent');
-          if (loginIntent && loginIntent !== userRole && userRole !== 'Unassigned') {
-            // User tried to log in through wrong option
-            await signOut();
-            alert(`You cannot log in as ${loginIntent}. Please use the ${userRole} login option.`);
-            sessionStorage.removeItem('loginIntent');
-          } else {
-            setCurrentUser(userRole);
-            sessionStorage.removeItem('loginIntent');
-          }
-        }
-      } else if (!authLoading && currentUser && !isAuthenticated) {
+  // Re-usable function to fetch user role from database
+  // isInitialLogin: when true, checks loginIntent in sessionStorage (first login only)
+  const fetchUserRole = React.useCallback(async (isInitialLogin = false) => {
+    if (!isAuthenticated || !user) {
+      if (!authLoading && currentUser) {
         // User was logged out from Supabase
         setCurrentUser(null);
       }
+      return;
     }
 
-    fetchUserRole();
+    try {
+      const { getSupabaseClient } = await import('./lib/supabase/client');
+      const supabase = getSupabaseClient();
+      
+      const { data: appUser, error } = await supabase
+        .from('profiles')
+        .select('role, is_active')
+        .eq('email', user.email)  // Use email instead of ID since Better Auth IDs don't match generated UUIDs
+        .single();
+
+      if (error) {
+        console.error('Error fetching user role:', error);
+        if (isInitialLogin) {
+          await signOut();
+          alert('Unable to fetch user role. Please try again.');
+        }
+        return;
+      }
+      
+      if (appUser) {
+        // Check is_active status — disabled users get signed out
+        if (appUser.is_active === false) {
+          console.log('[App] Disabled user detected, signing out');
+          await signOut();
+          setCurrentUser(null);
+          return;
+        }
+        
+        // Map database role to app role
+        const roleMap: Record<string, UserRole> = {
+          'unassigned': 'Unassigned',
+          'admin': 'Admin',
+          'manager': 'Manager',
+          'contractor': 'Contractor',
+        };
+        const userRole = roleMap[appUser.role.toLowerCase()] || 'Unassigned';
+        
+        // Only check loginIntent on initial login (not on refreshes)
+        if (isInitialLogin) {
+          const loginIntent = sessionStorage.getItem('loginIntent');
+          if (loginIntent && loginIntent !== userRole && userRole !== 'Unassigned') {
+            await signOut();
+            alert(`You cannot log in as ${loginIntent}. Please use the ${userRole} login option.`);
+            sessionStorage.removeItem('loginIntent');
+            return;
+          }
+          sessionStorage.removeItem('loginIntent');
+        }
+
+        // Update role (this handles both initial login and admin-driven role changes)
+        setCurrentUser(userRole);
+      }
+    } catch (err) {
+      console.error('[App] Error in fetchUserRole:', err);
+    }
+  }, [isAuthenticated, user, authLoading, currentUser, signOut]);
+
+  // Fetch role on initial auth state change (login/logout)
+  React.useEffect(() => {
+    fetchUserRole(true);
   }, [isAuthenticated, user, authLoading, signOut]);
+
+  // Re-fetch role when tab becomes visible and poll every 30s while authenticated
+  // This ensures admin role changes take effect without requiring the user to re-login
+  React.useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchUserRole(false);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const intervalId = setInterval(() => {
+      fetchUserRole(false);
+    }, 30_000); // Every 30 seconds
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(intervalId);
+    };
+  }, [isAuthenticated, user, fetchUserRole]);
 
   // Handle OAuth callback completion
   const handleAuthComplete = (authRole: string) => {
@@ -174,7 +208,7 @@ function App() {
     setContractorScreen("dashboard");
   };
   
-  // Refresh status for unassigned users - refetch role from database
+  // Refresh status for unassigned users - reuse fetchUserRole
   const [isRefreshingStatus, setIsRefreshingStatus] = React.useState(false);
   
   const handleRefreshStatus = async () => {
@@ -182,36 +216,7 @@ function App() {
     
     setIsRefreshingStatus(true);
     try {
-      const { getSupabaseClient } = await import('./lib/supabase/client');
-      const supabase = getSupabaseClient();
-      
-      const { data: appUser, error } = await supabase
-        .from('profiles')
-        .select('role, is_active')
-        .eq('email', user.email)  // Use email instead of ID
-        .single();
-      
-      if (error) {
-        console.error('Error refreshing user role:', error);
-        return;
-      }
-      
-      if (appUser) {
-        // Check if role has changed from unassigned
-        const roleMap: Record<string, UserRole> = {
-          'unassigned': 'Unassigned',
-          'admin': 'Admin',
-          'manager': 'Manager',
-          'contractor': 'Contractor',
-        };
-        const newRole = roleMap[appUser.role.toLowerCase()] || 'Unassigned';
-        
-        if (newRole !== 'Unassigned') {
-          setCurrentUser(newRole);
-        }
-      }
-    } catch (err) {
-      console.error('Error refreshing status:', err);
+      await fetchUserRole(false);
     } finally {
       setIsRefreshingStatus(false);
     }
