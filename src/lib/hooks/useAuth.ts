@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase, isSupabaseConfigured } from "../supabase/client";
 import { getUserProfile, type UserRole, type UserProfile } from "../supabase/repos/auth.repo";
+import { markUserActivated } from "../data/userAccess";
 import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthState {
@@ -161,7 +162,12 @@ export function useAuth(): UseAuthResult {
           };
         }
 
-        // User is active, return success
+        // User is active, mark as activated on first login
+        markUserActivated(data.user.id).catch((err) => {
+          console.error("[useAuth] Failed to mark user activated:", err);
+        });
+
+        // Return success
         return { success: true, role: profileData?.role as UserRole };
       } catch (err) {
         console.error("[useAuth] Sign in exception:", err);

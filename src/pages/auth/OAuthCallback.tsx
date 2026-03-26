@@ -2,6 +2,7 @@ import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { useSession } from "../../lib/auth-client";
 import { getSupabaseClient } from "../../lib/supabase/client";
+import { markUserActivated } from "../../lib/data/userAccess";
 
 interface OAuthCallbackProps {
   onAuthComplete: (role: string) => void;
@@ -92,6 +93,14 @@ export function OAuthCallback({ onAuthComplete }: OAuthCallbackProps) {
         }
 
         console.log("[OAuth Callback] Session verified successfully, role:", data.user.role);
+
+        // Mark user as activated on first successful login (updates activated_at in profiles)
+        const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+        if (supabaseUser) {
+          markUserActivated(supabaseUser.id).catch((err) => {
+            console.error("[OAuth Callback] Failed to mark user activated:", err);
+          });
+        }
 
         // Map role to uppercase for App.tsx
         const roleMap: Record<string, string> = {
