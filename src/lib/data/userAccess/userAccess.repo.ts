@@ -60,26 +60,24 @@ export async function getUsers(): Promise<UserAccessUser[]> {
 }
 
 /**
- * Update user role via server-side API endpoint
- * Uses the service role key on the server to bypass RLS
- * This guarantees the role update actually persists in the database
+ * Update user role via Supabase RPC (SECURITY DEFINER function)
+ * This bypasses RLS and works on both local dev and Vercel
+ * The function checks admin role internally for security
  */
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
-  const response = await fetch(`/api/users/${userId}/role`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include', // Send Better Auth session cookie
-    body: JSON.stringify({ role }),
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase.rpc('admin_update_user_role', {
+    target_user_id: userId,
+    new_role: role,
   });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    console.error('[UserAccess] Error updating user role:', errorData);
-    throw new Error(errorData.error || `Failed to update role (HTTP ${response.status})`);
+  if (error) {
+    console.error('[UserAccess] Error updating user role via RPC:', error);
+    throw new Error(error.message || 'Failed to update user role');
   }
 
-  const result = await response.json();
-  console.log('[UserAccess] Role updated via API:', result);
+  console.log('[UserAccess] Role updated via RPC:', data);
 }
 
 /**
