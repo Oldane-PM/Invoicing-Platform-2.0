@@ -72,4 +72,70 @@ async function requireAdmin(req: Request, res: Response, next: Function) {
  */
 router.post("/", requireAdmin, createUser);
 
+/**
+ * PATCH /api/users/:userId/role
+ * Update a user's role (admin only)
+ * Uses the service role key to bypass RLS and guarantee the update persists
+ */
+router.patch("/:userId/role", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (!role) {
+      return res.status(400).json({ error: "Role is required" });
+    }
+
+    const validRoles = ['admin', 'manager', 'contractor', 'unassigned'];
+    if (!validRoles.includes(role.toLowerCase())) {
+      return res.status(400).json({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+    }
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Update profiles table (primary source of truth)
+    const { data: updatedProfile, error: profileError } = await supabase
+      .from('profiles')
+      .update({ role: role.toLowerCase() })
+      .eq('id', userId)
+      .select('id, role')
+      .single();
+
+    if (profileError) {
+      console.error('[UpdateRole] Error updating profiles:', profileError);
+      return res.status(500).json({ error: 'Failed to update user role' });
+    }
+
+    if (!updatedProfile) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    console.log('[UpdateRole] Profile role updated:', updatedProfile.id, '->', updatedProfile.role);
+
+    // Also sync app_users table (non-fatal)
+    const { error: appUserError } = await supabase
+      .from('app_users')
+      .update({ role: role.toLowerCase() })
+      .eq('id', userId);
+
+    if (appUserError) {
+      console.error('[UpdateRole] Error syncing app_users (non-fatal):', appUserError);
+    }
+
+    return res.json({ 
+      success: true, 
+      userId: updatedProfile.id, 
+      role: updatedProfile.role 
+    });
+  } catch (error) {
+    console.error('[UpdateRole] Unexpected error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
+

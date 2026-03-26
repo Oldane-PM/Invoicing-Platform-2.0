@@ -160,53 +160,41 @@ router.post('/supabase', async (req: Request, res: Response) => {
 
     console.log('[OAuth Callback] Using auth user:', authUserId);
 
-    // Step 3.5: Check if user already has a role and is_active status in profiles or app_users
-    // This prevents overwriting an admin/manager/contractor role with 'unassigned' on re-login
-    // and prevents re-enabling a disabled user
+    // Step 3.5: ALWAYS check the existing profile role — admin-set roles take precedence
+    // This prevents overwriting a role that was changed by an admin since the invitation was created
     let existingIsActive = true; // Default for new users
 
-    if (roleToAssign === 'unassigned') {
-      // Check existing profile first
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('role, full_name, is_active')
-        .eq('id', authUserId)
-        .maybeSingle();
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('role, full_name, is_active')
+      .eq('id', authUserId)
+      .maybeSingle();
 
-      if (existingProfile) {
-        existingIsActive = existingProfile.is_active !== false; // Preserve disabled status
-        if (existingProfile.role && existingProfile.role !== 'unassigned') {
-          console.log('[OAuth Callback] User already has role in profiles:', existingProfile.role);
-          roleToAssign = existingProfile.role;
-          fullName = existingProfile.full_name || fullName;
-        } else {
-          // Fallback: check app_users table for role
-          const { data: appUser } = await supabase
-            .from('app_users')
-            .select('role, full_name, is_active')
-            .eq('email', email.toLowerCase())
-            .maybeSingle();
+    if (existingProfile) {
+      existingIsActive = existingProfile.is_active !== false;
+      
+      // If the user already has a role in the profiles table, use THAT role
+      // This ensures admin-driven role changes are preserved across re-logins
+      if (existingProfile.role && existingProfile.role !== 'unassigned') {
+        console.log('[OAuth Callback] User already has role in profiles:', existingProfile.role, '- preserving it');
+        roleToAssign = existingProfile.role;
+        fullName = existingProfile.full_name || fullName;
+      } else if (roleToAssign === 'unassigned') {
+        // No role in profile and no invitation — check app_users as fallback
+        const { data: appUser } = await supabase
+          .from('app_users')
+          .select('role, full_name, is_active')
+          .eq('email', email.toLowerCase())
+          .maybeSingle();
 
-          if (appUser?.role && appUser.role !== 'unassigned' && appUser.role !== null) {
-            console.log('[OAuth Callback] Found role in app_users:', appUser.role);
-            roleToAssign = appUser.role.toLowerCase();
-            fullName = appUser.full_name || fullName;
-          }
-          if (appUser && appUser.is_active === false) {
-            existingIsActive = false;
-          }
+        if (appUser?.role && appUser.role !== 'unassigned' && appUser.role !== null) {
+          console.log('[OAuth Callback] Found role in app_users:', appUser.role);
+          roleToAssign = appUser.role.toLowerCase();
+          fullName = appUser.full_name || fullName;
         }
-      }
-    } else {
-      // Even with an invitation role, check if user was previously disabled
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('is_active')
-        .eq('id', authUserId)
-        .maybeSingle();
-
-      if (existingProfile && existingProfile.is_active === false) {
-        existingIsActive = false;
+        if (appUser && appUser.is_active === false) {
+          existingIsActive = false;
+        }
       }
     }
 
