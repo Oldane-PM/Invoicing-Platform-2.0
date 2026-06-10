@@ -8,13 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../../components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
+import { Checkbox } from "../../components/ui/checkbox";
 import { Alert, AlertDescription } from "../../components/ui/alert";
 import { toast } from "sonner";
 import {
@@ -22,9 +16,11 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
+  ChevronsUpDown,
   ArrowLeft,
   Loader2,
   AlertTriangle,
+  X,
 } from "lucide-react";
 import {
   format,
@@ -90,27 +86,50 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   const [description, setDescription] = React.useState("");
   const [overtimeHours, setOvertimeHours] = React.useState("");
   const [overtimeDescription, setOvertimeDescription] = React.useState("");
-  const [selectedProjectId, setSelectedProjectId] = React.useState<string>("");
+  const [selectedProjectIds, setSelectedProjectIds] = React.useState<string[]>([]);
+  const [projectPickerOpen, setProjectPickerOpen] = React.useState(false);
   const isPrePopulatingRef = React.useRef(false);
 
   // Get projects assigned to this contractor
-  const { projects, isLoading: loadingProjects, hasProjects } = useContractorProjects();
+  const { projects, isLoading: loadingProjects } = useContractorProjects();
 
-  /** Include the submission’s saved project if it is not in the current assignment list (so the select can show a label). */
+  /** Include any of the submission’s saved projects that are not in the current assignment list (so the picker can show labels). */
   const projectsForDropdown = React.useMemo(() => {
     const list = [...projects];
-    const pid = editingSubmission?.projectId;
-    if (isEditMode && pid && !list.some((p) => p.id === pid)) {
-      list.unshift({
-        id: pid,
-        name: editingSubmission?.projectName || "Project",
-        client: "—",
+    if (isEditMode) {
+      const savedIds = editingSubmission?.projectIds?.length
+        ? editingSubmission.projectIds
+        : editingSubmission?.projectId
+          ? [editingSubmission.projectId]
+          : [];
+      const savedNames = editingSubmission?.projectNames ?? [];
+      savedIds.forEach((pid, i) => {
+        if (pid && !list.some((p) => p.id === pid)) {
+          list.unshift({
+            id: pid,
+            name: savedNames[i] || editingSubmission?.projectName || "Project",
+            client: "—",
+          });
+        }
       });
     }
     return list;
-  }, [projects, isEditMode, editingSubmission?.projectId, editingSubmission?.projectName]);
+  }, [projects, isEditMode, editingSubmission?.projectId, editingSubmission?.projectName, editingSubmission?.projectIds, editingSubmission?.projectNames]);
 
   const hasProjectsForDropdown = projectsForDropdown.length > 0;
+
+  const selectedProjects = React.useMemo(
+    () => projectsForDropdown.filter((p) => selectedProjectIds.includes(p.id)),
+    [projectsForDropdown, selectedProjectIds]
+  );
+
+  const toggleProject = (projectId: string) => {
+    setSelectedProjectIds((prev) =>
+      prev.includes(projectId)
+        ? prev.filter((id) => id !== projectId)
+        : [...prev, projectId]
+    );
+  };
 
   const queryClient = useQueryClient();
 
@@ -155,10 +174,10 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     return !isNaN(hours) && hours > 0;
   }, [overtimeHours]);
 
-  // Clear project when leaving edit mode (e.g. parent clears editingSubmission)
+  // Clear projects when leaving edit mode (e.g. parent clears editingSubmission)
   React.useEffect(() => {
     if (!editingSubmission) {
-      setSelectedProjectId("");
+      setSelectedProjectIds([]);
     }
   }, [editingSubmission]);
 
@@ -186,8 +205,13 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
         setOvertimeDescription(editingSubmission.overtimeDescription || "");
         setIsHoursManuallyEdited(true); // Prevent auto-calculation from overwriting
 
-        if (editingSubmission.projectId) {
-          setSelectedProjectId(editingSubmission.projectId);
+        const editProjectIds = editingSubmission.projectIds?.length
+          ? editingSubmission.projectIds
+          : editingSubmission.projectId
+            ? [editingSubmission.projectId]
+            : [];
+        if (editProjectIds.length > 0) {
+          setSelectedProjectIds(editProjectIds);
         }
 
         // Load excluded dates if they exist
@@ -214,12 +238,17 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     }
   }, [editingSubmission]);
 
-  // If submission details arrive with projectId after first paint (cache refresh / async), keep the dropdown in sync
+  // If submission details arrive with projects after first paint (cache refresh / async), keep the picker in sync
   React.useEffect(() => {
-    const pid = editingSubmission?.projectId;
-    if (!isEditMode || !pid) return;
-    setSelectedProjectId((prev) => (prev === pid ? prev : pid));
-  }, [isEditMode, editingSubmission?.id, editingSubmission?.projectId]);
+    if (!isEditMode) return;
+    const pids = editingSubmission?.projectIds?.length
+      ? editingSubmission.projectIds
+      : editingSubmission?.projectId
+        ? [editingSubmission.projectId]
+        : [];
+    if (pids.length === 0) return;
+    setSelectedProjectIds((prev) => (prev.length > 0 ? prev : pids));
+  }, [isEditMode, editingSubmission?.id, editingSubmission?.projectId, editingSubmission?.projectIds]);
 
   // Clear overtime description when overtime hours is cleared or set to 0
   // Don't clear during initial pre-population
@@ -314,8 +343,8 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   };
 
   const handleSubmit = async () => {
-    if (!selectedProjectId) {
-      toast.error("Please select a project");
+    if (selectedProjectIds.length === 0) {
+      toast.error("Please select at least one project");
       return;
     }
 
@@ -345,8 +374,13 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       format(d, "yyyy-MM-dd")
     );
 
-    // Get project name from selected project
-    const selectedProject = projectsForDropdown.find((p) => p.id === selectedProjectId);
+    // Resolve selected projects in the order they appear in the list, so the
+    // primary project (project_id) and the joined label stay deterministic.
+    const orderedProjects = projectsForDropdown.filter((p) =>
+      selectedProjectIds.includes(p.id)
+    );
+    const projectIds = orderedProjects.map((p) => p.id);
+    const projectNames = orderedProjects.map((p) => p.name);
 
     const draft: SubmissionDraft = {
       workPeriod,
@@ -355,8 +389,11 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       description: description.trim(),
       overtimeHours: parseInt(overtimeHours) || 0,
       overtimeDescription: overtimeDescription.trim() || null,
-      projectName: selectedProject?.name || "General Work",
-      projectId: selectedProjectId,
+      // Comma-joined label keeps existing single-column displays/invoices showing every project
+      projectName: projectNames.join(", ") || "General Work",
+      projectId: projectIds[0], // primary project (FK)
+      projectIds,
+      projectNames,
     };
 
 
@@ -427,7 +464,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     setDescription("");
     setOvertimeHours("");
     setOvertimeDescription("");
-    setSelectedProjectId("");
+    setSelectedProjectIds([]);
     onCancel();
   };
 
@@ -474,30 +511,87 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
           )}
 
           <div className="space-y-5">
-            {/* Project Dropdown */}
+            {/* Projects Multi-Select */}
             <div>
               <Label
                 htmlFor="project"
                 className="text-sm font-medium text-gray-900 mb-1.5 block"
               >
-                Project <span className="text-red-600">*</span>
+                Projects <span className="text-red-600">*</span>
               </Label>
-              <Select
-                value={selectedProjectId || undefined}
-                onValueChange={setSelectedProjectId}
-                disabled={loadingProjects || !hasProjectsForDropdown}
-              >
-                <SelectTrigger id="project" className="w-full h-11 bg-white border-gray-300 rounded-lg">
-                  <SelectValue placeholder={loadingProjects ? "Loading projects..." : "Select a project"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectsForDropdown.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name} ({project.client})
-                    </SelectItem>
+              <Popover open={projectPickerOpen} onOpenChange={setProjectPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="project"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={projectPickerOpen}
+                    disabled={loadingProjects || !hasProjectsForDropdown}
+                    className="w-full h-11 justify-between text-left font-normal bg-white border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    <span className={selectedProjectIds.length === 0 ? "text-gray-500" : ""}>
+                      {loadingProjects
+                        ? "Loading projects..."
+                        : selectedProjectIds.length === 0
+                          ? "Select one or more projects"
+                          : selectedProjectIds.length === 1
+                            ? selectedProjects[0]?.name
+                            : `${selectedProjectIds.length} projects selected`}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 text-gray-500 flex-shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-1.5"
+                  align="start"
+                >
+                  <div className="max-h-64 overflow-y-auto space-y-0.5">
+                    {projectsForDropdown.map((project) => {
+                      const checked = selectedProjectIds.includes(project.id);
+                      return (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => toggleProject(project.id)}
+                          className="w-full flex items-center gap-2.5 rounded-md px-2 py-2 text-sm text-left hover:bg-gray-100 transition-colors"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            className="pointer-events-none"
+                            tabIndex={-1}
+                          />
+                          <span className="flex-1 text-gray-900">
+                            {project.name}{" "}
+                            <span className="text-gray-500">({project.client})</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {/* Selected project chips */}
+              {selectedProjects.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2.5">
+                  {selectedProjects.map((project) => (
+                    <span
+                      key={project.id}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 text-purple-700 text-xs font-medium pl-3 pr-1.5 py-1"
+                    >
+                      {project.name}
+                      <button
+                        type="button"
+                        onClick={() => toggleProject(project.id)}
+                        aria-label={`Remove ${project.name}`}
+                        className="rounded-full p-0.5 hover:bg-purple-100 transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
             </div>
 
             {/* Work Period - Month & Year Picker */}

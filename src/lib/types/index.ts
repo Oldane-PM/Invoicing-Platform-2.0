@@ -75,9 +75,14 @@ export type SubmissionStatus =
 export interface ContractorSubmission {
   id: string;
   submissionDate: string;
+  /** Comma-joined label of all tagged projects (mirrors `submissions.project_name`). */
   projectName: string;
-  /** UUID from `submissions.project_id`; null/undefined if legacy row has no project link */
+  /** UUID of the PRIMARY project from `submissions.project_id`; null/undefined if legacy row has no project link */
   projectId?: string | null;
+  /** All projects tagged on this submission (shared-hours model). Falls back to `[projectId]` for legacy rows. */
+  projectIds?: string[];
+  /** Names aligned by index with `projectIds`. Falls back to `[projectName]` for legacy rows. */
+  projectNames?: string[];
   description: string;
   regularHours: number;
   overtimeHours: number;
@@ -274,8 +279,12 @@ export interface SubmissionDraft {
   description: string;
   overtimeHours: number;
   overtimeDescription?: string | null;
-  projectName?: string; // optional for backwards compatibility
-  projectId: string; // Required - UUID reference to projects table
+  projectName?: string; // optional for backwards compatibility - comma-joined label of all tagged projects
+  projectId: string; // Required - PRIMARY (first) project; UUID reference to projects table
+  /** All projects tagged on this submission (shared-hours model). At least one required. */
+  projectIds?: string[];
+  /** Names aligned by index with `projectIds`. */
+  projectNames?: string[];
 }
 
 export interface EmployeeDirectoryRow {
