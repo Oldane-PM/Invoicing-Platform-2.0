@@ -116,6 +116,15 @@ router.post('/supabase', async (req: Request, res: Response) => {
       });
     }
 
+    // Step 1.5: Restrict sign-in to @intellibus.com emails only
+    if (!email.toLowerCase().endsWith('@intellibus.com')) {
+      console.log('[OAuth Callback] Non-Intellibus email blocked:', email);
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Access restricted to Intellibus accounts only. Please sign in with your @intellibus.com email.' 
+      });
+    }
+
     // Step 2: Check for invitation (including already used ones for role info)
     // First check for unused invitation
     const { data: unusedInvitation } = await supabase
