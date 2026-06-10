@@ -139,8 +139,14 @@ router.post('/supabase', async (req: Request, res: Response) => {
     const invitation = unusedInvitation || anyInvitation;
     const isInvitationAlreadyUsed = !unusedInvitation && !!anyInvitation;
 
-    let roleToAssign = 'unassigned';
+    // Default role: intellibus.com emails get 'contractor', everyone else gets 'unassigned'
+    const isIntellibusEmail = email.toLowerCase().endsWith('@intellibus.com');
+    let roleToAssign = isIntellibusEmail ? 'contractor' : 'unassigned';
     let fullName = name || email.split('@')[0];
+
+    if (isIntellibusEmail && !invitation) {
+      console.log('[OAuth Callback] Intellibus email detected without invitation, defaulting to contractor:', email);
+    }
 
     if (invitation) {
       console.log('[OAuth Callback] Found invitation for:', email, 'with role:', invitation.role, 'already used:', isInvitationAlreadyUsed);
@@ -255,8 +261,11 @@ router.post('/supabase', async (req: Request, res: Response) => {
       console.log('[OAuth Callback] app_users synced with role:', roleToAssign);
     }
 
-    // Step 5: If contractor from invitation, ensure contractor record exists (idempotent)
-    if (invitation && invitation.role === 'CONTRACTOR' && invitation.contract_start_date && invitation.contract_end_date) {
+    // Step 5: If contractor (from invitation OR auto-assigned Intellibus), ensure contractor record exists (idempotent)
+    const isContractorFromInvitation = invitation && invitation.role === 'CONTRACTOR' && invitation.contract_start_date && invitation.contract_end_date;
+    const isAutoAssignedContractor = isIntellibusEmail && roleToAssign === 'contractor' && !invitation;
+
+    if (isContractorFromInvitation || isAutoAssignedContractor) {
       // Check if contractor record already exists
       const { data: existingContractor } = await supabase
         .from('contractors')
@@ -265,14 +274,23 @@ router.post('/supabase', async (req: Request, res: Response) => {
         .maybeSingle();
 
       if (!existingContractor) {
-        console.log('[OAuth Callback] Creating contractor record for:', email);
+        // Determine contract dates: use invitation dates if available, otherwise default to 1 year from today
+        const contractStart = isContractorFromInvitation
+          ? invitation.contract_start_date
+          : new Date().toISOString().split('T')[0];
+        const contractEnd = isContractorFromInvitation
+          ? invitation.contract_end_date
+          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        console.log('[OAuth Callback] Creating contractor record for:', email, 
+          isAutoAssignedContractor ? '(auto-assigned Intellibus)' : '(from invitation)');
         
         const { error: contractorError } = await supabase
           .from('contractors')
           .insert({
             contractor_id: authUserId,
-            contract_start: invitation.contract_start_date,
-            contract_end: invitation.contract_end_date,
+            contract_start: contractStart,
+            contract_end: contractEnd,
             hourly_rate: 75.0,
             overtime_rate: 112.5,
             is_active: true,
