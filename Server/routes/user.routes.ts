@@ -137,5 +137,110 @@ router.patch("/:userId/role", requireAdmin, async (req: Request, res: Response) 
   }
 });
 
+/**
+ * DELETE /api/users/:userId
+ * Delete a user (admin only). Admins cannot delete themselves.
+ * Removes from profiles, app_users, and contractors tables.
+ */
+router.delete("/:userId", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const adminProfileId = (req as any).profileId;
+
+    // Prevent self-deletion
+    if (userId === adminProfileId) {
+      return res.status(403).json({ error: "You cannot delete your own account" });
+    }
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // 1) Get user info before deleting (for logging)
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email, full_name, role")
+      .eq("id", userId)
+      .single();
+
+    if (!profile) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    console.log('[DeleteUser] Deleting user:', profile.email, '- requested by admin:', adminProfileId);
+
+    // 2) Delete from contractors table (if exists)
+    const { error: contractorError } = await supabase
+      .from("contractors")
+      .delete()
+      .eq("contractor_id", userId);
+
+    if (contractorError) {
+      console.error("[DeleteUser] Error deleting contractor record (non-fatal):", contractorError);
+    }
+
+    // 3) Delete from app_users table
+    const { error: appUserError } = await supabase
+      .from("app_users")
+      .delete()
+      .eq("id", userId);
+
+    if (appUserError) {
+      console.error("[DeleteUser] Error deleting app_users record (non-fatal):", appUserError);
+    }
+
+    // 4) Nullify foreign key references that don't have ON DELETE CASCADE/SET NULL
+    //    These would block the profiles row deletion otherwise
+    await supabase
+      .from("submissions")
+      .update({ approved_by: null })
+      .eq("approved_by", userId);
+
+    await supabase
+      .from("submissions")
+      .update({ rejected_by: null })
+      .eq("rejected_by", userId);
+
+    await supabase
+      .from("user_invitations")
+      .update({ created_by: null })
+      .eq("created_by", userId);
+
+    // 5) Delete from profiles table (primary — cascades to contractors, manager_teams, notifications, etc.)
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .delete()
+      .eq("id", userId);
+
+    if (profileError) {
+      console.error("[DeleteUser] Error deleting profile:", profileError);
+      return res.status(500).json({ error: "Failed to delete user: " + profileError.message });
+    }
+
+    // 6) Delete from Supabase auth (remove their auth account entirely)
+    const { error: authError } = await supabase.auth.admin.deleteUser(userId as string);
+    if (authError) {
+      console.error("[DeleteUser] Error deleting auth user (non-fatal):", authError);
+      // Non-fatal — profile is already gone
+    }
+
+    console.log('[DeleteUser] User deleted successfully:', profile.email);
+
+    return res.json({
+      success: true,
+      deletedUser: {
+        id: userId,
+        email: profile.email,
+        fullName: profile.full_name,
+      },
+    });
+  } catch (error) {
+    console.error("[DeleteUser] Unexpected error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
 

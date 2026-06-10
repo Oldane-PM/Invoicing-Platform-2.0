@@ -1,5 +1,5 @@
 {
-  "watch": ["Server/server.ts", "src/lib/auth.ts"],
+  "watch": ["Server/", "src/lib/auth.ts"],
   "ext": "ts,js,json",
   "ignore": ["**/*.test.ts", "**/*.spec.ts"],
   "exec": "tsx Server/server.ts",
