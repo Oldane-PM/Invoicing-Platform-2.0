@@ -21,6 +21,22 @@ import {
   getDefaultOvertimeRate,
 } from "../calculations";
 
+/** Tagged project IDs for a submission row, falling back to the legacy scalar column. */
+function deriveProjectIds(sub: any): string[] {
+  if (Array.isArray(sub.project_ids) && sub.project_ids.length > 0) {
+    return sub.project_ids.filter(Boolean);
+  }
+  return sub.project_id ? [sub.project_id] : [];
+}
+
+/** Tagged project names for a submission row, falling back to the legacy scalar column. */
+function deriveProjectNames(sub: any): string[] {
+  if (Array.isArray(sub.project_names) && sub.project_names.length > 0) {
+    return sub.project_names.filter(Boolean);
+  }
+  return sub.project_name ? [sub.project_name] : [];
+}
+
 /**
  * Interface for submissions data source
  * Any implementation (Supabase, Mock, etc.) must implement this interface
@@ -205,7 +221,9 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         invoice_number,
         invoice_url,
         invoice_generated_at,
-        project_id
+        project_id,
+        project_ids,
+        project_names
       `
       )
       .eq("contractor_user_id", contractorUserId)
@@ -244,6 +262,8 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         submissionDate: sub.submitted_at || sub.created_at,
         projectName: sub.project_name || "General Work",
         projectId: sub.project_id ?? null,
+        projectIds: deriveProjectIds(sub),
+        projectNames: deriveProjectNames(sub),
         description: sub.description || "",
         regularHours: sub.regular_hours || 0,
         overtimeHours: sub.overtime_hours || 0,
@@ -340,7 +360,9 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         contractor_user_id: contractorUserId,
         contract_id: contractId,
         project_name: draft.projectName || projectName,
-        project_id: draft.projectId || null, // Link to projects table if provided
+        project_id: draft.projectId || null, // PRIMARY project (FK used by invoice generation)
+        project_ids: draft.projectIds && draft.projectIds.length > 0 ? draft.projectIds : (draft.projectId ? [draft.projectId] : null),
+        project_names: draft.projectNames && draft.projectNames.length > 0 ? draft.projectNames : (draft.projectName ? [draft.projectName] : null),
         description: draft.description,
         period_start: periodStart,
         period_end: periodEnd,
@@ -373,6 +395,8 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       submissionDate: submission.submitted_at || submission.created_at,
       projectName: submission.project_name,
       projectId: submission.project_id ?? null,
+      projectIds: deriveProjectIds(submission),
+      projectNames: deriveProjectNames(submission),
       description: submission.description,
       regularHours: submission.regular_hours,
       overtimeHours: submission.overtime_hours,
@@ -506,6 +530,14 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     if (updatedData?.projectName !== undefined) {
       updatePayload.project_name = updatedData.projectName;
     }
+    if (updatedData?.projectIds !== undefined) {
+      updatePayload.project_ids = updatedData.projectIds.length > 0 ? updatedData.projectIds : null;
+      // Keep the primary FK in sync with the first tagged project
+      updatePayload.project_id = updatedData.projectIds[0] || null;
+    }
+    if (updatedData?.projectNames !== undefined) {
+      updatePayload.project_names = updatedData.projectNames.length > 0 ? updatedData.projectNames : null;
+    }
 
     // Recalculate total if hours were updated - fetch actual contractor rates
     if (updatedData?.hoursSubmitted !== undefined || updatedData?.overtimeHours !== undefined) {
@@ -556,6 +588,8 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       submissionDate: updated.submitted_at || updated.created_at,
       projectName: updated.project_name || "General Work",
       projectId: updated.project_id ?? null,
+      projectIds: deriveProjectIds(updated),
+      projectNames: deriveProjectNames(updated),
       description: updated.description || "",
       regularHours: updated.regular_hours || 0,
       overtimeHours: updated.overtime_hours || 0,
