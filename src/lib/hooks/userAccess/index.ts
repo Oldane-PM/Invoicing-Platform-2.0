@@ -6,4 +6,5 @@
 export * from './useUserAccessUsers';
 export * from './useUpdateUserRole';
 export * from './useSetUserEnabled';
+export * from './useDeleteUser';
 export * from './useCurrentUserId';

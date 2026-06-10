@@ -11,7 +11,7 @@ import {
 } from "../../components/ui/table";
 import { Combobox } from "../../components/shared/Combobox";
 import { Switch } from "../../components/ui/switch";
-import { ShieldAlert, Lock, Loader2, AlertCircle, UserX, UserPlus, Clock, CheckCircle2 } from "lucide-react";
+import { ShieldAlert, Lock, Loader2, AlertCircle, UserX, UserPlus, Clock, CheckCircle2, Trash2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import {
   Tooltip,
@@ -23,11 +23,13 @@ import {
   useUserAccessUsers,
   useUpdateUserRole,
   useSetUserEnabled,
+  useDeleteUser,
   useCurrentUserId,
 } from "../../lib/hooks/userAccess";
 import { RoleChangeConfirmationModal } from "../../components/shared/RoleChangeConfirmationModal";
 import { NewUserModal } from "../../components/modals/NewUserModal";
 import { SuccessModal } from "../../components/modals/SuccessModal";
+import { DeleteUserConfirmationModal } from "../../components/shared/DeleteUserConfirmationModal";
 import type { UserRole } from "../../lib/data/userAccess";
 
 // Role options in specified order
@@ -53,6 +55,7 @@ export function UserAccessManagement() {
   // Mutations
   const updateRole = useUpdateUserRole();
   const setEnabled = useSetUserEnabled();
+  const deleteUserMutation = useDeleteUser();
 
   // Pending role change state for confirmation modal
   const [pendingRoleChange, setPendingRoleChange] = React.useState<PendingRoleChange | null>(null);
@@ -63,6 +66,14 @@ export function UserAccessManagement() {
   // New user modal state
   const [newUserModalOpen, setNewUserModalOpen] = React.useState(false);
   const [successModalOpen, setSuccessModalOpen] = React.useState(false);
+
+  // Delete user state
+  const [pendingDelete, setPendingDelete] = React.useState<{
+    userId: string;
+    userName: string;
+    userEmail: string;
+    userRole: string;
+  } | null>(null);
 
   // Handle role dropdown change - opens confirmation modal instead of immediately persisting
   const handleRoleChange = (userId: string, userName: string, newRoleDisplay: string, currentRole: UserRole) => {
@@ -254,6 +265,9 @@ export function UserAccessManagement() {
                   <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
                     Enable
                   </TableHead>
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -358,6 +372,50 @@ export function UserAccessManagement() {
                           </div>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {isInvitation ? (
+                          <span className="text-sm text-gray-400 italic">—</span>
+                        ) : isCurrentUser ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled
+                                  className="w-8 h-8 text-gray-300 cursor-not-allowed"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Cannot delete yourself</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setPendingDelete({
+                                  userId: user.id,
+                                  userName: user.fullName,
+                                  userEmail: user.email,
+                                  userRole: user.role,
+                                })}
+                                className="w-8 h-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Delete user</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -397,6 +455,33 @@ export function UserAccessManagement() {
           title="User Pre-Registered!"
           message="The user will be assigned their role when they sign in with Google"
         />
+
+        {/* Delete User Confirmation Modal */}
+        {pendingDelete && (
+          <DeleteUserConfirmationModal
+            open={!!pendingDelete}
+            onOpenChange={(open) => {
+              if (!open) setPendingDelete(null);
+            }}
+            userName={pendingDelete.userName}
+            userEmail={pendingDelete.userEmail}
+            userRole={pendingDelete.userRole}
+            onConfirm={() => {
+              deleteUserMutation.mutate(
+                {
+                  userId: pendingDelete.userId,
+                  userName: pendingDelete.userName,
+                },
+                {
+                  onSuccess: () => setPendingDelete(null),
+                  onError: () => setPendingDelete(null),
+                }
+              );
+            }}
+            onCancel={() => setPendingDelete(null)}
+            isLoading={deleteUserMutation.isPending}
+          />
+        )}
       </div>
     </TooltipProvider>
   );

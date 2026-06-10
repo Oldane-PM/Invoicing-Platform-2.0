@@ -145,3 +145,27 @@ export async function markUserActivated(userId: string): Promise<void> {
     }
   }
 }
+
+/**
+ * Delete a user via server API (admin endpoint)
+ * Removes from profiles, app_users, contractors, and auth
+ */
+export async function deleteUser(userId: string): Promise<void> {
+  const apiBase = (import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:5001').replace(/\/+$/, '');
+  
+  const response = await fetch(`${apiBase}/api/users/${userId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Failed to delete user' }));
+    throw new Error(errorData.error || 'Failed to delete user');
+  }
+
+  const data = await response.json();
+  console.log('[UserAccess] User deleted:', data.deletedUser);
+}
