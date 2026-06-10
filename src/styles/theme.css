@@ -192,3 +192,84 @@
     line-height: 1.5;
   }
 }
+
+/**
+ * Dark-mode retrofit overrides.
+ *
+ * Most of the app is built with hardcoded light Tailwind utilities
+ * (bg-white, text-gray-900, border-gray-200, ...) rather than the theme
+ * variables, so toggling the `.dark` class alone wouldn't change them.
+ * These rules remap the neutral surface/text/border utilities to the
+ * near-black palette from the reference design while leaving colored
+ * accents (blue/green/purple/red/yellow) untouched.
+ *
+ * Kept outside @layer so they win over Tailwind's layered utilities.
+ * Light mode is unaffected — these only apply under `.dark`.
+ */
+
+/* Surfaces — page background */
+.dark .bg-\[\#F9FAFB\],
+.dark .bg-gray-50 {
+  background-color: #0a0a0b;
+}
+
+/* Surfaces — cards, headers, panels */
+.dark .bg-white,
+.dark .bg-\[\#FFFFFF\] {
+  background-color: #121316;
+}
+
+/* Surfaces — subtle / hover fills */
+.dark .bg-gray-100 {
+  background-color: #1d1e22;
+}
+
+.dark .bg-gray-200 {
+  background-color: #26272c;
+}
+
+/* Hover fills */
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Borders */
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark .border-\[\#EAEAEA\],
+.dark .border-\[\#E5E7EB\] {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Text — headings / primary */
+.dark .text-gray-900,
+.dark .text-gray-800 {
+  color: #f4f4f5;
+}
+
+/* Text — body / secondary */
+.dark .text-gray-700 {
+  color: #d4d4d8;
+}
+
+.dark .text-gray-600 {
+  color: #a1a1aa;
+}
+
+/* Text — muted / placeholder */
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: #8b8b93;
+}
+
+.dark .placeholder\:text-gray-400::placeholder,
+.dark .placeholder\:text-gray-500::placeholder {
+  color: #6b6b72;
+}

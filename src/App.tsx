@@ -33,6 +33,7 @@ import { AdminProjects } from "./pages/admin/Projects";
 import { UnassignedDashboard } from "./pages/unassigned/Dashboard";
 import { NotificationBell } from "./components/shared/NotificationBell";
 import { NotificationDrawer } from "./components/shared/NotificationDrawer";
+import { ThemeToggle } from "./components/shared/ThemeToggle";
 import { ContractorDetailDrawer } from "./components/drawers/ContractorDetailDrawer";
 import { useAuth } from "./lib/hooks/useAuth";
 import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
@@ -320,6 +321,7 @@ function App() {
               </div>
               <div className="flex items-center gap-2 md:gap-3">
                 <NotificationBell onClick={() => setNotificationsOpen(true)} />
+                <ThemeToggle />
                 <Button
                   variant="ghost"
                   size="icon"
@@ -449,6 +451,9 @@ function App() {
               {/* Notifications */}
               <NotificationBell onClick={() => setNotificationsOpen(true)} />
 
+              {/* Theme Toggle */}
+              <ThemeToggle />
+
               {/* Avatar Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -547,6 +552,7 @@ function App() {
             </div>
             <div className="flex items-center gap-2 md:gap-3">
               <NotificationBell onClick={() => setNotificationsOpen(true)} />
+              <ThemeToggle />
               <Button
                 variant="ghost"
                 size="icon"
