@@ -48,8 +48,8 @@ type UserRole = "Admin" | "Manager" | "Contractor" | "Unassigned" | null;
 type AppView = "login" | "oauth-callback" | "app";
 
 function App() {
-  // Supabase auth for Contractor and Manager
-  const { isAuthenticated, user, profile, signIn, signOut, loading: authLoading } = useAuth();
+  // Supabase auth for Contractor and Manager - BYPASSED for Demo
+  const { isAuthenticated, user, signOut, loading: authLoading } = useAuth();
 
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
   const [currentView, setCurrentView] = React.useState<AppView>("login");
@@ -80,107 +80,29 @@ function App() {
     return name.slice(0, 2).toUpperCase();
   };
   
-  const displayName = profile?.fullName 
-    || user?.user_metadata?.full_name 
-    || user?.email?.split('@')[0] 
-    || 'User';
+  // Use Demo Names if we are bypassed
+  let displayName = "User";
+  if (currentUser === "Admin") displayName = "Admin User";
+  if (currentUser === "Manager") displayName = "Manager User";
+  if (currentUser === "Contractor") displayName = "Contractor User";
   
   const userInitials = getInitials(displayName);
 
   // Re-usable function to fetch user role from database
   // isInitialLogin: when true, checks loginIntent in sessionStorage (first login only)
-  const fetchUserRole = React.useCallback(async (isInitialLogin = false) => {
-    if (!isAuthenticated || !user) {
-      if (!authLoading && currentUser) {
-        // User was logged out from Supabase
-        setCurrentUser(null);
-      }
-      return;
-    }
-
-    try {
-      const { getSupabaseClient } = await import('./lib/supabase/client');
-      const supabase = getSupabaseClient();
-      
-      const { data: appUser, error } = await supabase
-        .from('profiles')
-        .select('role, is_active')
-        .eq('email', user.email)  // Use email instead of ID since Better Auth IDs don't match generated UUIDs
-        .single();
-
-      if (error) {
-        console.error('Error fetching user role:', error);
-        if (isInitialLogin) {
-          await signOut();
-          alert('Unable to fetch user role. Please try again.');
-        }
-        return;
-      }
-      
-      if (appUser) {
-        // Check is_active status — disabled users get signed out
-        if (appUser.is_active === false) {
-          console.log('[App] Disabled user detected, signing out');
-          await signOut();
-          setCurrentUser(null);
-          return;
-        }
-        
-        // Map database role to app role
-        const roleMap: Record<string, UserRole> = {
-          'unassigned': 'Unassigned',
-          'admin': 'Admin',
-          'manager': 'Manager',
-          'contractor': 'Contractor',
-        };
-        const userRole = roleMap[appUser.role.toLowerCase()] || 'Unassigned';
-        
-        // Only check loginIntent on initial login (not on refreshes)
-        if (isInitialLogin) {
-          const loginIntent = sessionStorage.getItem('loginIntent');
-          if (loginIntent && loginIntent !== userRole && userRole !== 'Unassigned') {
-            await signOut();
-            alert(`You cannot log in as ${loginIntent}. Please use the ${userRole} login option.`);
-            sessionStorage.removeItem('loginIntent');
-            return;
-          }
-          sessionStorage.removeItem('loginIntent');
-        }
-
-        // Update role (this handles both initial login and admin-driven role changes)
-        setCurrentUser(userRole);
-      }
-    } catch (err) {
-      console.error('[App] Error in fetchUserRole:', err);
-    }
-  }, [isAuthenticated, user, authLoading, currentUser, signOut]);
+  const fetchUserRole = React.useCallback(async () => {
+    // BYPASSED FOR DEMO
+  }, []);
 
   // Fetch role on initial auth state change (login/logout)
   React.useEffect(() => {
-    fetchUserRole(true);
+    // fetchUserRole(true); BYPASSED FOR DEMO
   }, [isAuthenticated, user, authLoading, signOut]);
 
   // Re-fetch role when tab becomes visible and poll every 30s while authenticated
   // This ensures admin role changes take effect without requiring the user to re-login
   React.useEffect(() => {
-    if (!isAuthenticated || !user) return;
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchUserRole(false);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    const intervalId = setInterval(() => {
-      fetchUserRole(false);
-    }, 30_000); // Every 30 seconds
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(intervalId);
-    };
+    // BYPASSED FOR DEMO
   }, [isAuthenticated, user, fetchUserRole]);
 
   // Handle OAuth callback completion
@@ -197,12 +119,26 @@ function App() {
     setCurrentView("app");
   };
 
+  // Handle demo login
+  const handleDemoLogin = (role: string) => {
+    if (role.toLowerCase() === 'admin') {
+      setCurrentUser('Admin');
+    } else if (role.toLowerCase() === 'manager') {
+      setCurrentUser('Manager');
+    } else if (role.toLowerCase() === 'contractor') {
+      setCurrentUser('Contractor');
+    } else {
+      setCurrentUser('Unassigned');
+    }
+    setCurrentView('app');
+  };
+
   // Handle logout for all user types
   const handleLogout = async () => {
-    if (currentUser === "Contractor" || currentUser === "Manager" || currentUser === "Unassigned" || currentUser === "Admin") {
-      // Sign out from Supabase for all authenticated users
-      await signOut();
-    }
+    // Bypassed Supabase signOut for demo
+    // if (currentUser === "Contractor" || currentUser === "Manager" || currentUser === "Unassigned" || currentUser === "Admin") {
+    //   await signOut();
+    // }
     setCurrentUser(null);
     setCurrentScreen("dashboard");
     setManagerScreen("dashboard");
@@ -213,14 +149,10 @@ function App() {
   const [isRefreshingStatus, setIsRefreshingStatus] = React.useState(false);
   
   const handleRefreshStatus = async () => {
-    if (!user) return;
-    
     setIsRefreshingStatus(true);
-    try {
-      await fetchUserRole(false);
-    } finally {
+    setTimeout(() => {
       setIsRefreshingStatus(false);
-    }
+    }, 500);
   };
 
   const handleEmployeeClick = (employee: EmployeeDirectoryRow) => {
@@ -287,7 +219,7 @@ function App() {
 
   // Show login screen if not authenticated
   if (!currentUser) {
-    return <Login authLoading={authLoading} />;
+    return <Login onDemoLogin={handleDemoLogin} authLoading={authLoading} />;
   }
 
   // Unassigned User Portal - Users without a role assignment

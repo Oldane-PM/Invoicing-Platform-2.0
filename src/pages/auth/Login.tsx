@@ -1,11 +1,18 @@
 import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { Loader2 } from "lucide-react";
-import { signIn } from "../../lib/auth-client";
+// Import for better-auth (commented out)
+// import { signIn } from "../../lib/auth-client";
 
 interface LoginProps {
   authLoading?: boolean;
+  onDemoLogin?: (role: string) => void;
 }
+
+/* 
+=========================================================
+BETTER-AUTH LOGIN (COMMENTED OUT FOR DEMO MODE)
+=========================================================
 
 export function Login({ authLoading }: LoginProps) {
   const [loading, setLoading] = React.useState(false);
@@ -56,9 +63,7 @@ export function Login({ authLoading }: LoginProps) {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-[400px]">
-        {/* Login Card */}
         <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200">
-          {/* Title */}
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">
             Sign In
           </h1>
@@ -66,7 +71,6 @@ export function Login({ authLoading }: LoginProps) {
             Sign in with your Google account to access the platform
           </p>
 
-          {/* Google Sign In Button */}
           <Button
             onClick={handleGoogleSignIn}
             disabled={loading}
@@ -103,7 +107,6 @@ export function Login({ authLoading }: LoginProps) {
             )}
           </Button>
 
-          {/* Error Message */}
           {error && (
             <div className="mt-4 text-red-600 text-sm text-center">
               {error}
@@ -111,12 +114,122 @@ export function Login({ authLoading }: LoginProps) {
           )}
         </div>
 
-        {/* Footer Text */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500">
             Sign in with your Google account to access the platform.
             <br />
             Your portal access is determined by your account role.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+*/
+
+export function Login({ authLoading, onDemoLogin }: LoginProps) {
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [username, setUsername] = React.useState("");
+  const [password, setPassword] = React.useState("");
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    // Simulate network delay
+    setTimeout(() => {
+      if (onDemoLogin) {
+        const lowerUser = username.toLowerCase().trim();
+        if (["admin", "manager", "contractor"].includes(lowerUser)) {
+          onDemoLogin(lowerUser);
+        } else {
+          setError("Invalid username. Try Admin, Manager, or Contractor.");
+          setLoading(false);
+        }
+      } else {
+        setError("Demo login handler is not provided.");
+        setLoading(false);
+      }
+    }, 500);
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-6">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-purple-600 animate-spin mx-auto mb-3" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#FDFDFD] flex items-center justify-center p-6 flex-col">
+      <div className="w-full max-w-[420px]">
+        {/* Login Card */}
+        <div className="bg-white rounded-[24px] p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 mb-6">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-semibold text-gray-900">
+              Invoicing Platform
+            </h1>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">
+                Username
+              </label>
+              <input
+                type="text"
+                placeholder="Enter username"
+                className="w-full h-12 px-4 rounded-xl border border-blue-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">
+                Password
+              </label>
+              <input
+                type="password"
+                placeholder="Enter password"
+                className="w-full h-12 px-4 rounded-xl border border-gray-100 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            {error && (
+              <div className="text-red-500 text-sm text-center font-medium">
+                {error}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full h-12 bg-[#9B1CFF] hover:bg-[#8614E0] text-white rounded-xl font-medium mt-2 transition-colors"
+            >
+              {loading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                "Log In"
+              )}
+            </Button>
+          </form>
+        </div>
+
+        {/* Hint Text */}
+        <div className="text-center">
+          <p className="text-sm text-gray-500">
+            Demo usernames: <span className="font-semibold text-gray-700">Admin</span>,{" "}
+            <span className="font-semibold text-gray-700">Manager</span>, or{" "}
+            <span className="font-semibold text-gray-700">Contractor</span>
           </p>
         </div>
       </div>
