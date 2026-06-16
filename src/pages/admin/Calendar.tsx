@@ -38,6 +38,7 @@ import {
 } from "../../lib/hooks/adminCalendar";
 import { useEmployeeRoles } from "../../lib/hooks/admin/useEmployeeRoles";
 import { useProjects } from "../../lib/hooks/admin/useProjects";
+import { useUserAccessUsers } from "../../lib/hooks/userAccess/useUserAccessUsers";
 import { TimeOffEntry, CalendarEntryType, CalendarAppliesTo, TimeOffScopeType } from "../../lib/data/adminCalendar";
 
 type ViewMode = "month" | "year";
@@ -110,19 +111,25 @@ export function AdminCalendar() {
   // Get total contractor count for affected count display
   const { data: totalContractorCount = 0 } = useTotalContractorCount();
   
+  // Get all users for exact role counts
+  const { data: allUsers = [] } = useUserAccessUsers();
+
   // Compute affected count based on scope type
   const affectedCount = React.useMemo(() => {
     if (formData.appliesToType === 'ALL') {
       return totalContractorCount;
     } else if (formData.appliesToType === 'ROLES' && formData.appliesToRoles.length > 0) {
-      // For ROLES scope, show total count as approximation
-      // (accurate count would require matching roles to contractors)
-      return totalContractorCount;
+      // Accurate count using all users
+      const lowerRoles = formData.appliesToRoles.map(r => r.toLowerCase());
+      return allUsers.filter(u => lowerRoles.includes(u.role.toLowerCase())).length;
     } else if (formData.appliesToType === 'PROJECTS' && formData.appliesToProjects.length > 0) {
-      return totalContractorCount;
+      // Sum contractorCount from selected projects
+      return availableProjects
+        .filter(p => formData.appliesToProjects.includes(p.name))
+        .reduce((sum, p) => sum + (p.contractorCount || 0), 0);
     }
     return 0;
-  }, [formData.appliesToType, formData.appliesToRoles, totalContractorCount]);
+  }, [formData.appliesToType, formData.appliesToRoles, formData.appliesToProjects, totalContractorCount, allUsers, availableProjects]);
 
   // Get upcoming entries from dedicated hook (includes affected contractor count from Supabase)
   const upcomingQuery = useUpcomingDaysOff(90);
