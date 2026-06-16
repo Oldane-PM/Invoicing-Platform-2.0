@@ -185,7 +185,7 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
               <input
                 type="text"
                 placeholder="Enter username"
-                className="w-full h-12 px-4 rounded-xl border border-blue-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm"
+                className="w-full h-12 px-4 rounded-xl border border-blue-200 bg-[#F8FAFC] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
@@ -198,7 +198,7 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
               <input
                 type="password"
                 placeholder="Enter password"
-                className="w-full h-12 px-4 rounded-xl border border-gray-100 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
+                className="w-full h-12 px-4 rounded-xl border border-gray-100 bg-[#F8FAFC] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
