@@ -43,6 +43,53 @@ export function useManagerApprove() {
 }
 
 /**
+ * Hook for bulk approving submissions (Manager action)
+ * Transitions: PENDING_MANAGER -> AWAITING_ADMIN_PAYMENT
+ */
+export function useManagerBulkApprove() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (submissionIds: string[]) => {
+      if (!user?.id) throw new Error("Not authenticated");
+      
+      const results = {
+        successful: [] as string[],
+        failed: [] as { id: string; error: string }[],
+      };
+
+      for (const id of submissionIds) {
+        try {
+          await approveSubmission(id, user.id);
+          results.successful.push(id);
+        } catch (error: any) {
+          results.failed.push({ id, error: error.message || "Unknown error" });
+        }
+      }
+
+      return results;
+    },
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: [MANAGER_SUBMISSIONS_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [MANAGER_SUBMISSION_DETAILS_QUERY_KEY] });
+      
+      if (results.failed.length === 0) {
+        toast.success(`Successfully approved ${results.successful.length} submissions`);
+      } else if (results.successful.length > 0) {
+        toast.warning(`Approved ${results.successful.length} submissions, but ${results.failed.length} failed`);
+      } else {
+        toast.error(`Failed to approve ${results.failed.length} submissions`);
+      }
+    },
+    onError: (error: Error) => {
+      console.error("[useManagerBulkApprove] Error:", error);
+      toast.error(error.message || "Failed to process bulk approval");
+    },
+  });
+}
+
+/**
  * Hook for rejecting a submission (Manager action)
  * Transitions: PENDING_MANAGER -> REJECTED_CONTRACTOR
  */
@@ -138,18 +185,28 @@ export function useSubmissionActions() {
   const rejectMutation = useManagerReject();
   const markPaidMutation = useManagerMarkPaid();
   const respondClarificationMutation = useManagerRespondClarification();
+  const bulkApproveMutation = useManagerBulkApprove();
 
   return {
     approving: { loading: approveMutation.isPending, error: approveMutation.error },
     rejecting: { loading: rejectMutation.isPending, error: rejectMutation.error },
     markingPaid: { loading: markPaidMutation.isPending, error: markPaidMutation.error },
     respondingClarification: { loading: respondClarificationMutation.isPending, error: respondClarificationMutation.error },
+    bulkApproving: { loading: bulkApproveMutation.isPending, error: bulkApproveMutation.error },
     approve: async (submissionId: string) => {
       try {
         await approveMutation.mutateAsync(submissionId);
         return true;
       } catch {
         return false;
+      }
+    },
+    bulkApprove: async (submissionIds: string[]) => {
+      try {
+        const results = await bulkApproveMutation.mutateAsync(submissionIds);
+        return results;
+      } catch {
+        return { successful: [], failed: submissionIds.map(id => ({ id, error: "Failed to process bulk approval" })) };
       }
     },
     reject: async (submissionId: string, reason: string) => {

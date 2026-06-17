@@ -17,12 +17,15 @@ import { SubmissionReviewDrawer } from "../../components/drawers/SubmissionRevie
 import { toast } from "sonner";
 import { Search, FileX, Users, FileText, DollarSign, TrendingUp, Loader2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import { Checkbox } from "../../components/ui/checkbox";
+import { useAuth } from "../../lib/hooks/useAuth";
 import {
   useAdminMetrics,
   useAdminSubmissions,
   useProjects,
   useManagers,
 } from "../../lib/hooks/adminDashboard";
+import { useBulkMarkPaid } from "../../lib/hooks/adminDashboard/useSubmissionActions";
 import type { SubmissionFilters } from "../../lib/data/adminDashboard";
 
 const statusStyles: Record<string, string> = {
@@ -100,12 +103,18 @@ export function AdminDashboard() {
   const [filters, setFilters] = React.useState<SubmissionFilters>({});
   const [selectedSubmissionId, setSelectedSubmissionId] = React.useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  
+  // Multi-selection state
+  const [selectedSubmissionIds, setSelectedSubmissionIds] = React.useState<string[]>([]);
+  const [showBulkConfirm, setShowBulkConfirm] = React.useState(false);
 
   // Fetch data using hooks
+  const { user } = useAuth();
   const { data: metrics, isLoading: metricsLoading, error: metricsError } = useAdminMetrics();
   const { data: submissions, isLoading: submissionsLoading, error: submissionsError } = useAdminSubmissions(filters);
   const { data: projects } = useProjects();
   const { data: managers } = useManagers();
+  const bulkMarkPaidMutation = useBulkMarkPaid();
 
   // Generate month options (last 4 months)
   const months = React.useMemo(() => {
@@ -131,6 +140,39 @@ export function AdminDashboard() {
   const handleDrawerClose = () => {
     setDrawerOpen(false);
     setSelectedSubmissionId(null);
+    // Unselect this item when drawer closes just in case it was processed
+    if (selectedSubmissionId) {
+      setSelectedSubmissionIds(prev => prev.filter(id => id !== selectedSubmissionId));
+    }
+  };
+
+  const handleBulkPay = async () => {
+    if (selectedSubmissionIds.length === 0 || !user?.id) return;
+    
+    setShowBulkConfirm(false);
+    const results = await bulkMarkPaidMutation.mutateAsync({ 
+      submissionIds: selectedSubmissionIds, 
+      adminUserId: user.id 
+    });
+    
+    if (results.successful.length > 0) {
+      setSelectedSubmissionIds(prev => prev.filter(id => !results.successful.includes(id)));
+    }
+  };
+
+  const approvableSubmissions = (submissions || []).filter(s => 
+    s.status === "approved" || s.status === "awaiting_admin_payment"
+  );
+  const allApprovableSelected = approvableSubmissions.length > 0 && 
+    approvableSubmissions.every(s => selectedSubmissionIds.includes(s.id));
+
+  const toggleSelectAll = () => {
+    if (allApprovableSelected) {
+      setSelectedSubmissionIds(prev => prev.filter(id => !approvableSubmissions.find(s => s.id === id)));
+    } else {
+      const approvableIds = approvableSubmissions.map(s => s.id);
+      setSelectedSubmissionIds(prev => Array.from(new Set([...prev, ...approvableIds])));
+    }
   };
 
   // Show error state if metrics fail to load
@@ -151,6 +193,39 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Header Actions */}
+      <div className="flex justify-between items-center h-10">
+        <div>
+          {selectedSubmissionIds.length > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full">
+                {selectedSubmissionIds.length} selected
+              </span>
+              <Button 
+                onClick={() => setShowBulkConfirm(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+                disabled={bulkMarkPaidMutation.isPending}
+              >
+                {bulkMarkPaidMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <DollarSign className="w-4 h-4 mr-2" />
+                )}
+                Bulk Pay ({selectedSubmissionIds.length})
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setSelectedSubmissionIds([])}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {metricsLoading ? (
@@ -265,6 +340,14 @@ export function AdminDashboard() {
           <Table>
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-gray-50">
+                <TableHead className="w-12 text-center px-4">
+                  <Checkbox 
+                    checked={allApprovableSelected}
+                    onCheckedChange={toggleSelectAll}
+                    disabled={approvableSubmissions.length === 0}
+                    aria-label="Select all approvable submissions"
+                  />
+                </TableHead>
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
                   Work Period
                 </TableHead>
@@ -312,7 +395,7 @@ export function AdminDashboard() {
                 </TableRow>
               ) : !submissions || submissions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-64 text-center">
+                  <TableCell colSpan={8} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <FileX className="w-16 h-16 mb-3" strokeWidth={1.5} />
                       <div className="text-gray-600 font-medium">No submissions match your filters</div>
@@ -321,13 +404,29 @@ export function AdminDashboard() {
                   </TableCell>
                 </TableRow>
               ) : (
-                submissions.map((submission) => (
-                  <TableRow
-                    key={submission.id}
-                    className="h-16 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
-                    onClick={() => handleSubmissionClick(submission.id)}
-                  >
-                    <TableCell className="text-gray-700">
+                submissions.map((submission) => {
+                  const isApprovable = submission.status === "approved" || submission.status === "awaiting_admin_payment";
+                  const isSelected = selectedSubmissionIds.includes(submission.id);
+
+                  return (
+                    <TableRow
+                      key={submission.id}
+                      className={`h-16 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 ${isSelected ? 'bg-purple-50/50' : ''}`}
+                      onClick={() => handleSubmissionClick(submission.id)}
+                    >
+                      <TableCell className="text-center px-4" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox 
+                          checked={isSelected}
+                          onCheckedChange={() => {
+                            setSelectedSubmissionIds(prev => 
+                              prev.includes(submission.id) ? prev.filter(id => id !== submission.id) : [...prev, submission.id]
+                            );
+                          }}
+                          disabled={!isApprovable}
+                          aria-label={`Select submission for ${submission.contractorName}`}
+                        />
+                      </TableCell>
+                      <TableCell className="text-gray-700">
                       {formatWorkPeriod(submission.workPeriod, submission.periodStart)}
                     </TableCell>
                     <TableCell>
@@ -352,7 +451,8 @@ export function AdminDashboard() {
                       </Badge>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -365,6 +465,49 @@ export function AdminDashboard() {
         open={drawerOpen}
         onOpenChange={handleDrawerClose}
       />
+
+      {/* Bulk Pay Confirmation Modal */}
+      {showBulkConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mb-4 mx-auto">
+                <DollarSign className="w-6 h-6 text-purple-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-center text-gray-900 mb-2">
+                Pay {selectedSubmissionIds.length} Invoices?
+              </h3>
+              <p className="text-center text-gray-600 mb-6 text-sm">
+                You are about to mark {selectedSubmissionIds.length} invoice(s) as paid. This action cannot be undone.
+              </p>
+              
+              <div className="flex gap-3 mt-8">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 border-gray-200 text-gray-700 hover:bg-gray-50"
+                  onClick={() => setShowBulkConfirm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                  onClick={handleBulkPay}
+                  disabled={bulkMarkPaidMutation.isPending}
+                >
+                  {bulkMarkPaidMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Paying...
+                    </>
+                  ) : (
+                    'Confirm Payment'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

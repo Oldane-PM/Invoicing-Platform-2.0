@@ -68,7 +68,8 @@ export async function generateInvoiceForSubmission(submissionId: string): Promis
       invoice_currency,
       regular_rate,
       overtime_rate,
-      rate_type
+      rate_type,
+      payment_link
     `
     )
     .eq('id', submissionId)
@@ -185,6 +186,7 @@ export async function generateInvoiceForSubmission(submissionId: string): Promis
       accountNumber: profile?.bank_account_number || 'N/A',
       accountType: profile?.account_type || undefined,
     },
+    paymentLink: submission.payment_link || undefined,
   };
 
   const pdfBuffer = await generateInvoicePdf(invoiceData);

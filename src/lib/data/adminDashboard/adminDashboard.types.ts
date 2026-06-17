@@ -21,7 +21,7 @@ export interface AdminSubmission {
   regularHours: number;
   overtimeHours: number;
   totalAmount: number;
-  status: 'submitted' | 'pending_manager' | 'approved' | 'rejected' | 'needs_clarification' | 'clarification_requested' | 'paid';
+  status: 'submitted' | 'pending_manager' | 'approved' | 'awaiting_admin_payment' | 'rejected' | 'needs_clarification' | 'clarification_requested' | 'paid';
   submittedAt: string;
   periodStart: string;
   periodEnd: string;

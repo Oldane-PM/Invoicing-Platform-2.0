@@ -100,6 +100,7 @@ export interface ContractorSubmission {
   adminNote?: string | null;            // Admin clarification request note (shown to manager)
   managerNote?: string | null;          // Manager clarification response (shown to admin)
   updatedAt?: string | null;
+  paymentLink?: string | null;          // Payment link (Payoneer, PayPal, Wise)
 }
 
 // ============================================
@@ -285,6 +286,7 @@ export interface SubmissionDraft {
   projectIds?: string[];
   /** Names aligned by index with `projectIds`. */
   projectNames?: string[];
+  paymentLink?: string | null; // Optional payment link for this invoice
 }
 
 export interface EmployeeDirectoryRow {

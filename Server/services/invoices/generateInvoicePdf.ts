@@ -52,6 +52,9 @@ export interface InvoiceData {
     accountType?: string;
     intermediaryBank?: string;
   };
+
+  // Payment Link (Payoneer, PayPal, Wise)
+  paymentLink?: string;
 }
 
 // Color and font configuration
@@ -106,8 +109,6 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
 }
 
 function drawHeader(doc: PDFKit.PDFDocument, data: InvoiceData): void {
-  const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  
   // Title
   doc
     .font(FONTS.bold)
@@ -317,6 +318,24 @@ function drawBankingSection(doc: PDFKit.PDFDocument, data: InvoiceData): void {
       .text(field.value || 'N/A', 50 + labelWidth, fieldY);
     fieldY += 18;
   });
+
+  // Render Payment Link if present
+  if (data.paymentLink) {
+    fieldY += 5;
+    doc
+      .font(FONTS.bold)
+      .fillColor(COLORS.accent)
+      .text('Pay Online:', 50, fieldY);
+      
+    doc
+      .font(FONTS.regular)
+      .fillColor('blue')
+      .text(data.paymentLink, 50 + labelWidth, fieldY, {
+        link: data.paymentLink,
+        underline: true,
+      });
+    fieldY += 18;
+  }
 }
 
 function drawFooter(doc: PDFKit.PDFDocument): void {
