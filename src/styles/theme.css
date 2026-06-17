@@ -224,6 +224,15 @@
   background-color: #1d1e22;
 }
 
+/* Surfaces — form input fills (e.g. login fields) */
+.dark .bg-\[\#F8FAFC\] {
+  background-color: #1d1e22;
+}
+
+.dark .focus\:bg-white:focus {
+  background-color: #26272c;
+}
+
 .dark .bg-gray-200 {
   background-color: #26272c;
 }

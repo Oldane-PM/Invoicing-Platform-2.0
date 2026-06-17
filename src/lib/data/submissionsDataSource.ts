@@ -223,7 +223,8 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         invoice_generated_at,
         project_id,
         project_ids,
-        project_names
+        project_names,
+        payment_link
       `
       )
       .eq("contractor_user_id", contractorUserId)
@@ -280,6 +281,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         adminNote: sub.admin_note ?? null,
         managerNote: sub.manager_note ?? null,
         updatedAt: sub.updated_at,
+        paymentLink: sub.payment_link ?? null,
       };
     });
   }
@@ -373,6 +375,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         overtime_description: draft.overtimeDescription || null,
         excluded_dates: draft.excludedDates,
         total_amount: totalAmount,
+        payment_link: draft.paymentLink || null,
         // Store rates at submission time for invoice consistency
         regular_rate: hourlyRate,
         overtime_rate: overtimeRate,
@@ -410,6 +413,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       adminNote: null,
       managerNote: null,
       updatedAt: submission.created_at,
+      paymentLink: submission.payment_link ?? null,
     };
   }
 
@@ -538,6 +542,9 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     if (updatedData?.projectNames !== undefined) {
       updatePayload.project_names = updatedData.projectNames.length > 0 ? updatedData.projectNames : null;
     }
+    if (updatedData?.paymentLink !== undefined) {
+      updatePayload.payment_link = updatedData.paymentLink || null;
+    }
 
     // Recalculate total if hours were updated - fetch actual contractor rates
     if (updatedData?.hoursSubmitted !== undefined || updatedData?.overtimeHours !== undefined) {
@@ -605,6 +612,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       adminNote: null,
       managerNote: null,
       updatedAt: updated.updated_at,
+      paymentLink: updated.payment_link ?? null,
     };
   }
 
