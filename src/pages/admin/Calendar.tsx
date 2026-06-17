@@ -278,7 +278,7 @@ export function AdminCalendar() {
           </h2>
           <p className="text-gray-600 mb-4">
             {isAccessDenied 
-              ? "You don't have permission to access the calendar. Admin access required."
+              ? "You don't have permission to access the calendar. Finance Officer access required."
               : "Failed to load calendar data. Please try again."}
           </p>
           {!isAccessDenied && (

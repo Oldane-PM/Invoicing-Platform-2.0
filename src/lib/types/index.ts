@@ -111,8 +111,8 @@ export interface ContractorSubmission {
 export const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
   PENDING_MANAGER: "Pending Manager Approval",
   REJECTED_CONTRACTOR: "Rejected (Action Required)",
-  CLARIFICATION_REQUESTED: "Admin Requested Clarification",
-  AWAITING_ADMIN_PAYMENT: "Awaiting Admin Payment",
+  CLARIFICATION_REQUESTED: "Finance Officer Requested Clarification",
+  AWAITING_ADMIN_PAYMENT: "Awaiting Finance Officer Payment",
   PAID: "Paid",
 };
 
@@ -186,7 +186,7 @@ export function getAllowedActions(
       actions.push({
         action: "RESPOND_RESUBMIT",
         config: {
-          label: "Resubmit to Admin",
+          label: "Resubmit to Finance Officer",
           variant: "default",
           requiresNote: true,
           notePlaceholder: "Explain clarification or provide additional details...",

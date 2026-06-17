@@ -26,7 +26,7 @@ const ROLE_OPTIONS = [
   { value: "Unassigned", label: "Unassigned" },
   { value: "Contractor", label: "Contractor" },
   { value: "Manager", label: "Manager" },
-  { value: "Admin", label: "Admin" },
+  { value: "Admin", label: "Finance Officer" },
 ];
 
 export function NewUserModal({
