@@ -70,8 +70,17 @@ export async function saveVendorOnboarding(
     .single();
 
   if (error) {
-    console.error("[vendorOnboarding.repo] Error saving onboarding:", error);
-    throw error;
+    console.error("[vendorOnboarding.repo] Error saving onboarding:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new Error(
+      `${error.message}${error.code ? ` (code ${error.code})` : ""}${
+        error.details ? ` — ${error.details}` : ""
+      }`
+    );
   }
 
   return getVendorOnboarding(userId);

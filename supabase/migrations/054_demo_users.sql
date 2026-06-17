@@ -23,6 +23,7 @@ DECLARE
   v_manager_id    UUID := '22222222-2222-2222-2222-222222222222';
   v_contractor_id UUID := '33333333-3333-3333-3333-333333333333';
   v_demo_pw       TEXT := 'Demo123!';
+  v_org_id        UUID;
   u               RECORD;
 BEGIN
   FOR u IN
@@ -73,6 +74,38 @@ BEGIN
       email     = EXCLUDED.email,
       is_active = true;
   END LOOP;
+
+  -- app_users — the live schema FKs contractor_profiles.user_id -> app_users(id)
+  -- (legacy normalized schema), so the demo users must exist here too or saving
+  -- onboarding/profile data fails with FK error 23503. Guarded + non-fatal for
+  -- installs where app_users does not exist.
+  BEGIN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'app_users'
+    ) THEN
+      -- Reuse an existing organization, or create one if none exist.
+      SELECT id INTO v_org_id FROM public.organizations LIMIT 1;
+      IF v_org_id IS NULL THEN
+        INSERT INTO public.organizations (id, name)
+        VALUES (gen_random_uuid(), 'Demo Organization')
+        RETURNING id INTO v_org_id;
+      END IF;
+
+      INSERT INTO public.app_users (id, organization_id, role, full_name, email, is_active)
+      VALUES
+        (v_admin_id,      v_org_id, 'admin',      'Demo Admin',      'admin@demo.local',      true),
+        (v_manager_id,    v_org_id, 'manager',    'Demo Manager',    'manager@demo.local',    true),
+        (v_contractor_id, v_org_id, 'contractor', 'Demo Contractor', 'contractor@demo.local', true)
+      ON CONFLICT (id) DO UPDATE SET
+        role      = EXCLUDED.role,
+        full_name = EXCLUDED.full_name,
+        email     = EXCLUDED.email,
+        is_active = true;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipped app_users seed (% — %)', SQLSTATE, SQLERRM;
+  END;
 
   -- Contractor: rates + active flag so contractor/admin screens have data.
   INSERT INTO public.contractors (

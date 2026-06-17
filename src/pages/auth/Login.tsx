@@ -233,21 +233,24 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
           </p>
           <div className="space-y-1.5">
             {[
-              { username: "Admin", desc: "Full system access" },
-              { username: "Manager", desc: "Team management" },
-              { username: "Contractor", desc: "Submit hours & onboarding" },
+              { username: "Admin", email: "admin@demo.local" },
+              { username: "Manager", email: "manager@demo.local" },
+              { username: "Contractor", email: "contractor@demo.local" },
             ].map((u) => (
               <div
                 key={u.username}
-                className="flex items-center justify-between text-sm"
+                className="flex items-center justify-between text-sm gap-3"
               >
                 <span className="font-semibold text-gray-800">{u.username}</span>
-                <span className="text-gray-500">{u.desc}</span>
+                <span className="text-gray-500 truncate">{u.email}</span>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-400 mt-3 text-center">
-            Enter a username above (password is not required for demo).
+          <p className="text-xs text-gray-500 mt-3 text-center">
+            Password: <span className="font-semibold text-gray-700">Demo123!</span>
+          </p>
+          <p className="text-xs text-gray-400 mt-1 text-center">
+            Type a username (e.g. <span className="font-medium">Contractor</span>) above to sign in.
           </p>
         </div>
       </div>
