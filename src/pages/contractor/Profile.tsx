@@ -132,9 +132,9 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
     });
 
     if (result.ok) {
-      toast.success("Onboarding details saved");
+      toast.success("Work order details saved");
     } else {
-      toast.error("Failed to save onboarding details", { description: result.error });
+      toast.error("Failed to save work order details", { description: result.error });
     }
   };
 
@@ -390,34 +390,34 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 bg-white border-b border-gray-200 w-full justify-start h-auto p-0 rounded-none">
+          <TabsList className="mb-6 bg-white border-b border-gray-200 w-full justify-start h-auto p-0 rounded-none overflow-x-auto">
             <TabsTrigger
               value="personal"
-              className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
+              className="px-4 py-3 whitespace-nowrap shrink-0 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
             >
               Personal Information
             </TabsTrigger>
             <TabsTrigger
               value="banking"
-              className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
+              className="px-4 py-3 whitespace-nowrap shrink-0 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
             >
               Banking Details
             </TabsTrigger>
             <TabsTrigger
               value="onboarding"
-              className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
+              className="px-4 py-3 whitespace-nowrap shrink-0 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
             >
-              Onboarding
+              Work Order
             </TabsTrigger>
             <TabsTrigger
               value="contract"
-              className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
+              className="px-4 py-3 whitespace-nowrap shrink-0 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
             >
               Contract Information
             </TabsTrigger>
             <TabsTrigger
               value="tax"
-              className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
+              className="px-4 py-3 whitespace-nowrap shrink-0 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
             >
               Tax Forms
             </TabsTrigger>
@@ -711,7 +711,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
             {/* Info Banner */}
             <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-4">
               <p className="text-sm text-blue-900">
-                <span className="font-semibold">Onboarding:</span> Upload your signed work order
+                <span className="font-semibold">Work Order:</span> Upload your signed work order
                 for our records, then enter your contract details and your last invoice number.
                 Review the values below before saving — new invoices will continue from the number
                 you provide.
@@ -935,7 +935,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                       Saving...
                     </>
                   ) : (
-                    "Save Onboarding"
+                    "Save Work Order"
                   )}
                 </Button>
               </div>
@@ -947,7 +947,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
             {/* Info Banner */}
             <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-4">
               <p className="text-sm text-blue-900">
-                <span className="font-semibold">Note:</span> Rate and contract dates reflect what you entered during onboarding. Project, contract type, and reporting manager are managed by your administrator.
+                <span className="font-semibold">Note:</span> Rate and contract dates reflect what you entered in the Work Order tab. Project, contract type, and reporting manager are managed by your administrator.
               </p>
             </div>
 

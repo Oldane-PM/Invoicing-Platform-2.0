@@ -42,6 +42,7 @@ import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 // Demo credentials seeded by supabase/migrations/054_demo_users.sql
 const DEMO_CREDENTIALS: Record<string, { email: string; password: string }> = {
   admin: { email: "admin@demo.local", password: "Demo123!" },
+  "finance officer": { email: "admin@demo.local", password: "Demo123!" },
   manager: { email: "manager@demo.local", password: "Demo123!" },
   contractor: { email: "contractor@demo.local", password: "Demo123!" },
 };
@@ -104,7 +105,7 @@ function App() {
   
   // Use Demo Names if we are bypassed
   let displayName = "User";
-  if (currentUser === "Admin") displayName = "Admin User";
+  if (currentUser === "Admin") displayName = "Finance Officer";
   if (currentUser === "Manager") displayName = "Manager User";
   if (currentUser === "Contractor") displayName = "Contractor User";
   
@@ -219,7 +220,7 @@ function App() {
       case "dashboard":
         return {
           title: `Welcome, ${displayName}`,
-          subtitle: "Admin Dashboard — System overview and financial monitoring",
+          subtitle: "Finance Officer Dashboard — System overview and financial monitoring",
         };
       case "directory":
         return {

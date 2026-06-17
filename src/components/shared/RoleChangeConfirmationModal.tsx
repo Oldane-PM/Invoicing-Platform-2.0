@@ -32,6 +32,8 @@ interface RoleChangeConfirmationModalProps {
 }
 
 function capitalizeRole(role: UserRole): string {
+  // "admin" is presented to users as "Finance Officer" (internal value unchanged).
+  if (role.toLowerCase() === "admin") return "Finance Officer";
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
@@ -85,7 +87,7 @@ export function RoleChangeConfirmationModal({
             {isAdminSelfLockout ? (
               <>
                 <ShieldAlert className="w-5 h-5 text-red-600" />
-                <span className="text-red-600">Critical: Admin Self-Lockout</span>
+                <span className="text-red-600">Critical: Finance Officer Self-Lockout</span>
               </>
             ) : (
               <>
@@ -97,8 +99,8 @@ export function RoleChangeConfirmationModal({
           <DialogDescription className="pt-2">
             {isAdminSelfLockout ? (
               <span className="text-red-600 font-medium">
-                Warning: You are about to remove your own admin access. 
-                You may lose the ability to access the Admin Portal.
+                Warning: You are about to remove your own finance officer access.
+                You may lose the ability to access the Finance Officer Portal.
               </span>
             ) : (
               <>

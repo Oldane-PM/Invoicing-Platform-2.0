@@ -549,7 +549,7 @@ export function ContractorDetailDrawer({
 
                   {/* Onboarding (read-only) — work order + contractor-entered details */}
                   <div className="pt-2 border-t border-gray-200 space-y-4">
-                    <h4 className="text-sm font-semibold text-gray-900">Onboarding</h4>
+                    <h4 className="text-sm font-semibold text-gray-900">Work Order</h4>
 
                     {/* Signed Work Order */}
                     <div>

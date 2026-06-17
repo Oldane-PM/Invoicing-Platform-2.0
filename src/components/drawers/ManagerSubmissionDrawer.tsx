@@ -87,11 +87,11 @@ export function ManagerSubmissionDrawer({
       case "Pending":
         return "Pending Manager Approval";
       case "Approved":
-        return "Awaiting Admin Payment";
+        return "Awaiting Finance Officer Payment";
       case "Rejected":
         return "Rejected (Contractor Action Required)";
       case "Clarification":
-        return "Admin Requested Clarification";
+        return "Finance Officer Requested Clarification";
       case "Paid":
         return "Paid";
       default:
@@ -302,7 +302,7 @@ export function ManagerSubmissionDrawer({
                 {submission.status === "Clarification" && submission.adminNote && (
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">
-                      Admin Clarification Request
+                      Finance Officer Clarification Request
                     </h3>
                     <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
                       <p className="text-sm text-orange-900 leading-relaxed">
@@ -362,7 +362,7 @@ export function ManagerSubmissionDrawer({
                   className="flex-1 bg-blue-600 hover:bg-blue-700 h-11 rounded-lg"
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  Resubmit to Admin
+                  Resubmit to Finance Officer
                 </Button>
                 <Button
                   variant="outline"
@@ -453,11 +453,11 @@ export function ManagerSubmissionDrawer({
         <DialogContent className="sm:max-w-[440px] bg-white p-0" aria-describedby="clarification-response-description">
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200">
             <DialogTitle className="text-lg font-semibold text-gray-900">
-              {clarificationResponseType === "RESUBMIT" ? "Resubmit to Admin" : "Reject to Contractor"}
+              {clarificationResponseType === "RESUBMIT" ? "Resubmit to Finance Officer" : "Reject to Contractor"}
             </DialogTitle>
             <DialogDescription id="clarification-response-description" className="sr-only">
               {clarificationResponseType === "RESUBMIT"
-                ? "Provide clarification response for the admin"
+                ? "Provide clarification response for the finance officer"
                 : "Provide instructions for the contractor"}
             </DialogDescription>
           </DialogHeader>
@@ -465,7 +465,7 @@ export function ManagerSubmissionDrawer({
             {/* Show the admin's original request */}
             {submission?.adminNote && (
               <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                <div className="text-xs text-orange-700 mb-1">Admin asked:</div>
+                <div className="text-xs text-orange-700 mb-1">Finance Officer asked:</div>
                 <p className="text-sm text-orange-900">{submission.adminNote}</p>
               </div>
             )}
@@ -488,7 +488,7 @@ export function ManagerSubmissionDrawer({
               />
               <p className="text-xs text-gray-500 mt-1.5">
                 {clarificationResponseType === "RESUBMIT"
-                  ? "This will be sent to the admin along with the submission."
+                  ? "This will be sent to the finance officer along with the submission."
                   : "This will be sent to the contractor with the rejection."}
               </p>
             </div>
@@ -513,7 +513,7 @@ export function ManagerSubmissionDrawer({
                   : "bg-red-600 hover:bg-red-700"
               }`}
             >
-              {clarificationResponseType === "RESUBMIT" ? "Send to Admin" : "Reject to Contractor"}
+              {clarificationResponseType === "RESUBMIT" ? "Send to Finance Officer" : "Reject to Contractor"}
             </Button>
           </div>
         </DialogContent>

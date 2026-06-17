@@ -103,12 +103,12 @@ export function SubmissionReviewDrawer({
     const statusMap: Record<string, string> = {
       submitted: "Pending Manager Approval",
       pending_manager: "Pending Manager Approval",
-      approved: "Awaiting Admin Payment",
-      awaiting_admin_payment: "Awaiting Admin Payment",
+      approved: "Awaiting Finance Officer Payment",
+      awaiting_admin_payment: "Awaiting Finance Officer Payment",
       rejected: "Rejected (Contractor Action Required)",
       rejected_contractor: "Rejected (Contractor Action Required)",
-      needs_clarification: "Admin Requested Clarification",
-      clarification_requested: "Admin Requested Clarification",
+      needs_clarification: "Finance Officer Requested Clarification",
+      clarification_requested: "Finance Officer Requested Clarification",
       paid: "Paid",
     };
     return statusMap[status] || status;

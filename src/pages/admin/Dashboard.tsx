@@ -40,12 +40,12 @@ const statusStyles: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   submitted: "Pending Manager Approval",
   pending_manager: "Pending Manager Approval",
-  approved: "Awaiting Admin Payment",
-  awaiting_admin_payment: "Awaiting Admin Payment",
+  approved: "Awaiting Finance Officer Payment",
+  awaiting_admin_payment: "Awaiting Finance Officer Payment",
   rejected: "Rejected",
   rejected_contractor: "Rejected (Action Required)",
   needs_clarification: "Needs Clarification",
-  clarification_requested: "Admin Requested Clarification",
+  clarification_requested: "Finance Officer Requested Clarification",
   paid: "Paid",
 };
 
@@ -225,7 +225,7 @@ export function AdminDashboard() {
               onValueChange={(value) => setFilters({ ...filters, status: value })}
               options={[
                 { value: "submitted", label: "Pending Manager Approval" },
-                { value: "approved", label: "Awaiting Admin Payment" },
+                { value: "approved", label: "Awaiting Finance Officer Payment" },
                 { value: "paid", label: "Paid" },
                 { value: "rejected", label: "Rejected" },
                 { value: "needs_clarification", label: "Needs Clarification" },

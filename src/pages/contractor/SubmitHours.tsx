@@ -505,7 +505,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 <strong>No projects assigned.</strong> You cannot submit hours until a project is assigned to you. 
-                Please contact your manager or admin.
+                Please contact your manager or finance officer.
               </AlertDescription>
             </Alert>
           )}

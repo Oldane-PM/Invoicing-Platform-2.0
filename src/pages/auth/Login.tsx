@@ -143,8 +143,8 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
     }
 
     const lowerUser = username.toLowerCase().trim();
-    if (!["admin", "manager", "contractor"].includes(lowerUser)) {
-      setError("Invalid username. Try Admin, Manager, or Contractor.");
+    if (!["admin", "finance officer", "manager", "contractor"].includes(lowerUser)) {
+      setError("Invalid username. Try Finance Officer, Manager, or Contractor.");
       return;
     }
 
@@ -233,7 +233,7 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
           </p>
           <div className="space-y-1.5">
             {[
-              { username: "Admin", email: "admin@demo.local" },
+              { username: "Finance Officer", email: "admin@demo.local" },
               { username: "Manager", email: "manager@demo.local" },
               { username: "Contractor", email: "contractor@demo.local" },
             ].map((u) => (
