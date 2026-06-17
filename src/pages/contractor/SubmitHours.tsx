@@ -370,6 +370,11 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       return;
     }
 
+    if (!paymentLink.trim()) {
+      toast.error("Please provide a Payment Link");
+      return;
+    }
+
     if (paymentLink.trim()) {
       try {
         new URL(paymentLink);
@@ -960,7 +965,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
                 className="text-sm font-medium text-gray-900 mb-1.5 block"
               >
                 Payment Link{" "}
-                <span className="text-gray-500 font-normal">(Optional)</span>
+                <span className="text-red-600">*</span>
               </Label>
               <Input
                 id="payment-link"
