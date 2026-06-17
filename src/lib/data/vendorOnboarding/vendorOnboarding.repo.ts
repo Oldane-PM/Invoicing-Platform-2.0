@@ -1,0 +1,151 @@
+/**
+ * Vendor Onboarding Repository (Supabase)
+ *
+ * Persists onboarding data to the contractor_profiles columns added in migration
+ * 052, uploads signed work orders to the private "work-orders" storage bucket,
+ * and records each upload in vendor_work_orders for audit purposes.
+ */
+
+import { getSupabaseClient } from "../../supabase/client";
+import {
+  emptyVendorOnboarding,
+  type VendorOnboardingData,
+  type VendorOnboardingPatch,
+  type WorkOrderRef,
+  type WorkOrderUploadResult,
+} from "./vendorOnboarding.types";
+
+const WORK_ORDERS_BUCKET = "work-orders";
+const SIGNED_URL_EXPIRY_SECONDS = 600; // 10 minutes
+
+// Columns that belong to onboarding (subset of contractor_profiles).
+const ONBOARDING_COLUMNS =
+  "user_id, onboarding_role, onboarding_rate, onboarding_rate_type, contract_start_date, contract_end_date, last_invoice_number, work_order_path, work_order_filename, work_order_uploaded_at, onboarding_completed_at";
+
+/** Fetch onboarding fields for a contractor. Returns empty record if none yet. */
+export async function getVendorOnboarding(userId: string): Promise<VendorOnboardingData> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("contractor_profiles")
+    .select(ONBOARDING_COLUMNS)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error && error.code !== "PGRST116") {
+    console.error("[vendorOnboarding.repo] Error fetching onboarding:", error);
+    throw error;
+  }
+
+  if (!data) return emptyVendorOnboarding(userId);
+
+  return {
+    user_id: userId,
+    onboarding_role: data.onboarding_role ?? null,
+    onboarding_rate: data.onboarding_rate ?? null,
+    onboarding_rate_type: data.onboarding_rate_type ?? null,
+    contract_start_date: data.contract_start_date ?? null,
+    contract_end_date: data.contract_end_date ?? null,
+    last_invoice_number: data.last_invoice_number ?? null,
+    work_order_path: data.work_order_path ?? null,
+    work_order_filename: data.work_order_filename ?? null,
+    work_order_uploaded_at: data.work_order_uploaded_at ?? null,
+    onboarding_completed_at: data.onboarding_completed_at ?? null,
+  };
+}
+
+/** Upsert onboarding fields. Only updates the provided fields. */
+export async function saveVendorOnboarding(
+  userId: string,
+  patch: VendorOnboardingPatch
+): Promise<VendorOnboardingData> {
+  const supabase = getSupabaseClient();
+
+  const { error } = await supabase
+    .from("contractor_profiles")
+    .upsert(
+      { user_id: userId, ...patch, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    )
+    .select(ONBOARDING_COLUMNS)
+    .single();
+
+  if (error) {
+    console.error("[vendorOnboarding.repo] Error saving onboarding:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new Error(
+      `${error.message}${error.code ? ` (code ${error.code})` : ""}${
+        error.details ? ` — ${error.details}` : ""
+      }`
+    );
+  }
+
+  return getVendorOnboarding(userId);
+}
+
+/**
+ * Upload a signed work order to the work-orders bucket and record it in the
+ * audit table. Returns the stored path + filename.
+ */
+export async function uploadWorkOrder(
+  userId: string,
+  file: File
+): Promise<WorkOrderUploadResult> {
+  const supabase = getSupabaseClient();
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${userId}/${Date.now()}-${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(WORK_ORDERS_BUCKET)
+    .upload(path, file, {
+      contentType: file.type || "application/octet-stream",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    console.error("[vendorOnboarding.repo] Work order upload failed:", uploadError);
+    throw new Error(`Failed to upload work order: ${uploadError.message}`);
+  }
+
+  const uploadedAt = new Date().toISOString();
+
+  // Record in audit table (non-fatal if it fails — upload already succeeded).
+  const { error: auditError } = await supabase.from("vendor_work_orders").insert({
+    user_id: userId,
+    storage_path: path,
+    file_name: file.name,
+    file_size: file.size,
+    content_type: file.type || null,
+    uploaded_at: uploadedAt,
+  });
+
+  if (auditError) {
+    console.error("[vendorOnboarding.repo] Work order audit insert failed:", auditError);
+  }
+
+  return { path, filename: file.name, uploadedAt };
+}
+
+/** Build an openable signed URL for a stored work order. */
+export async function getWorkOrderRef(
+  path: string,
+  filename: string | null
+): Promise<WorkOrderRef> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase.storage
+    .from(WORK_ORDERS_BUCKET)
+    .createSignedUrl(path, SIGNED_URL_EXPIRY_SECONDS);
+
+  if (error || !data) {
+    console.error("[vendorOnboarding.repo] Failed to sign work order URL:", error);
+    throw new Error(`Failed to open work order: ${error?.message ?? "unknown error"}`);
+  }
+
+  return { path, filename, url: data.signedUrl };
+}

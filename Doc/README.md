@@ -66,19 +66,25 @@
 
   ## 👥 User Roles & Login
 
-  The app supports three user roles with different access levels:
+  Demo login signs in with **real Supabase users** seeded by
+  `supabase/migrations/054_demo_users.sql`. Type the username on the login screen
+  (the password field is ignored — the seeded credentials are used automatically).
+  Apply migrations `053_vendor_onboarding.sql` and `054_demo_users.sql` to your
+  Supabase project first, or demo login will report a sign-in error.
 
   ### Admin Access
-  - Username: `Admin`
+  - Username: `Admin` (`admin@demo.local` / `Demo123!`)
   - Full system access including user management and calendar
 
   ### Manager Access
-  - Username: `Manager`
+  - Username: `Manager` (`manager@demo.local` / `Demo123!`)
   - Team management and submission approval
 
   ### Contractor Access
-  - Username: `Contractor`
-  - Submit hours, view submissions, and manage profile
+  - Username: `Contractor` (`contractor@demo.local` / `Demo123!`)
+  - Onboarding (work order upload + contract details + invoice numbering),
+    submit hours, view submissions, and manage profile
+  - Re-test onboarding anytime via `supabase/reset_demo_contractor.sql`
 
   ## 📁 Project Structure
 
@@ -140,9 +146,9 @@
 
   ## 🐛 Known Issues
 
-  - Mock data is used for demonstration purposes
-  - Authentication is simulated (no real backend)
-  - PDF generation uses mock data
+  - Demo login uses seeded Supabase users (see User Roles & Login); the typed
+    password is ignored in favor of the seeded credentials
+  - Requires the SQL migrations to be applied to a configured Supabase project
 
   ## 📝 License
 

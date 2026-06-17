@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 
 interface LoginProps {
   authLoading?: boolean;
-  onDemoLogin?: (role: string) => void;
+  onDemoLogin?: (role: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 /* 
@@ -133,26 +133,28 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
 
-    // Simulate network delay
-    setTimeout(() => {
-      if (onDemoLogin) {
-        const lowerUser = username.toLowerCase().trim();
-        if (["admin", "manager", "contractor"].includes(lowerUser)) {
-          onDemoLogin(lowerUser);
-        } else {
-          setError("Invalid username. Try Admin, Manager, or Contractor.");
-          setLoading(false);
-        }
-      } else {
-        setError("Demo login handler is not provided.");
-        setLoading(false);
-      }
-    }, 500);
+    if (!onDemoLogin) {
+      setError("Demo login handler is not provided.");
+      return;
+    }
+
+    const lowerUser = username.toLowerCase().trim();
+    if (!["admin", "manager", "contractor"].includes(lowerUser)) {
+      setError("Invalid username. Try Admin, Manager, or Contractor.");
+      return;
+    }
+
+    setLoading(true);
+    const result = await onDemoLogin(lowerUser);
+    // On success the app navigates away; only handle the failure case here.
+    if (!result.ok) {
+      setError(result.error || "Sign in failed. Please try again.");
+      setLoading(false);
+    }
   };
 
   if (authLoading) {
@@ -185,7 +187,7 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
               <input
                 type="text"
                 placeholder="Enter username"
-                className="w-full h-12 px-4 rounded-xl border border-blue-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm"
+                className="w-full h-12 px-4 rounded-xl border border-blue-200 bg-[#F8FAFC] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
@@ -198,7 +200,7 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
               <input
                 type="password"
                 placeholder="Enter password"
-                className="w-full h-12 px-4 rounded-xl border border-gray-100 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
+                className="w-full h-12 px-4 rounded-xl border border-gray-100 bg-[#F8FAFC] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -224,12 +226,31 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
           </form>
         </div>
 
-        {/* Hint Text */}
-        <div className="text-center">
-          <p className="text-sm text-gray-500">
-            Demo usernames: <span className="font-semibold text-gray-700">Admin</span>,{" "}
-            <span className="font-semibold text-gray-700">Manager</span>, or{" "}
-            <span className="font-semibold text-gray-700">Contractor</span>
+        {/* Demo Credentials Hint */}
+        <div className="bg-white rounded-[16px] border border-gray-100 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+          <p className="text-xs font-semibold text-gray-700 mb-2 text-center">
+            Demo Credentials
+          </p>
+          <div className="space-y-1.5">
+            {[
+              { username: "Admin", email: "admin@demo.local" },
+              { username: "Manager", email: "manager@demo.local" },
+              { username: "Contractor", email: "contractor@demo.local" },
+            ].map((u) => (
+              <div
+                key={u.username}
+                className="flex items-center justify-between text-sm gap-3"
+              >
+                <span className="font-semibold text-gray-800">{u.username}</span>
+                <span className="text-gray-500 truncate">{u.email}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-3 text-center">
+            Password: <span className="font-semibold text-gray-700">Demo123!</span>
+          </p>
+          <p className="text-xs text-gray-400 mt-1 text-center">
+            Type a username (e.g. <span className="font-medium">Contractor</span>) above to sign in.
           </p>
         </div>
       </div>
