@@ -17,13 +17,27 @@ Navigate to `http://localhost:5173`
 
 ## 👤 Login Credentials
 
-Test the app with these user roles:
+Demo login signs in with **real Supabase users** seeded by `supabase/migrations/053_demo_users.sql`.
+On the login screen, type the username below (the password field is ignored — the
+app signs in with the seeded credentials behind the scenes):
 
-| Role | Username | Access Level |
-|------|----------|--------------|
-| **Admin** | `Admin` | Full system access |
-| **Manager** | `Manager` | Team management |
-| **Contractor** | `Contractor` | Submit hours & view invoices |
+| Role | Username | Seeded email | Password | Access Level |
+|------|----------|--------------|----------|--------------|
+| **Admin** | `Admin` | `admin@demo.local` | `Demo123!` | Full system access |
+| **Manager** | `Manager` | `manager@demo.local` | `Demo123!` | Team management |
+| **Contractor** | `Contractor` | `contractor@demo.local` | `Demo123!` | Submit hours & view invoices |
+
+> **First-time setup:** apply the SQL migrations to your Supabase project before
+> logging in — at minimum `052_vendor_onboarding.sql` (onboarding schema) and
+> `053_demo_users.sql` (these demo users). Without `053`, demo login will report
+> a sign-in error.
+
+### Re-testing contractor onboarding
+
+To run the contractor onboarding flow from scratch again, execute
+`supabase/reset_demo_contractor.sql` in the Supabase SQL Editor. It clears the
+demo contractor's onboarding fields, work-order uploads, and (optionally)
+generated invoice numbers. Safe to run repeatedly.
 
 ## 📱 Key Features to Test
 
@@ -41,10 +55,12 @@ Test the app with these user roles:
 4. View team member details
 
 ### As Contractor
-1. Submit work hours
-2. View submission history
-3. Generate PDF invoices
-4. Update profile information
+1. Complete onboarding (Profile → Onboarding): upload a signed work order, enter
+   role/rate/contract dates, and set your last invoice number
+2. Submit work hours
+3. View submission history
+4. Generate PDF invoices (numbers continue from your last invoice number)
+5. Update profile information
 
 ## 🛠️ Available Commands
 

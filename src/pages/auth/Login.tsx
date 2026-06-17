@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 
 interface LoginProps {
   authLoading?: boolean;
-  onDemoLogin?: (role: string) => void;
+  onDemoLogin?: (role: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 /* 
@@ -133,26 +133,28 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
 
-    // Simulate network delay
-    setTimeout(() => {
-      if (onDemoLogin) {
-        const lowerUser = username.toLowerCase().trim();
-        if (["admin", "manager", "contractor"].includes(lowerUser)) {
-          onDemoLogin(lowerUser);
-        } else {
-          setError("Invalid username. Try Admin, Manager, or Contractor.");
-          setLoading(false);
-        }
-      } else {
-        setError("Demo login handler is not provided.");
-        setLoading(false);
-      }
-    }, 500);
+    if (!onDemoLogin) {
+      setError("Demo login handler is not provided.");
+      return;
+    }
+
+    const lowerUser = username.toLowerCase().trim();
+    if (!["admin", "manager", "contractor"].includes(lowerUser)) {
+      setError("Invalid username. Try Admin, Manager, or Contractor.");
+      return;
+    }
+
+    setLoading(true);
+    const result = await onDemoLogin(lowerUser);
+    // On success the app navigates away; only handle the failure case here.
+    if (!result.ok) {
+      setError(result.error || "Sign in failed. Please try again.");
+      setLoading(false);
+    }
   };
 
   if (authLoading) {
@@ -224,12 +226,28 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
           </form>
         </div>
 
-        {/* Hint Text */}
-        <div className="text-center">
-          <p className="text-sm text-gray-500">
-            Demo usernames: <span className="font-semibold text-gray-700">Admin</span>,{" "}
-            <span className="font-semibold text-gray-700">Manager</span>, or{" "}
-            <span className="font-semibold text-gray-700">Contractor</span>
+        {/* Demo Credentials Hint */}
+        <div className="bg-white rounded-[16px] border border-gray-100 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+          <p className="text-xs font-semibold text-gray-700 mb-2 text-center">
+            Demo Credentials
+          </p>
+          <div className="space-y-1.5">
+            {[
+              { username: "Admin", desc: "Full system access" },
+              { username: "Manager", desc: "Team management" },
+              { username: "Contractor", desc: "Submit hours & onboarding" },
+            ].map((u) => (
+              <div
+                key={u.username}
+                className="flex items-center justify-between text-sm"
+              >
+                <span className="font-semibold text-gray-800">{u.username}</span>
+                <span className="text-gray-500">{u.desc}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-3 text-center">
+            Enter a username above (password is not required for demo).
           </p>
         </div>
       </div>

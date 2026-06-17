@@ -36,7 +36,29 @@ import { NotificationDrawer } from "./components/shared/NotificationDrawer";
 import { ThemeToggle } from "./components/shared/ThemeToggle";
 import { ContractorDetailDrawer } from "./components/drawers/ContractorDetailDrawer";
 import { useAuth } from "./lib/hooks/useAuth";
+import { getUserProfile } from "./lib/supabase/repos/auth.repo";
 import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
+
+// Demo credentials seeded by supabase/migrations/053_demo_users.sql
+const DEMO_CREDENTIALS: Record<string, { email: string; password: string }> = {
+  admin: { email: "admin@demo.local", password: "Demo123!" },
+  manager: { email: "manager@demo.local", password: "Demo123!" },
+  contractor: { email: "contractor@demo.local", password: "Demo123!" },
+};
+
+// Map a profile role (any casing) to the app's UserRole.
+function roleToUserRole(role: string | null | undefined): UserRole {
+  switch ((role || "").toUpperCase()) {
+    case "ADMIN":
+      return "Admin";
+    case "MANAGER":
+      return "Manager";
+    case "CONTRACTOR":
+      return "Contractor";
+    default:
+      return "Unassigned";
+  }
+}
 
 type Screen = "dashboard" | "directory" | "access" | "calendar" | "projects";
 type ManagerScreen = "dashboard" | "team";
@@ -48,8 +70,8 @@ type UserRole = "Admin" | "Manager" | "Contractor" | "Unassigned" | null;
 type AppView = "login" | "oauth-callback" | "app";
 
 function App() {
-  // Supabase auth for Contractor and Manager - BYPASSED for Demo
-  const { isAuthenticated, user, signOut, loading: authLoading } = useAuth();
+  // Supabase auth — demo login now signs in with real seeded users.
+  const { isAuthenticated, user, signIn, signOut, loading: authLoading } = useAuth();
 
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
   const [currentView, setCurrentView] = React.useState<AppView>("login");
@@ -94,10 +116,24 @@ function App() {
     // BYPASSED FOR DEMO
   }, []);
 
-  // Fetch role on initial auth state change (login/logout)
+  // Restore the portal on refresh: if a Supabase session already exists but the
+  // app hasn't routed yet, look up the role and drop the user back into their portal.
   React.useEffect(() => {
-    // fetchUserRole(true); BYPASSED FOR DEMO
-  }, [isAuthenticated, user, authLoading, signOut]);
+    if (authLoading || currentView === "oauth-callback") return;
+    if (currentUser || !user?.id) return;
+
+    let cancelled = false;
+    (async () => {
+      const profile = await getUserProfile(user.id);
+      if (cancelled) return;
+      setCurrentUser(roleToUserRole(profile?.role));
+      setCurrentView("app");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user, currentUser, currentView]);
 
   // Re-fetch role when tab becomes visible and poll every 30s while authenticated
   // This ensures admin role changes take effect without requiring the user to re-login
@@ -119,26 +155,34 @@ function App() {
     setCurrentView("app");
   };
 
-  // Handle demo login
-  const handleDemoLogin = (role: string) => {
-    if (role.toLowerCase() === 'admin') {
-      setCurrentUser('Admin');
-    } else if (role.toLowerCase() === 'manager') {
-      setCurrentUser('Manager');
-    } else if (role.toLowerCase() === 'contractor') {
-      setCurrentUser('Contractor');
-    } else {
-      setCurrentUser('Unassigned');
+  // Handle demo login — signs in with the seeded Supabase user for the role so a
+  // real session exists and all role-scoped screens work through Supabase + RLS.
+  const handleDemoLogin = async (
+    role: string
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const creds = DEMO_CREDENTIALS[role.toLowerCase()];
+    if (!creds) {
+      return { ok: false, error: "Unknown demo user." };
     }
-    setCurrentView('app');
+
+    const result = await signIn(creds.email, creds.password);
+    if (!result.success) {
+      return {
+        ok: false,
+        error:
+          result.error ||
+          "Could not sign in. Did you run migration 053 to seed the demo users?",
+      };
+    }
+
+    setCurrentUser(roleToUserRole(result.role));
+    setCurrentView("app");
+    return { ok: true };
   };
 
   // Handle logout for all user types
   const handleLogout = async () => {
-    // Bypassed Supabase signOut for demo
-    // if (currentUser === "Contractor" || currentUser === "Manager" || currentUser === "Unassigned" || currentUser === "Admin") {
-    //   await signOut();
-    // }
+    await signOut();
     setCurrentUser(null);
     setCurrentScreen("dashboard");
     setManagerScreen("dashboard");
