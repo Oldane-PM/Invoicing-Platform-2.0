@@ -6,10 +6,26 @@ import { Textarea } from "../../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { toast } from "sonner";
-import { Calendar, DollarSign, Clock, ArrowLeft, Loader2 } from "lucide-react";
+import {
+  Calendar,
+  DollarSign,
+  Clock,
+  ArrowLeft,
+  Loader2,
+  Upload,
+  FileText,
+  ExternalLink,
+  Hash,
+} from "lucide-react";
 import { useContractorProfile } from "../../lib/hooks/contractor/useContractorProfile";
+import { useVendorOnboarding } from "../../lib/hooks/contractor/useVendorOnboarding";
+import { incrementInvoiceNumber } from "../../lib/invoiceSequence";
 import { format } from "date-fns";
 import { TaxFormsTab } from "./TaxFormsTab";
+
+// Accepted work order file types and max size (10MB).
+const WORK_ORDER_ACCEPT = ".pdf,.doc,.docx,.png,.jpg,.jpeg";
+const WORK_ORDER_MAX_BYTES = 10 * 1024 * 1024;
 
 interface ContractorProfileProps {
   onCancel: () => void;
@@ -17,8 +33,130 @@ interface ContractorProfileProps {
 
 export function ContractorProfile({ onCancel }: ContractorProfileProps) {
   const { profile, contract, isLoading, isSaving, error, saveProfile } = useContractorProfile();
-  
+
+  // Onboarding (work order + contract details + invoice sequence)
+  const {
+    data: onboarding,
+    isSaving: isSavingOnboarding,
+    isUploading,
+    saveOnboarding,
+    uploadWorkOrderFile,
+    getWorkOrderUrl,
+  } = useVendorOnboarding();
+
   const [activeTab, setActiveTab] = React.useState("personal");
+
+  // Onboarding form state (manually entered / reviewed before submission)
+  const [woRole, setWoRole] = React.useState("");
+  const [woRate, setWoRate] = React.useState("");
+  const [woRateType, setWoRateType] = React.useState<"hourly" | "fixed">("hourly");
+  const [woStart, setWoStart] = React.useState("");
+  const [woEnd, setWoEnd] = React.useState("");
+  const [lastInvoiceNumber, setLastInvoiceNumber] = React.useState("");
+  const [onboardingInitialized, setOnboardingInitialized] = React.useState(false);
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Initialize onboarding form from stored data once it loads
+  React.useEffect(() => {
+    if (onboarding && !onboardingInitialized) {
+      setWoRole(onboarding.onboarding_role || "");
+      setWoRate(onboarding.onboarding_rate != null ? String(onboarding.onboarding_rate) : "");
+      setWoRateType(onboarding.onboarding_rate_type === "fixed" ? "fixed" : "hourly");
+      setWoStart(onboarding.contract_start_date || "");
+      setWoEnd(onboarding.contract_end_date || "");
+      setLastInvoiceNumber(onboarding.last_invoice_number || "");
+      setOnboardingInitialized(true);
+    }
+  }, [onboarding, onboardingInitialized]);
+
+  const handleWorkOrderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUploadError(null);
+    const file = e.target.files?.[0];
+    // Allow re-selecting the same file later
+    e.target.value = "";
+    if (!file) return;
+
+    if (file.size > WORK_ORDER_MAX_BYTES) {
+      const msg = "File is too large. Maximum size is 10MB.";
+      setUploadError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const result = await uploadWorkOrderFile(file);
+    if (result.ok) {
+      toast.success("Work order uploaded");
+    } else {
+      const msg = result.error || "We couldn't process that document. Please try a different file.";
+      setUploadError(msg);
+      toast.error("Upload failed", { description: msg });
+    }
+  };
+
+  const handleViewWorkOrder = async () => {
+    if (!onboarding?.work_order_path) return;
+    try {
+      const ref = await getWorkOrderUrl(onboarding.work_order_path, onboarding.work_order_filename);
+      if (ref.url) {
+        window.open(ref.url, "_blank", "noopener,noreferrer");
+      } else {
+        toast.error("Work order file is not available");
+      }
+    } catch (err) {
+      toast.error("Could not open work order", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
+  };
+
+  const handleSaveOnboarding = async () => {
+    const rateValue = woRate.trim() === "" ? null : Number(woRate);
+    if (rateValue != null && (Number.isNaN(rateValue) || rateValue < 0)) {
+      toast.error("Rate must be a valid number");
+      return;
+    }
+    if (woStart && woEnd && woEnd < woStart) {
+      toast.error("Contract expiry date cannot be before the start date");
+      return;
+    }
+
+    const result = await saveOnboarding({
+      onboarding_role: woRole.trim() || null,
+      onboarding_rate: rateValue,
+      onboarding_rate_type: woRateType,
+      contract_start_date: woStart || null,
+      contract_end_date: woEnd || null,
+      last_invoice_number: lastInvoiceNumber.trim() || null,
+      onboarding_completed_at: new Date().toISOString(),
+    });
+
+    if (result.ok) {
+      toast.success("Onboarding details saved");
+    } else {
+      toast.error("Failed to save onboarding details", { description: result.error });
+    }
+  };
+
+  // The next invoice number that will be generated for this vendor.
+  const nextInvoiceNumber = lastInvoiceNumber.trim()
+    ? incrementInvoiceNumber(lastInvoiceNumber.trim())
+    : null;
+
+  // Contract Information tab reflects onboarding-entered values when present,
+  // falling back to the admin-managed contract data.
+  const displayStartDate = onboarding?.contract_start_date || contract?.start_date || null;
+  const displayEndDate = onboarding?.contract_end_date || contract?.end_date || null;
+  const displayRole = onboarding?.onboarding_role || contract?.position || null;
+  const onboardingRate = onboarding?.onboarding_rate ?? null;
+  const isFixedRate =
+    onboardingRate != null && onboarding?.onboarding_rate_type === "fixed";
+  const displayHourlyRate =
+    onboardingRate != null && onboarding?.onboarding_rate_type !== "fixed"
+      ? onboardingRate
+      : contract?.hourly_rate ?? null;
+  const displayOvertimeRate =
+    displayHourlyRate != null ? displayHourlyRate * 1.5 : contract?.overtime_rate ?? null;
   
   // Personal Information State (local form state)
   const [fullName, setFullName] = React.useState("");
@@ -264,6 +402,12 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
               className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
             >
               Banking Details
+            </TabsTrigger>
+            <TabsTrigger
+              value="onboarding"
+              className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
+            >
+              Onboarding
             </TabsTrigger>
             <TabsTrigger
               value="contract"
@@ -562,52 +706,304 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
             </div>
           </TabsContent>
 
+          {/* Onboarding Tab */}
+          <TabsContent value="onboarding" className="space-y-6">
+            {/* Info Banner */}
+            <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-4">
+              <p className="text-sm text-blue-900">
+                <span className="font-semibold">Onboarding:</span> Upload your signed work order
+                for our records, then enter your contract details and your last invoice number.
+                Review the values below before saving — new invoices will continue from the number
+                you provide.
+              </p>
+            </div>
+
+            {/* Work Order Upload */}
+            <div className="bg-white rounded-[14px] border border-gray-200 p-4">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Signed Work Order
+              </h2>
+
+              {onboarding?.work_order_path ? (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {onboarding.work_order_filename || "Work order"}
+                      </p>
+                      {onboarding.work_order_uploaded_at && (
+                        <p className="text-xs text-gray-500">
+                          Uploaded {formatContractDate(onboarding.work_order_uploaded_at)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    onClick={handleViewWorkOrder}
+                    className="h-9 px-3 text-blue-600 hover:bg-blue-50 shrink-0"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-1.5" />
+                    View
+                  </Button>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+                  <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600">
+                    Upload your signed work order (PDF, Word, or image — max 10MB)
+                  </p>
+                </div>
+              )}
+
+              {uploadError && (
+                <p className="mt-3 text-sm text-red-600">{uploadError}</p>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={WORK_ORDER_ACCEPT}
+                className="hidden"
+                onChange={handleWorkOrderSelect}
+              />
+
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="h-11 px-6 rounded-lg border-gray-300"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 mr-2" />
+                      {onboarding?.work_order_path ? "Replace Work Order" : "Upload Work Order"}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Contract Details (manually entered) */}
+            <div className="bg-white rounded-[14px] border border-gray-200 p-4">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                Contract Details
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Enter these from your work order. You can review and edit them before saving.
+              </p>
+
+              <div className="space-y-5">
+                {/* Role */}
+                <div>
+                  <Label htmlFor="woRole" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    Role
+                  </Label>
+                  <Input
+                    id="woRole"
+                    value={woRole}
+                    onChange={(e) => setWoRole(e.target.value)}
+                    placeholder="e.g. Software Engineer"
+                    className="h-11 bg-white border-gray-300 rounded-lg"
+                  />
+                </div>
+
+                {/* Rate type + amount */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="woRateType" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                      Rate Type
+                    </Label>
+                    <Select
+                      value={woRateType}
+                      onValueChange={(value) => setWoRateType(value as "hourly" | "fixed")}
+                    >
+                      <SelectTrigger id="woRateType" className="h-11 bg-white border-gray-300 rounded-lg">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hourly">Hourly Rate</SelectItem>
+                        <SelectItem value="fixed">Fixed Rate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="woRate" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                      {woRateType === "fixed" ? "Fixed Rate" : "Hourly Rate"}
+                    </Label>
+                    <Input
+                      id="woRate"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={woRate}
+                      onChange={(e) => setWoRate(e.target.value)}
+                      placeholder={woRateType === "fixed" ? "e.g. 5000.00" : "e.g. 75.00"}
+                      className="h-11 bg-white border-gray-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                {/* Start & End dates */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="woStart" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                      Contract Start Date
+                    </Label>
+                    <Input
+                      id="woStart"
+                      type="date"
+                      value={woStart}
+                      onChange={(e) => setWoStart(e.target.value)}
+                      className="h-11 bg-white border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="woEnd" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                      Contract Expiry Date
+                    </Label>
+                    <Input
+                      id="woEnd"
+                      type="date"
+                      value={woEnd}
+                      onChange={(e) => setWoEnd(e.target.value)}
+                      className="h-11 bg-white border-gray-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Invoice Sequence */}
+            <div className="bg-white rounded-[14px] border border-gray-200 p-4">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                Invoice Numbering
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Enter your last invoice number if you have one. New invoices will continue from it.
+                Leave this blank if you're a new contractor — numbering will start automatically.
+              </p>
+
+              <div>
+                <Label htmlFor="lastInvoiceNumber" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                  Last Invoice Number <span className="text-gray-400 font-normal">(optional)</span>
+                </Label>
+                <Input
+                  id="lastInvoiceNumber"
+                  value={lastInvoiceNumber}
+                  onChange={(e) => setLastInvoiceNumber(e.target.value)}
+                  placeholder="e.g. INV-0042"
+                  className="h-11 bg-white border-gray-300 rounded-lg"
+                />
+              </div>
+
+              {nextInvoiceNumber && (
+                <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 p-3">
+                  <Hash className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">Next invoice number will be</span>
+                  <span className="text-sm font-semibold text-gray-900">{nextInvoiceNumber}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="bg-white rounded-[14px] border border-gray-200 p-4">
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={onCancel}
+                  disabled={isSavingOnboarding}
+                  className="h-11 px-6 rounded-lg border-gray-300"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveOnboarding}
+                  disabled={isSavingOnboarding}
+                  className="h-11 px-6 rounded-lg bg-blue-600 hover:bg-blue-700"
+                >
+                  {isSavingOnboarding ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Onboarding"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+
           {/* Contract Information Tab */}
           <TabsContent value="contract" className="space-y-6">
             {/* Info Banner */}
             <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-4">
               <p className="text-sm text-blue-900">
-                <span className="font-semibold">Note:</span> Contract information is managed by your administrator and cannot be edited.
+                <span className="font-semibold">Note:</span> Rate and contract dates reflect what you entered during onboarding. Project, contract type, and reporting manager are managed by your administrator.
               </p>
             </div>
 
             <div className="bg-white rounded-[14px] border border-gray-200 p-6">
               <div className="space-y-6">
+                {/* Role */}
+                <div>
+                  <div className="text-sm text-gray-600 mb-2">Role</div>
+                  <div className="text-gray-900">{displayRole || "Not set"}</div>
+                </div>
+
                 {/* Start Date & End Date */}
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <div className="text-sm text-gray-600 mb-2">Start Date</div>
                     <div className="flex items-center gap-2 text-gray-900">
                       <Calendar className="w-4 h-4 text-gray-500" />
-                      <span>{formatContractDate(contract?.start_date || null)}</span>
+                      <span>{formatContractDate(displayStartDate)}</span>
                     </div>
                   </div>
                   <div>
                     <div className="text-sm text-gray-600 mb-2">End Date</div>
                     <div className="flex items-center gap-2 text-gray-900">
                       <Calendar className="w-4 h-4 text-gray-500" />
-                      <span>{contract?.end_date ? formatContractDate(contract.end_date) : "Ongoing"}</span>
+                      <span>{displayEndDate ? formatContractDate(displayEndDate) : "Ongoing"}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Hourly Rate & Overtime Rate */}
-                <div className="grid grid-cols-2 gap-6">
+                {/* Rate (hourly: rate + overtime; fixed: single fixed rate) */}
+                {isFixedRate ? (
                   <div>
-                    <div className="text-sm text-gray-600 mb-2">Hourly Rate</div>
+                    <div className="text-sm text-gray-600 mb-2">Fixed Rate</div>
                     <div className="flex items-center gap-2 text-gray-900">
                       <DollarSign className="w-4 h-4 text-gray-500" />
-                      <span>{formatRate(contract?.hourly_rate || null)}</span>
+                      <span>{onboardingRate != null ? `$${onboardingRate.toFixed(2)}/monthly` : "Not set"}</span>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-sm text-gray-600 mb-2">Overtime Rate</div>
-                    <div className="flex items-center gap-2 text-gray-900">
-                      <Clock className="w-4 h-4 text-gray-500" />
-                      <span>{formatRate(contract?.overtime_rate || null)}</span>
+                ) : (
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <div className="text-sm text-gray-600 mb-2">Hourly Rate</div>
+                      <div className="flex items-center gap-2 text-gray-900">
+                        <DollarSign className="w-4 h-4 text-gray-500" />
+                        <span>{formatRate(displayHourlyRate)}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 mb-2">Overtime Rate</div>
+                      <div className="flex items-center gap-2 text-gray-900">
+                        <Clock className="w-4 h-4 text-gray-500" />
+                        <span>{formatRate(displayOvertimeRate)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Project Name */}
                 <div>

@@ -14,11 +14,13 @@ import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import { Pencil, Calendar, DollarSign, Clock, User, FileText, Download, RotateCcw, CheckCircle2, Loader2 } from "lucide-react";
+import { Pencil, Calendar, DollarSign, Clock, User, FileText, ExternalLink, Hash, Download, RotateCcw, CheckCircle2, Loader2 } from "lucide-react";
 import { useContractorSubmissions } from "../../lib/hooks/admin/useContractorSubmissions";
 import { useManagerOptions } from "../../lib/hooks/admin/useManagerOptions";
 import { useUpdateManagerAssignment } from "../../lib/hooks/admin/useUpdateManagerAssignment";
 import { useUpdateContractInfo } from "../../lib/hooks/admin/useUpdateContractInfo";
+import { useContractorOnboarding } from "../../lib/hooks/admin/useContractorOnboarding";
+import { incrementInvoiceNumber } from "../../lib/invoiceSequence";
 import { groupSubmissionsByWorkPeriod } from "../../lib/utils";
 
 interface ContractorDetailDrawerProps {
@@ -97,6 +99,25 @@ export function ContractorDetailDrawer({
 
   // Mutation to update contract info (rates, dates, etc.)
   const updateContractInfo = useUpdateContractInfo();
+
+  // Read-only onboarding data (work order + entered contract details) for review
+  const { data: onboarding, getWorkOrderUrl } = useContractorOnboarding(employee?.contractor_id);
+
+  const handleViewWorkOrder = async () => {
+    if (!onboarding?.work_order_path) return;
+    try {
+      const ref = await getWorkOrderUrl(onboarding.work_order_path, onboarding.work_order_filename);
+      if (ref.url) {
+        window.open(ref.url, "_blank", "noopener,noreferrer");
+      } else {
+        toast.error("Work order file is not available");
+      }
+    } catch (err) {
+      toast.error("Could not open work order", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
+  };
 
   // Group submissions by Work Period
   const groupedSubmissions = React.useMemo(
@@ -524,6 +545,90 @@ export function ContractorDetailDrawer({
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  {/* Onboarding (read-only) — work order + contractor-entered details */}
+                  <div className="pt-2 border-t border-gray-200 space-y-4">
+                    <h4 className="text-sm font-semibold text-gray-900">Onboarding</h4>
+
+                    {/* Signed Work Order */}
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1.5">Signed Work Order</div>
+                      {onboarding?.work_order_path ? (
+                        <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <FileText className="w-4 h-4 text-purple-600 shrink-0" />
+                            <span className="text-sm text-gray-900 truncate">
+                              {onboarding.work_order_filename || "Work order"}
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleViewWorkOrder}
+                            className="h-8 px-2.5 text-purple-600 hover:bg-purple-50 shrink-0"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-400">No work order uploaded</div>
+                      )}
+                    </div>
+
+                    {/* Entered contract details */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Role (entered)</div>
+                        <div className="font-medium text-sm text-gray-900">
+                          {onboarding?.onboarding_role || "-"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">
+                          {onboarding?.onboarding_rate_type === "fixed" ? "Fixed Rate (entered)" : "Hourly Rate (entered)"}
+                        </div>
+                        <div className="font-medium text-sm text-gray-900">
+                          {onboarding?.onboarding_rate != null
+                            ? `$${onboarding.onboarding_rate}${onboarding.onboarding_rate_type === "fixed" ? "/monthly" : "/hr"}`
+                            : "-"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Contract Start</div>
+                        <div className="font-medium text-sm text-gray-900">
+                          {onboarding?.contract_start_date
+                            ? format(new Date(onboarding.contract_start_date + "T12:00:00Z"), "MMM d, yyyy")
+                            : "-"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Contract Expiry</div>
+                        <div className="font-medium text-sm text-gray-900">
+                          {onboarding?.contract_end_date
+                            ? format(new Date(onboarding.contract_end_date + "T12:00:00Z"), "MMM d, yyyy")
+                            : "-"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Invoice sequence */}
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+                        <Hash className="w-3.5 h-3.5" />
+                        <span>Invoice Sequence</span>
+                      </div>
+                      {onboarding?.last_invoice_number ? (
+                        <div className="font-medium text-sm text-gray-900">
+                          Last: {onboarding.last_invoice_number}
+                          <span className="text-gray-400"> · </span>
+                          Next: {incrementInvoiceNumber(onboarding.last_invoice_number)}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-400">Not set</div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (

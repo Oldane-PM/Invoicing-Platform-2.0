@@ -4,7 +4,7 @@
  */
 
 import { getSupabaseAdmin } from '../../clients/supabase.server';
-import { getNextInvoiceNumber } from './invoiceNumber';
+import { getNextInvoiceNumberForContractor } from './invoiceNumber';
 import { uploadInvoicePdf, getSignedInvoiceUrl, deleteInvoicePdf } from './invoiceStorage';
 import { generateInvoicePdf, type InvoiceData } from './generateInvoicePdf';
 
@@ -123,7 +123,7 @@ export async function generateInvoiceForSubmission(submissionId: string): Promis
     overtimeRate = contractor?.overtime_rate || hourlyRate * 1.5;
   }
 
-  const invoiceNumber = await getNextInvoiceNumber();
+  const invoiceNumber = await getNextInvoiceNumberForContractor(contractorId);
   const invoiceDate = new Date();
   const dueDays = submission.invoice_due_days || parseInt(process.env.INVOICE_DUE_DAYS || '15', 10);
   const currency = submission.invoice_currency || process.env.INVOICE_CURRENCY || 'USD';
