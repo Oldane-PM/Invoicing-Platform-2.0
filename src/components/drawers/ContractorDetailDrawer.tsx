@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import { Pencil, Calendar, DollarSign, Clock, User } from "lucide-react";
+import { Pencil, Calendar, DollarSign, Clock, User, FileText, Download, RotateCcw, CheckCircle2, Loader2 } from "lucide-react";
 import { useContractorSubmissions } from "../../lib/hooks/admin/useContractorSubmissions";
 import { useManagerOptions } from "../../lib/hooks/admin/useManagerOptions";
 import { useUpdateManagerAssignment } from "../../lib/hooks/admin/useUpdateManagerAssignment";
@@ -65,7 +65,7 @@ function normalizeStatus(status: string): "Pending" | "Approved" | "Rejected" | 
   }
 }
 
-type TabType = "submissions" | "contract";
+type TabType = "submissions" | "contract" | "taxforms";
 
 export function ContractorDetailDrawer({
   open,
@@ -76,6 +76,13 @@ export function ContractorDetailDrawer({
   const [activeTab, setActiveTab] = React.useState<TabType>("submissions");
   const [isEditing, setIsEditing] = React.useState(false);
   const [formData, setFormData] = React.useState<EmployeeDirectoryRow | null>(null);
+
+  // W-8BEN state
+  const [w8benData, setW8benData] = React.useState<any>(null);
+  const [w8benLoading, setW8benLoading] = React.useState(false);
+  const [returnReason, setReturnReason] = React.useState("");
+  const [returning, setReturning] = React.useState(false);
+  const [showReturnInput, setShowReturnInput] = React.useState(false);
 
   // Fetch submissions directly
   const { data: realSubmissions, isLoading: isLoadingSubmissions } = useContractorSubmissions(
@@ -97,13 +104,68 @@ export function ContractorDetailDrawer({
     [realSubmissions]
   );
 
+  const fetchW8ben = React.useCallback(async () => {
+    if (!employee?.contractor_id) return;
+    setW8benLoading(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${employee.contractor_id}`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setW8benData(data.data);
+      } else {
+        setW8benData(null);
+      }
+    } catch {
+      setW8benData(null);
+    } finally {
+      setW8benLoading(false);
+    }
+  }, [employee?.contractor_id]);
+
+  const handleReturnForReview = async () => {
+    if (!employee?.contractor_id) return;
+    setReturning(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${employee.contractor_id}/return`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reason: returnReason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('W-8BEN form returned for review');
+        setShowReturnInput(false);
+        setReturnReason('');
+        fetchW8ben();
+      } else {
+        toast.error(data.error || 'Failed to return form');
+      }
+    } catch {
+      toast.error('Failed to return form');
+    } finally {
+      setReturning(false);
+    }
+  };
+
   React.useEffect(() => {
     if (employee) {
       setFormData({ ...employee });
       setIsEditing(false);
       setActiveTab("submissions");
+      setW8benData(null);
+      setShowReturnInput(false);
+      setReturnReason('');
     }
   }, [employee]);
+
+  React.useEffect(() => {
+    if (activeTab === 'taxforms' && employee) {
+      fetchW8ben();
+    }
+  }, [activeTab, employee, fetchW8ben]);
 
   const handleSave = async () => {
     if (!formData || !employee) return;
@@ -234,6 +296,16 @@ export function ContractorDetailDrawer({
               }`}
             >
               Contract Info
+            </button>
+            <button
+              onClick={() => setActiveTab("taxforms")}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                activeTab === "taxforms"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Tax Forms
             </button>
           </div>
         </div>
@@ -597,6 +669,137 @@ export function ContractorDetailDrawer({
                         searchPlaceholder="Search managers..."
                         emptyText="No managers found."
                       />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "taxforms" && (
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 mb-4">
+                W-8BEN Form
+              </h3>
+
+              {w8benLoading ? (
+                <div className="text-center py-12">
+                  <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
+                  <div className="text-sm text-gray-500 mt-2">Loading tax forms...</div>
+                </div>
+              ) : !w8benData ? (
+                <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
+                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <div className="text-sm text-gray-600 font-medium">No W-8BEN form submitted</div>
+                  <div className="text-xs text-gray-500 mt-1">This contractor has not yet submitted a W-8BEN form.</div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Status Badge */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Status</span>
+                    {w8benData.status === 'submitted' ? (
+                      <Badge className="bg-green-100 text-green-700 border-green-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                        Submitted
+                      </Badge>
+                    ) : w8benData.status === 'returned' ? (
+                      <Badge className="bg-orange-100 text-orange-700 border-orange-200">
+                        <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                        Returned for Review
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-gray-100 text-gray-700">{w8benData.status}</Badge>
+                    )}
+                  </div>
+
+                  {/* Form Details */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Name</div>
+                        <div className="text-sm font-medium text-gray-900">{w8benData.form_data?.name || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Citizenship</div>
+                        <div className="text-sm font-medium text-gray-900">{w8benData.form_data?.citizenship || '-'}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Residence</div>
+                      <div className="text-sm text-gray-900">
+                        {w8benData.form_data?.residenceAddress}, {w8benData.form_data?.residenceCity}, {w8benData.form_data?.residenceCountry}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200">
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Signed by</div>
+                        <div className="text-sm font-medium text-gray-900">{w8benData.signature_data?.name || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Signed on</div>
+                        <div className="text-sm text-gray-900">
+                          {w8benData.signature_data?.date
+                            ? new Date(w8benData.signature_data.date).toLocaleDateString()
+                            : '-'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Download PDF */}
+                  {w8benData.signed_pdf_url && (
+                    <Button
+                      variant="outline"
+                      className="w-full flex items-center justify-center gap-2"
+                      onClick={() => window.open(w8benData.signed_pdf_url, '_blank')}
+                    >
+                      <Download className="w-4 h-4" />
+                      Download Signed PDF
+                    </Button>
+                  )}
+
+                  {/* Return for Review */}
+                  {w8benData.status === 'submitted' && (
+                    <div className="pt-4 border-t border-gray-200">
+                      {!showReturnInput ? (
+                        <Button
+                          variant="outline"
+                          className="w-full flex items-center justify-center gap-2 border-orange-200 text-orange-700 hover:bg-orange-50"
+                          onClick={() => setShowReturnInput(true)}
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          Return for Review
+                        </Button>
+                      ) : (
+                        <div className="space-y-3">
+                          <Label className="text-xs text-gray-700">Reason for return (optional)</Label>
+                          <Input
+                            value={returnReason}
+                            onChange={(e) => setReturnReason(e.target.value)}
+                            placeholder="e.g. Missing foreign tax ID, incorrect address..."
+                            className="bg-gray-50 border-gray-200 rounded-lg h-10 text-sm"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => { setShowReturnInput(false); setReturnReason(''); }}
+                              className="flex-1"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleReturnForReview}
+                              disabled={returning}
+                              className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+                            >
+                              {returning ? 'Returning...' : 'Confirm Return'}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

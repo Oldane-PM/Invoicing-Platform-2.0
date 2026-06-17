@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Calendar, DollarSign, Clock, ArrowLeft, Loader2 } from "lucide-react";
 import { useContractorProfile } from "../../lib/hooks/contractor/useContractorProfile";
 import { format } from "date-fns";
+import { TaxFormsTab } from "./TaxFormsTab";
 
 interface ContractorProfileProps {
   onCancel: () => void;
@@ -269,6 +270,12 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
               className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
             >
               Contract Information
+            </TabsTrigger>
+            <TabsTrigger
+              value="tax"
+              className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
+            >
+              Tax Forms
             </TabsTrigger>
           </TabsList>
 
@@ -632,6 +639,11 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                 </Button>
               </div>
             </div>
+          </TabsContent>
+
+          {/* Tax Forms Tab */}
+          <TabsContent value="tax" className="space-y-6">
+            <TaxFormsTab />
           </TabsContent>
         </Tabs>
       </div>

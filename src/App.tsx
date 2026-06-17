@@ -327,7 +327,32 @@ function App() {
         {/* Manager Content */}
         <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
           {managerScreen === "dashboard" && <ManagerDashboard />}
-          {managerScreen === "team" && <ManagerTeamView />}
+          {managerScreen === "team" && (
+            <ManagerTeamView 
+              onContractorClick={(member) => {
+                // Map TeamContractor to EmployeeDirectoryRow format expected by the drawer
+                const mappedEmployee: EmployeeDirectoryRow = {
+                  contractor_id: member.id, // ID is the profile ID in both cases
+                  full_name: member.fullName,
+                  email: member.email,
+                  role: 'Contractor', // default
+                  contract_start: member.contractStart ? new Date(member.contractStart).toISOString() : undefined,
+                  contract_end: member.contractEnd ? new Date(member.contractEnd).toISOString() : undefined,
+                  rate_type: 'Hourly', // default
+                  hourly_rate: member.hourlyRate || undefined,
+                  fixed_rate: undefined,
+                  contract_type: member.contractType,
+                  reporting_manager_id: user?.id || undefined,
+                  reporting_manager_name: displayName,
+                  position: 'Contractor',
+                  department: 'Engineering',
+                  status: 'Active', // required by type
+                  joined_at: member.contractStart ? new Date(member.contractStart).toISOString() : new Date().toISOString() // required by type
+                };
+                handleEmployeeClick(mappedEmployee);
+              }}
+            />
+          )}
         </main>
 
         {/* Drawers */}
