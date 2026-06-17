@@ -591,7 +591,7 @@ export function ContractorDetailDrawer({
                         </div>
                         <div className="font-medium text-sm text-gray-900">
                           {onboarding?.onboarding_rate != null
-                            ? `$${onboarding.onboarding_rate}${onboarding.onboarding_rate_type === "fixed" ? "" : "/hr"}`
+                            ? `$${onboarding.onboarding_rate}${onboarding.onboarding_rate_type === "fixed" ? "/monthly" : "/hr"}`
                             : "-"}
                         </div>
                       </div>

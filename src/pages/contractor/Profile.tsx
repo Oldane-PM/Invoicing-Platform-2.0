@@ -111,10 +111,6 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
   };
 
   const handleSaveOnboarding = async () => {
-    if (!lastInvoiceNumber.trim()) {
-      toast.error("Last invoice number is required");
-      return;
-    }
     const rateValue = woRate.trim() === "" ? null : Number(woRate);
     if (rateValue != null && (Number.isNaN(rateValue) || rateValue < 0)) {
       toast.error("Rate must be a valid number");
@@ -131,7 +127,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
       onboarding_rate_type: woRateType,
       contract_start_date: woStart || null,
       contract_end_date: woEnd || null,
-      last_invoice_number: lastInvoiceNumber.trim(),
+      last_invoice_number: lastInvoiceNumber.trim() || null,
       onboarding_completed_at: new Date().toISOString(),
     });
 
@@ -146,6 +142,21 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
   const nextInvoiceNumber = lastInvoiceNumber.trim()
     ? incrementInvoiceNumber(lastInvoiceNumber.trim())
     : null;
+
+  // Contract Information tab reflects onboarding-entered values when present,
+  // falling back to the admin-managed contract data.
+  const displayStartDate = onboarding?.contract_start_date || contract?.start_date || null;
+  const displayEndDate = onboarding?.contract_end_date || contract?.end_date || null;
+  const displayRole = onboarding?.onboarding_role || contract?.position || null;
+  const onboardingRate = onboarding?.onboarding_rate ?? null;
+  const isFixedRate =
+    onboardingRate != null && onboarding?.onboarding_rate_type === "fixed";
+  const displayHourlyRate =
+    onboardingRate != null && onboarding?.onboarding_rate_type !== "fixed"
+      ? onboardingRate
+      : contract?.hourly_rate ?? null;
+  const displayOvertimeRate =
+    displayHourlyRate != null ? displayHourlyRate * 1.5 : contract?.overtime_rate ?? null;
   
   // Personal Information State (local form state)
   const [fullName, setFullName] = React.useState("");
@@ -876,12 +887,13 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                 Invoice Numbering
               </h2>
               <p className="text-sm text-gray-600 mb-4">
-                Enter your last invoice number (if applicable). New invoices will continue from it.
+                Enter your last invoice number if you have one. New invoices will continue from it.
+                Leave this blank if you're a new contractor — numbering will start automatically.
               </p>
 
               <div>
                 <Label htmlFor="lastInvoiceNumber" className="text-sm font-medium text-gray-900 mb-1.5 block">
-                  Last Invoice Number <span className="text-red-600">*</span>
+                  Last Invoice Number <span className="text-gray-400 font-normal">(optional)</span>
                 </Label>
                 <Input
                   id="lastInvoiceNumber"
@@ -935,47 +947,63 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
             {/* Info Banner */}
             <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-4">
               <p className="text-sm text-blue-900">
-                <span className="font-semibold">Note:</span> Contract information is managed by your administrator and cannot be edited.
+                <span className="font-semibold">Note:</span> Rate and contract dates reflect what you entered during onboarding. Project, contract type, and reporting manager are managed by your administrator.
               </p>
             </div>
 
             <div className="bg-white rounded-[14px] border border-gray-200 p-6">
               <div className="space-y-6">
+                {/* Role */}
+                <div>
+                  <div className="text-sm text-gray-600 mb-2">Role</div>
+                  <div className="text-gray-900">{displayRole || "Not set"}</div>
+                </div>
+
                 {/* Start Date & End Date */}
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <div className="text-sm text-gray-600 mb-2">Start Date</div>
                     <div className="flex items-center gap-2 text-gray-900">
                       <Calendar className="w-4 h-4 text-gray-500" />
-                      <span>{formatContractDate(contract?.start_date || null)}</span>
+                      <span>{formatContractDate(displayStartDate)}</span>
                     </div>
                   </div>
                   <div>
                     <div className="text-sm text-gray-600 mb-2">End Date</div>
                     <div className="flex items-center gap-2 text-gray-900">
                       <Calendar className="w-4 h-4 text-gray-500" />
-                      <span>{contract?.end_date ? formatContractDate(contract.end_date) : "Ongoing"}</span>
+                      <span>{displayEndDate ? formatContractDate(displayEndDate) : "Ongoing"}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Hourly Rate & Overtime Rate */}
-                <div className="grid grid-cols-2 gap-6">
+                {/* Rate (hourly: rate + overtime; fixed: single fixed rate) */}
+                {isFixedRate ? (
                   <div>
-                    <div className="text-sm text-gray-600 mb-2">Hourly Rate</div>
+                    <div className="text-sm text-gray-600 mb-2">Fixed Rate</div>
                     <div className="flex items-center gap-2 text-gray-900">
                       <DollarSign className="w-4 h-4 text-gray-500" />
-                      <span>{formatRate(contract?.hourly_rate || null)}</span>
+                      <span>{onboardingRate != null ? `$${onboardingRate.toFixed(2)}/monthly` : "Not set"}</span>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-sm text-gray-600 mb-2">Overtime Rate</div>
-                    <div className="flex items-center gap-2 text-gray-900">
-                      <Clock className="w-4 h-4 text-gray-500" />
-                      <span>{formatRate(contract?.overtime_rate || null)}</span>
+                ) : (
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <div className="text-sm text-gray-600 mb-2">Hourly Rate</div>
+                      <div className="flex items-center gap-2 text-gray-900">
+                        <DollarSign className="w-4 h-4 text-gray-500" />
+                        <span>{formatRate(displayHourlyRate)}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 mb-2">Overtime Rate</div>
+                      <div className="flex items-center gap-2 text-gray-900">
+                        <Clock className="w-4 h-4 text-gray-500" />
+                        <span>{formatRate(displayOvertimeRate)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Project Name */}
                 <div>
