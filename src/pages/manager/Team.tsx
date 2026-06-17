@@ -18,7 +18,11 @@ import { useTeam } from "../../lib/hooks/manager/useTeam";
 import { AddContractorDialog } from "../../components/modals/AddContractorDialog";
 import type { TeamContractor } from "../../lib/supabase/repos/team.repo";
 
-export function ManagerTeamView() {
+interface ManagerTeamViewProps {
+  onContractorClick?: (contractor: TeamContractor) => void;
+}
+
+export function ManagerTeamView({ onContractorClick }: ManagerTeamViewProps) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [sortColumn, setSortColumn] =
     React.useState<keyof TeamContractor | null>(null);
@@ -44,7 +48,8 @@ export function ManagerTeamView() {
     adding,
   } = useTeam();
 
-  const handleCopyEmail = (email: string) => {
+  const handleCopyEmail = (e: React.MouseEvent, email: string) => {
+    e.stopPropagation();
     navigator.clipboard.writeText(email);
     toast.success("Email copied to clipboard");
   };
@@ -263,7 +268,11 @@ export function ManagerTeamView() {
                   </TableRow>
                 ) : (
                   filteredTeam.map((member) => (
-                    <TableRow key={member.id} className="hover:bg-gray-50">
+                    <TableRow 
+                      key={member.id} 
+                      className={`hover:bg-gray-50 ${onContractorClick ? 'cursor-pointer' : ''}`}
+                      onClick={() => onContractorClick?.(member)}
+                    >
                       <TableCell>
                         <div>
                           <div className="font-medium text-gray-900">
@@ -285,7 +294,7 @@ export function ManagerTeamView() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleCopyEmail(member.email)}
+                            onClick={(e) => handleCopyEmail(e, member.email)}
                             className="h-6 w-6 rounded hover:bg-gray-100"
                           >
                             <Copy className="w-3.5 h-3.5 text-gray-500" />

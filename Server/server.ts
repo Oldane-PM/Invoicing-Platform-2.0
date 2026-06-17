@@ -6,6 +6,7 @@ import { auth } from "../src/lib/auth";
 import invoiceRoutes from "./routes/invoice.routes";
 import oauthCallbackRoutes from "./routes/oauth-callback.routes";
 import userRoutes from "./routes/user.routes";
+import w8benRoutes from "./routes/w8ben.routes";
 
 const app = express();
 const port = Number(process.env.PORT ?? 5001);
@@ -50,6 +51,9 @@ app.use("/api/invoices", invoiceRoutes);
 
 // User routes (admin only)
 app.use("/api/users", userRoutes);
+
+// W-8BEN routes
+app.use("/api/w8ben", w8benRoutes);
 
 // OAuth callback routes (mounted separately to avoid conflict with Better Auth)
 app.use("/api/callback", oauthCallbackRoutes);
