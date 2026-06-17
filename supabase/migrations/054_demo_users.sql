@@ -13,20 +13,23 @@
 -- Idempotent: safe to re-run. Targets the current Supabase GoTrue auth schema
 -- (auth.users + auth.identities with provider_id). If your GoTrue is older and
 -- auth.identities has no provider_id column, remove it from the identities insert.
+--
+-- NOTE: PL/pgSQL variables are prefixed v_ so they don't collide with table
+-- column names like contractors.contractor_id / manager_teams.manager_id.
 
 DO $$
 DECLARE
-  admin_id      UUID := '11111111-1111-1111-1111-111111111111';
-  manager_id    UUID := '22222222-2222-2222-2222-222222222222';
-  contractor_id UUID := '33333333-3333-3333-3333-333333333333';
-  demo_pw       TEXT := 'Demo123!';
-  u             RECORD;
+  v_admin_id      UUID := '11111111-1111-1111-1111-111111111111';
+  v_manager_id    UUID := '22222222-2222-2222-2222-222222222222';
+  v_contractor_id UUID := '33333333-3333-3333-3333-333333333333';
+  v_demo_pw       TEXT := 'Demo123!';
+  u               RECORD;
 BEGIN
   FOR u IN
     SELECT * FROM (VALUES
-      (admin_id,      'admin@demo.local',      'Demo Admin',      'admin'),
-      (manager_id,    'manager@demo.local',    'Demo Manager',    'manager'),
-      (contractor_id, 'contractor@demo.local', 'Demo Contractor', 'contractor')
+      (v_admin_id,      'admin@demo.local',      'Demo Admin',      'admin'),
+      (v_manager_id,    'manager@demo.local',    'Demo Manager',    'manager'),
+      (v_contractor_id, 'contractor@demo.local', 'Demo Contractor', 'contractor')
     ) AS t(id, email, full_name, role)
   LOOP
     -- auth.users — token columns are set to '' (not NULL) to satisfy GoTrue.
@@ -38,7 +41,7 @@ BEGIN
     )
     VALUES (
       '00000000-0000-0000-0000-000000000000', u.id, 'authenticated', 'authenticated', u.email,
-      crypt(demo_pw, gen_salt('bf')),
+      crypt(v_demo_pw, gen_salt('bf')),
       NOW(), NOW(), NOW(),
       '{"provider":"email","providers":["email"]}',
       jsonb_build_object('full_name', u.full_name),
@@ -77,7 +80,7 @@ BEGIN
     contract_start, contract_end, is_active
   )
   VALUES (
-    contractor_id, 75.00, 112.50, 'Demo Project',
+    v_contractor_id, 75.00, 112.50, 'Demo Project',
     '2026-01-01', '2026-12-31', true
   )
   ON CONFLICT (contractor_id) DO UPDATE SET
@@ -88,7 +91,7 @@ BEGIN
 
   -- Manager owns the contractor (so they appear in the manager's team).
   INSERT INTO public.manager_teams (manager_id, contractor_id)
-  VALUES (manager_id, contractor_id)
+  VALUES (v_manager_id, v_contractor_id)
   ON CONFLICT (manager_id, contractor_id) DO NOTHING;
 
   -- Active contract (needed to submit hours). The contracts table predates these
@@ -97,14 +100,14 @@ BEGIN
   BEGIN
     IF NOT EXISTS (
       SELECT 1 FROM public.contracts
-      WHERE contractor_user_id = contractor_id AND is_active = true
+      WHERE contractor_user_id = v_contractor_id AND is_active = true
     ) THEN
       INSERT INTO public.contracts (
         contractor_user_id, project_name, contract_type,
         start_date, end_date, is_active
       )
       VALUES (
-        contractor_id, 'Demo Project', 'hourly',
+        v_contractor_id, 'Demo Project', 'hourly',
         '2026-01-01', '2026-12-31', true
       );
     END IF;
@@ -112,5 +115,5 @@ BEGIN
     RAISE NOTICE 'Skipped contracts insert (schema mismatch): %', SQLERRM;
   END;
 
-  RAISE NOTICE 'Demo users seeded. Sign in with admin/manager/contractor @demo.local, password: %', demo_pw;
+  RAISE NOTICE 'Demo users seeded. Sign in with admin/manager/contractor @demo.local, password: %', v_demo_pw;
 END $$;

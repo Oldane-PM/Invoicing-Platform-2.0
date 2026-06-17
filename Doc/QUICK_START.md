@@ -17,7 +17,7 @@ Navigate to `http://localhost:5173`
 
 ## 👤 Login Credentials
 
-Demo login signs in with **real Supabase users** seeded by `supabase/migrations/053_demo_users.sql`.
+Demo login signs in with **real Supabase users** seeded by `supabase/migrations/054_demo_users.sql`.
 On the login screen, type the username below (the password field is ignored — the
 app signs in with the seeded credentials behind the scenes):
 
@@ -28,8 +28,8 @@ app signs in with the seeded credentials behind the scenes):
 | **Contractor** | `Contractor` | `contractor@demo.local` | `Demo123!` | Submit hours & view invoices |
 
 > **First-time setup:** apply the SQL migrations to your Supabase project before
-> logging in — at minimum `052_vendor_onboarding.sql` (onboarding schema) and
-> `053_demo_users.sql` (these demo users). Without `053`, demo login will report
+> logging in — at minimum `053_vendor_onboarding.sql` (onboarding schema) and
+> `054_demo_users.sql` (these demo users). Without `054`, demo login will report
 > a sign-in error.
 
 ### Re-testing contractor onboarding

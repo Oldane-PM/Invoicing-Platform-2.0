@@ -39,7 +39,7 @@ import { useAuth } from "./lib/hooks/useAuth";
 import { getUserProfile } from "./lib/supabase/repos/auth.repo";
 import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 
-// Demo credentials seeded by supabase/migrations/053_demo_users.sql
+// Demo credentials seeded by supabase/migrations/054_demo_users.sql
 const DEMO_CREDENTIALS: Record<string, { email: string; password: string }> = {
   admin: { email: "admin@demo.local", password: "Demo123!" },
   manager: { email: "manager@demo.local", password: "Demo123!" },
@@ -171,7 +171,7 @@ function App() {
         ok: false,
         error:
           result.error ||
-          "Could not sign in. Did you run migration 053 to seed the demo users?",
+          "Could not sign in. Did you run migration 054 to seed the demo users?",
       };
     }
 
@@ -371,7 +371,32 @@ function App() {
         {/* Manager Content */}
         <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
           {managerScreen === "dashboard" && <ManagerDashboard />}
-          {managerScreen === "team" && <ManagerTeamView />}
+          {managerScreen === "team" && (
+            <ManagerTeamView 
+              onContractorClick={(member) => {
+                // Map TeamContractor to EmployeeDirectoryRow format expected by the drawer
+                const mappedEmployee: EmployeeDirectoryRow = {
+                  contractor_id: member.id, // ID is the profile ID in both cases
+                  full_name: member.fullName,
+                  email: member.email,
+                  role: 'Contractor', // default
+                  contract_start: member.contractStart ? new Date(member.contractStart).toISOString() : undefined,
+                  contract_end: member.contractEnd ? new Date(member.contractEnd).toISOString() : undefined,
+                  rate_type: 'Hourly', // default
+                  hourly_rate: member.hourlyRate || undefined,
+                  fixed_rate: undefined,
+                  contract_type: member.contractType,
+                  reporting_manager_id: user?.id || undefined,
+                  reporting_manager_name: displayName,
+                  position: 'Contractor',
+                  department: 'Engineering',
+                  status: 'Active', // required by type
+                  joined_at: member.contractStart ? new Date(member.contractStart).toISOString() : new Date().toISOString() // required by type
+                };
+                handleEmployeeClick(mappedEmployee);
+              }}
+            />
+          )}
         </main>
 
         {/* Drawers */}

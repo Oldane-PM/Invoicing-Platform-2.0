@@ -3,7 +3,7 @@
  *
  * Loads/saves the current contractor's onboarding data and signed work order via
  * Supabase. Requires an authenticated session (the demo login now creates a real
- * session — see App.tsx + migration 053).
+ * session — see App.tsx + migration 054).
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";

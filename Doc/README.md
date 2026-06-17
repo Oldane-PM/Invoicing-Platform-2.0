@@ -67,9 +67,9 @@
   ## 👥 User Roles & Login
 
   Demo login signs in with **real Supabase users** seeded by
-  `supabase/migrations/053_demo_users.sql`. Type the username on the login screen
+  `supabase/migrations/054_demo_users.sql`. Type the username on the login screen
   (the password field is ignored — the seeded credentials are used automatically).
-  Apply migrations `052_vendor_onboarding.sql` and `053_demo_users.sql` to your
+  Apply migrations `053_vendor_onboarding.sql` and `054_demo_users.sql` to your
   Supabase project first, or demo login will report a sign-in error.
 
   ### Admin Access

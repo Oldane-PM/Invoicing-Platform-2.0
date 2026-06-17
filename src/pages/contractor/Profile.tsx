@@ -21,6 +21,7 @@ import { useContractorProfile } from "../../lib/hooks/contractor/useContractorPr
 import { useVendorOnboarding } from "../../lib/hooks/contractor/useVendorOnboarding";
 import { incrementInvoiceNumber } from "../../lib/invoiceSequence";
 import { format } from "date-fns";
+import { TaxFormsTab } from "./TaxFormsTab";
 
 // Accepted work order file types and max size (10MB).
 const WORK_ORDER_ACCEPT = ".pdf,.doc,.docx,.png,.jpg,.jpeg";
@@ -399,6 +400,12 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
               className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
             >
               Contract Information
+            </TabsTrigger>
+            <TabsTrigger
+              value="tax"
+              className="px-6 py-3 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none"
+            >
+              Tax Forms
             </TabsTrigger>
           </TabsList>
 
@@ -978,6 +985,11 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                 </Button>
               </div>
             </div>
+          </TabsContent>
+
+          {/* Tax Forms Tab */}
+          <TabsContent value="tax" className="space-y-6">
+            <TaxFormsTab />
           </TabsContent>
         </Tabs>
       </div>
