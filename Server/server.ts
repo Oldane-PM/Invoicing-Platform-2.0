@@ -31,7 +31,7 @@ app.use(
 app.use("/api/auth", toNodeHandler(auth));
 
 // Normal API routes can use JSON body parsing
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 
 // Health check endpoint
 app.get("/health", (_req, res) => {
