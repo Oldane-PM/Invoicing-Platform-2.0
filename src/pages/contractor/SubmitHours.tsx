@@ -86,6 +86,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   const [description, setDescription] = React.useState("");
   const [overtimeHours, setOvertimeHours] = React.useState("");
   const [overtimeDescription, setOvertimeDescription] = React.useState("");
+  const [paymentLink, setPaymentLink] = React.useState("");
   const [selectedProjectIds, setSelectedProjectIds] = React.useState<string[]>([]);
   const [projectPickerOpen, setProjectPickerOpen] = React.useState(false);
   const isPrePopulatingRef = React.useRef(false);
@@ -203,6 +204,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
         setDescription(editingSubmission.description || "");
         setOvertimeHours(editingSubmission.overtimeHours?.toString() || "");
         setOvertimeDescription(editingSubmission.overtimeDescription || "");
+        setPaymentLink(editingSubmission.paymentLink || "");
         setIsHoursManuallyEdited(true); // Prevent auto-calculation from overwriting
 
         const editProjectIds = editingSubmission.projectIds?.length
@@ -368,6 +370,15 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       return;
     }
 
+    if (paymentLink.trim()) {
+      try {
+        new URL(paymentLink);
+      } catch (e) {
+        toast.error("Please enter a valid URL for the Payment Link (e.g., https://paypal.me/...)");
+        return;
+      }
+    }
+
     // Build the submission draft
     const workPeriod = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}`;
     const excludedDatesStrings = excludedDates.map((d) =>
@@ -389,6 +400,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       description: description.trim(),
       overtimeHours: parseInt(overtimeHours) || 0,
       overtimeDescription: overtimeDescription.trim() || null,
+      paymentLink: paymentLink.trim() || null,
       // Comma-joined label keeps existing single-column displays/invoices showing every project
       projectName: projectNames.join(", ") || "General Work",
       projectId: projectIds[0], // primary project (FK)
@@ -464,6 +476,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     setDescription("");
     setOvertimeHours("");
     setOvertimeDescription("");
+    setPaymentLink("");
     setSelectedProjectIds([]);
     onCancel();
   };
@@ -939,6 +952,28 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Payment Link */}
+            <div>
+              <Label
+                htmlFor="payment-link"
+                className="text-sm font-medium text-gray-900 mb-1.5 block"
+              >
+                Payment Link{" "}
+                <span className="text-gray-500 font-normal">(Optional)</span>
+              </Label>
+              <Input
+                id="payment-link"
+                type="url"
+                value={paymentLink}
+                onChange={(e) => setPaymentLink(e.target.value)}
+                className="h-11 bg-white border-gray-300 rounded-lg"
+                placeholder="e.g., https://paypal.me/yourname, Payoneer, Wise..."
+              />
+              <p className="text-xs text-gray-500 mt-1.5">
+                Include a link to accept payments directly. Must be a valid URL.
+              </p>
+            </div>
           </div>
 
           {/* Actions */}
