@@ -268,6 +268,7 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
       paid_at,
       created_at,
       rejection_reason,
+      payment_link,
       profiles: contractor_user_id (
         full_name,
         email
@@ -345,6 +346,7 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
     clarificationMessage: undefined, // Legacy field
     adminNote: undefined, // Could be added if column exists
     managerNote: undefined, // Could be added if column exists
+    paymentLink: data.payment_link,
   };
 }
 

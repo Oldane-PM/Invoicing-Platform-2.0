@@ -271,6 +271,23 @@ export function SubmissionReviewDrawer({
                   </div>
                 )}
 
+                {/* Payment Link Section */}
+                {submission.paymentLink && (
+                  <div className="space-y-4 mb-6">
+                    <h3 className="text-sm font-semibold text-gray-900">Payment Link</h3>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <a 
+                        href={submission.paymentLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-800 break-all leading-relaxed"
+                      >
+                        {submission.paymentLink}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
                 {/* Rejection Reason (if rejected) */}
                 {submission.rejectionReason && (
                   <div className="space-y-4 mb-6">

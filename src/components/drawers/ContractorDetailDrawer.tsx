@@ -417,6 +417,21 @@ export function ContractorDetailDrawer({
                                 </div>
                               </div>
                             )}
+                            
+                            {/* Payment Link */}
+                            {submission.paymentLink && (
+                              <div className="mt-3 pt-3 border-t border-gray-200">
+                                <div className="text-[11px] text-gray-500 mb-1">Payment Link</div>
+                                <a 
+                                  href={submission.paymentLink} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-[13px] text-blue-600 hover:text-blue-800 break-all leading-relaxed"
+                                >
+                                  {submission.paymentLink}
+                                </a>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
