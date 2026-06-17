@@ -24,7 +24,9 @@ import {
   DollarSign,
   Loader2,
   RefreshCw,
+  CheckCircle2,
 } from "lucide-react";
+import { Checkbox } from "../../components/ui/checkbox";
 import { format } from "date-fns";
 import { useManagerDashboard } from "../../lib/hooks/manager/useManagerDashboard";
 import { useManagerSubmissions } from "../../lib/hooks/manager/useManagerSubmissions";
@@ -132,7 +134,11 @@ export function ManagerDashboard() {
   } = useManagerSubmissions({
     status: statusFilter || undefined,
   });
-  const { approve, reject, respondClarification } = useSubmissionActions();
+  const { approve, reject, respondClarification, bulkApprove, bulkApproving } = useSubmissionActions();
+
+  // Multi-selection state
+  const [selectedSubmissionIds, setSelectedSubmissionIds] = React.useState<string[]>([]);
+  const [showBulkConfirm, setShowBulkConfirm] = React.useState(false);
 
   const handleSubmissionClick = (submission: ManagerSubmission) => {
     setSelectedSubmission(submission);
@@ -157,6 +163,7 @@ export function ManagerDashboard() {
       refetchSubmissions();
       refetchMetrics();
       setDrawerOpen(false);
+      setSelectedSubmissionIds(prev => prev.filter(id => id !== submissionId));
     }
   };
 
@@ -170,9 +177,23 @@ export function ManagerDashboard() {
       refetchSubmissions();
       refetchMetrics();
       setDrawerOpen(false);
+      setSelectedSubmissionIds(prev => prev.filter(id => id !== submissionId));
     }
   };
 
+  const handleBulkApprove = async () => {
+    if (selectedSubmissionIds.length === 0) return;
+    
+    setShowBulkConfirm(false);
+    const results = await bulkApprove(selectedSubmissionIds);
+    
+    if (results.successful.length > 0) {
+      refetchSubmissions();
+      refetchMetrics();
+      // Clear successfully approved ids from selection
+      setSelectedSubmissionIds(prev => prev.filter(id => !results.successful.includes(id)));
+    }
+  };
 
   // Filter submissions by search query and selected months (client-side)
   const filteredSubmissions = React.useMemo(() => {
@@ -260,11 +281,55 @@ export function ManagerDashboard() {
     toast.success("Data refreshed");
   };
 
+  const pendingSubmissions = filteredSubmissions.filter(s => mapStatusToDisplay(s.status) === "Pending");
+  const allPendingSelected = pendingSubmissions.length > 0 && 
+    pendingSubmissions.every(s => selectedSubmissionIds.includes(s.id));
+
+  const toggleSelectAll = () => {
+    if (allPendingSelected) {
+      // Deselect all pending
+      setSelectedSubmissionIds(prev => prev.filter(id => !pendingSubmissions.find(s => s.id === id)));
+    } else {
+      // Select all pending
+      const pendingIds = pendingSubmissions.map(s => s.id);
+      setSelectedSubmissionIds(prev => Array.from(new Set([...prev, ...pendingIds])));
+    }
+  };
+
   return (
     <>
       <div className="space-y-6">
-        {/* Refresh Button */}
-        <div className="flex justify-end">
+        {/* Header Actions */}
+        <div className="flex justify-between items-center h-10">
+          <div>
+            {selectedSubmissionIds.length > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full">
+                  {selectedSubmissionIds.length} selected
+                </span>
+                <Button 
+                  onClick={() => setShowBulkConfirm(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                  disabled={bulkApproving.loading}
+                >
+                  {bulkApproving.loading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                  )}
+                  Bulk Approve ({selectedSubmissionIds.length})
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setSelectedSubmissionIds([])}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -391,6 +456,14 @@ export function ManagerDashboard() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50 hover:bg-gray-50">
+                  <TableHead className="w-12 text-center px-4">
+                    <Checkbox 
+                      checked={allPendingSelected}
+                      onCheckedChange={toggleSelectAll}
+                      disabled={pendingSubmissions.length === 0}
+                      aria-label="Select all pending submissions"
+                    />
+                  </TableHead>
                   <TableHead className="font-semibold text-gray-700">
                     Work Period
                   </TableHead>
@@ -431,13 +504,27 @@ export function ManagerDashboard() {
                     const displayStatus = mapStatusToDisplay(submission.status);
                     const totalHours =
                       submission.regularHours + submission.overtimeHours;
+                    const isPending = displayStatus === "Pending";
+                    const isSelected = selectedSubmissionIds.includes(submission.id);
 
                     return (
                       <TableRow
                         key={submission.id}
                         onClick={() => handleSubmissionClick(submission)}
-                        className="hover:bg-gray-50 cursor-pointer"
+                        className={`hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-blue-50/50' : ''}`}
                       >
+                        <TableCell className="text-center px-4" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox 
+                            checked={isSelected}
+                            onCheckedChange={() => {
+                              setSelectedSubmissionIds(prev => 
+                                prev.includes(submission.id) ? prev.filter(id => id !== submission.id) : [...prev, submission.id]
+                              );
+                            }}
+                            disabled={!isPending}
+                            aria-label={`Select submission for ${submission.contractorName}`}
+                          />
+                        </TableCell>
                         <TableCell className="text-gray-700">
                           {formatWorkPeriod(submission)}
                         </TableCell>
@@ -512,6 +599,49 @@ export function ManagerDashboard() {
         onStatusUpdate={handleStatusUpdate}
         onClarificationResponse={handleClarificationResponse}
       />
+
+      {/* Bulk Approval Confirmation Modal */}
+      {showBulkConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-4 mx-auto">
+                <CheckCircle2 className="w-6 h-6 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-center text-gray-900 mb-2">
+                Approve {selectedSubmissionIds.length} Invoices?
+              </h3>
+              <p className="text-center text-gray-600 mb-6 text-sm">
+                You are about to approve {selectedSubmissionIds.length} invoice(s). This action cannot be undone and will move them forward for admin payment.
+              </p>
+              
+              <div className="flex gap-3 mt-8">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 border-gray-200 text-gray-700 hover:bg-gray-50"
+                  onClick={() => setShowBulkConfirm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={handleBulkApprove}
+                  disabled={bulkApproving.loading}
+                >
+                  {bulkApproving.loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Approving...
+                    </>
+                  ) : (
+                    'Confirm Approval'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
