@@ -20,7 +20,7 @@ const SIGNED_URL_EXPIRY_SECONDS = 600; // 10 minutes
 
 // Columns that belong to onboarding (subset of contractor_profiles).
 const ONBOARDING_COLUMNS =
-  "user_id, onboarding_role, onboarding_rate, contract_start_date, contract_end_date, last_invoice_number, work_order_path, work_order_filename, work_order_uploaded_at, onboarding_completed_at";
+  "user_id, onboarding_role, onboarding_rate, onboarding_rate_type, contract_start_date, contract_end_date, last_invoice_number, work_order_path, work_order_filename, work_order_uploaded_at, onboarding_completed_at";
 
 /** Fetch onboarding fields for a contractor. Returns empty record if none yet. */
 export async function getVendorOnboarding(userId: string): Promise<VendorOnboardingData> {
@@ -43,6 +43,7 @@ export async function getVendorOnboarding(userId: string): Promise<VendorOnboard
     user_id: userId,
     onboarding_role: data.onboarding_role ?? null,
     onboarding_rate: data.onboarding_rate ?? null,
+    onboarding_rate_type: data.onboarding_rate_type ?? null,
     contract_start_date: data.contract_start_date ?? null,
     contract_end_date: data.contract_end_date ?? null,
     last_invoice_number: data.last_invoice_number ?? null,

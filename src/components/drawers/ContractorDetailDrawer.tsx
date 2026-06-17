@@ -586,9 +586,13 @@ export function ContractorDetailDrawer({
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500 mb-1">Rate (entered)</div>
+                        <div className="text-xs text-gray-500 mb-1">
+                          {onboarding?.onboarding_rate_type === "fixed" ? "Fixed Rate (entered)" : "Hourly Rate (entered)"}
+                        </div>
                         <div className="font-medium text-sm text-gray-900">
-                          {onboarding?.onboarding_rate != null ? `$${onboarding.onboarding_rate}` : "-"}
+                          {onboarding?.onboarding_rate != null
+                            ? `$${onboarding.onboarding_rate}${onboarding.onboarding_rate_type === "fixed" ? "" : "/hr"}`
+                            : "-"}
                         </div>
                       </div>
                       <div>

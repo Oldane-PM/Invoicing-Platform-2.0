@@ -12,6 +12,8 @@ export interface VendorOnboardingData {
   // Manually entered contract details (off the signed work order)
   onboarding_role: string | null;
   onboarding_rate: number | null;
+  /** How onboarding_rate is interpreted. */
+  onboarding_rate_type: "hourly" | "fixed" | null;
   contract_start_date: string | null; // ISO date (yyyy-MM-dd)
   contract_end_date: string | null;   // ISO date (yyyy-MM-dd)
 
@@ -50,6 +52,7 @@ export function emptyVendorOnboarding(userId: string): VendorOnboardingData {
     user_id: userId,
     onboarding_role: null,
     onboarding_rate: null,
+    onboarding_rate_type: "hourly",
     contract_start_date: null,
     contract_end_date: null,
     last_invoice_number: null,

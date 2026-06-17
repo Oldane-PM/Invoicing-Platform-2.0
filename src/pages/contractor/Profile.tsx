@@ -49,6 +49,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
   // Onboarding form state (manually entered / reviewed before submission)
   const [woRole, setWoRole] = React.useState("");
   const [woRate, setWoRate] = React.useState("");
+  const [woRateType, setWoRateType] = React.useState<"hourly" | "fixed">("hourly");
   const [woStart, setWoStart] = React.useState("");
   const [woEnd, setWoEnd] = React.useState("");
   const [lastInvoiceNumber, setLastInvoiceNumber] = React.useState("");
@@ -61,6 +62,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
     if (onboarding && !onboardingInitialized) {
       setWoRole(onboarding.onboarding_role || "");
       setWoRate(onboarding.onboarding_rate != null ? String(onboarding.onboarding_rate) : "");
+      setWoRateType(onboarding.onboarding_rate_type === "fixed" ? "fixed" : "hourly");
       setWoStart(onboarding.contract_start_date || "");
       setWoEnd(onboarding.contract_end_date || "");
       setLastInvoiceNumber(onboarding.last_invoice_number || "");
@@ -126,6 +128,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
     const result = await saveOnboarding({
       onboarding_role: woRole.trim() || null,
       onboarding_rate: rateValue,
+      onboarding_rate_type: woRateType,
       contract_start_date: woStart || null,
       contract_end_date: woEnd || null,
       last_invoice_number: lastInvoiceNumber.trim(),
@@ -801,21 +804,40 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                   />
                 </div>
 
-                {/* Rate */}
-                <div>
-                  <Label htmlFor="woRate" className="text-sm font-medium text-gray-900 mb-1.5 block">
-                    Rate
-                  </Label>
-                  <Input
-                    id="woRate"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={woRate}
-                    onChange={(e) => setWoRate(e.target.value)}
-                    placeholder="e.g. 75.00"
-                    className="h-11 bg-white border-gray-300 rounded-lg"
-                  />
+                {/* Rate type + amount */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="woRateType" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                      Rate Type
+                    </Label>
+                    <Select
+                      value={woRateType}
+                      onValueChange={(value) => setWoRateType(value as "hourly" | "fixed")}
+                    >
+                      <SelectTrigger id="woRateType" className="h-11 bg-white border-gray-300 rounded-lg">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hourly">Hourly Rate</SelectItem>
+                        <SelectItem value="fixed">Fixed Rate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="woRate" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                      {woRateType === "fixed" ? "Fixed Rate" : "Hourly Rate"}
+                    </Label>
+                    <Input
+                      id="woRate"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={woRate}
+                      onChange={(e) => setWoRate(e.target.value)}
+                      placeholder={woRateType === "fixed" ? "e.g. 5000.00" : "e.g. 75.00"}
+                      className="h-11 bg-white border-gray-300 rounded-lg"
+                    />
+                  </div>
                 </div>
 
                 {/* Start & End dates */}
