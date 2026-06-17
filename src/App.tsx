@@ -410,6 +410,12 @@ function App() {
             console.log('[Admin] Navigate to submission:', submissionId);
           }}
         />
+        <ContractorDetailDrawer
+          open={contractorDrawerOpen}
+          onOpenChange={setContractorDrawerOpen}
+          employee={selectedEmployee}
+          onSave={handleSaveEmployee}
+        />
       </div>
     );
   }

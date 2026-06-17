@@ -39,6 +39,7 @@ export interface SubmissionDetails extends AdminSubmission {
   adminNote?: string | null; // Admin's clarification request note
   managerNote?: string | null; // Manager's response to clarification
   overtimeDescription?: string | null; // Description of overtime work
+  paymentLink?: string | null; // Payment link (Payoneer, PayPal, Wise)
 }
 
 export interface SubmissionFilters {

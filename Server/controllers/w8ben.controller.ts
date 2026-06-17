@@ -211,10 +211,10 @@ export async function returnW8BenForm(req: Request, res: Response, next: NextFun
     const { data: callerProfile } = await supabase
       .from('profiles')
       .select('role')
-      .eq('id', session.user.id)
+      .eq('email', session.user.email)
       .single();
 
-    if (!callerProfile || !['ADMIN', 'MANAGER'].includes(callerProfile.role)) {
+    if (!callerProfile || !['admin', 'manager'].includes(callerProfile.role.toLowerCase())) {
       res.status(403).json({ error: 'Only admins and managers can return forms for review' });
       return;
     }

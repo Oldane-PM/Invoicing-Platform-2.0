@@ -194,6 +194,19 @@ export function ContractorSubmissionDrawer({
                 </p>
               </div>
             )}
+            {submission.paymentLink && (
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="text-xs text-gray-600 mb-1">Payment Link</div>
+                <a 
+                  href={submission.paymentLink} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-800 break-all leading-relaxed"
+                >
+                  {submission.paymentLink}
+                </a>
+              </div>
+            )}
           </div>
         </div>
 
