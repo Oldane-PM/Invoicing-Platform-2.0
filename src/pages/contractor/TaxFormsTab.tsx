@@ -1,20 +1,28 @@
 import * as React from "react";
-import { Button } from "../../components/ui/button";
 import { W8BENForm } from "../../components/forms/W8BENForm";
-import { Loader2, Download, CheckCircle2, AlertTriangle } from "lucide-react";
-import { authClient } from "../../lib/auth-client";
+import { Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+
+import { supabase } from "../../lib/supabase/client";
+import { useAuth } from "../../lib/hooks/useAuth";
 
 export function TaxFormsTab() {
   const [loading, setLoading] = React.useState(true);
   const [formData, setFormData] = React.useState<any>(null);
+  const { user } = useAuth();
 
   const fetchForm = async () => {
     try {
       setLoading(true);
-      const session = await authClient.getSession();
-      if (!session?.data?.user?.id) return;
+      
+      if (!user?.id) return;
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${session.data.user.id}`, {
+      const sessionResponse = await supabase?.auth.getSession();
+      const token = sessionResponse?.data?.session?.access_token;
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${user.id}`, {
+        headers: {
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         credentials: "include",
       });
 
@@ -32,8 +40,10 @@ export function TaxFormsTab() {
   };
 
   React.useEffect(() => {
-    fetchForm();
-  }, []);
+    if (user?.id) {
+      fetchForm();
+    }
+  }, [user?.id]);
 
   if (loading) {
     return (
@@ -85,19 +95,11 @@ export function TaxFormsTab() {
           </div>
         )}
 
-        {isSubmitted && formData.signed_pdf_url && (
-          <div className="mt-6 pt-6 border-t border-gray-100 flex items-center justify-between">
+        {isSubmitted && formData.created_at && (
+          <div className="mt-6 pt-6 border-t border-gray-100">
             <div className="text-sm text-gray-500">
               Submitted on {new Date(formData.created_at).toLocaleDateString()}
             </div>
-            <Button
-              variant="outline"
-              className="flex items-center gap-2"
-              onClick={() => window.open(formData.signed_pdf_url, '_blank')}
-            >
-              <Download className="w-4 h-4" />
-              Download PDF
-            </Button>
           </div>
         )}
       </div>
