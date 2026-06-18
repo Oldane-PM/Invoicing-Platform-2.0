@@ -362,9 +362,9 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         contractor_user_id: contractorUserId,
         contract_id: contractId,
         project_name: draft.projectName || projectName,
-        project_id: draft.projectId || null, // PRIMARY project (FK used by invoice generation)
+        project_id: draft.projectId || null, // PRIMARY project (FK used by invoice generation); null when no project selected
         project_ids: draft.projectIds && draft.projectIds.length > 0 ? draft.projectIds : (draft.projectId ? [draft.projectId] : null),
-        project_names: draft.projectNames && draft.projectNames.length > 0 ? draft.projectNames : (draft.projectName ? [draft.projectName] : null),
+        project_names: draft.projectNames && draft.projectNames.length > 0 ? draft.projectNames : (draft.projectName && draft.projectName !== "General Work" ? [draft.projectName] : null),
         description: draft.description,
         period_start: periodStart,
         period_end: periodEnd,

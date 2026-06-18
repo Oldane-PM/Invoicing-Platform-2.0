@@ -281,7 +281,7 @@ export interface SubmissionDraft {
   overtimeHours: number;
   overtimeDescription?: string | null;
   projectName?: string; // optional for backwards compatibility - comma-joined label of all tagged projects
-  projectId: string; // Required - PRIMARY (first) project; UUID reference to projects table
+  projectId?: string | null; // Optional - PRIMARY (first) project; UUID reference to projects table
   /** All projects tagged on this submission (shared-hours model). At least one required. */
   projectIds?: string[];
   /** Names aligned by index with `projectIds`. */

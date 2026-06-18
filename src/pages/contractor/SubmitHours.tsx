@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from "../../components/ui/popover";
 import { Checkbox } from "../../components/ui/checkbox";
-import { Alert, AlertDescription } from "../../components/ui/alert";
+
 import { toast } from "sonner";
 import {
   CalendarIcon,
@@ -19,7 +19,7 @@ import {
   ChevronsUpDown,
   ArrowLeft,
   Loader2,
-  AlertTriangle,
+
   X,
 } from "lucide-react";
 import {
@@ -345,11 +345,6 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   };
 
   const handleSubmit = async () => {
-    if (selectedProjectIds.length === 0) {
-      toast.error("Please select at least one project");
-      return;
-    }
-
     if (selectedMonth === null) {
       toast.error("Please select a work period");
       return;
@@ -517,16 +512,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
 
         {/* Form Content */}
         <div className="bg-white rounded-[14px] border border-gray-200 p-4 md:p-6">
-          {/* No Projects Warning */}
-          {!loadingProjects && !hasProjectsForDropdown && (
-            <Alert variant="destructive" className="mb-5">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>No projects assigned.</strong> You cannot submit hours until a project is assigned to you. 
-                Please contact your manager or finance officer.
-              </AlertDescription>
-            </Alert>
-          )}
+
 
           <div className="space-y-5">
             {/* Projects Multi-Select */}
@@ -535,7 +521,8 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
                 htmlFor="project"
                 className="text-sm font-medium text-gray-900 mb-1.5 block"
               >
-                Projects <span className="text-red-600">*</span>
+                Projects{" "}
+                <span className="text-gray-500 font-normal">(Optional)</span>
               </Label>
               <Popover open={projectPickerOpen} onOpenChange={setProjectPickerOpen}>
                 <PopoverTrigger asChild>
@@ -993,7 +980,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !hasProjectsForDropdown}
+              disabled={isSubmitting}
               className="h-11 px-6 rounded-lg bg-purple-600 hover:bg-purple-700"
             >
               {isSubmitting ? (

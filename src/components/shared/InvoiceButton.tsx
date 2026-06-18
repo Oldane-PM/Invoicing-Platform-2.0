@@ -12,7 +12,7 @@ interface InvoiceButtonProps {
 }
 
 export function InvoiceButton({ submissionId, onClick }: InvoiceButtonProps) {
-  const { onClick: openInvoice, isLoading, label, error } = useInvoiceButton(submissionId);
+  const { onClick: openInvoice, isLoading, label } = useInvoiceButton(submissionId);
 
   const handleClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
