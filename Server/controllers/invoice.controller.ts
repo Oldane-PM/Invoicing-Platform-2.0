@@ -27,7 +27,7 @@ import { auth } from '../../src/lib/auth';
  */
 export async function getOrCreateInvoice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { submissionId } = req.params;
+    const submissionId = req.params.submissionId as string;
 
     if (!submissionId) {
       res.status(400).json({ error: 'Submission ID is required' });
@@ -101,7 +101,7 @@ export async function getOrCreateInvoice(req: Request, res: Response, next: Next
  */
 export async function generateInvoice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { submissionId } = req.params;
+    const submissionId = req.params.submissionId as string;
 
     if (!submissionId) {
       res.status(400).json({ error: 'Submission ID is required' });
@@ -141,7 +141,7 @@ export async function replaceInvoiceAfterSubmissionEditHandler(
       return;
     }
 
-    const { submissionId } = req.params;
+    const submissionId = req.params.submissionId as string;
 
     if (!submissionId) {
       res.status(400).json({ error: 'Submission ID is required' });

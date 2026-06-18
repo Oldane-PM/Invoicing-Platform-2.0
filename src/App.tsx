@@ -293,7 +293,7 @@ function App() {
                   Welcome, {displayName}
                 </h1>
                 <p className="text-xs md:text-sm text-gray-600">
-                  Manager Portal — Review and approve team submissions
+                  Admin Portal — Review and approve submissions
                 </p>
               </div>
               <div className="flex items-center gap-2 md:gap-3">

@@ -144,7 +144,7 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
 
     const lowerUser = username.toLowerCase().trim();
     if (!["admin", "finance officer", "manager", "contractor"].includes(lowerUser)) {
-      setError("Invalid username. Try Finance Officer, Manager, or Contractor.");
+      setError("Invalid username. Try Finance Officer, Admin, or Contractor.");
       return;
     }
 
@@ -234,7 +234,7 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
           <div className="space-y-1.5">
             {[
               { username: "Finance Officer", email: "admin@demo.local" },
-              { username: "Manager", email: "manager@demo.local" },
+              { username: "Admin", email: "manager@demo.local" },
               { username: "Contractor", email: "contractor@demo.local" },
             ].map((u) => (
               <div

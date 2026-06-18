@@ -347,7 +347,7 @@ export function ManagerDashboard() {
         {/* Metrics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
-            title="Team Size"
+            title="Total Contractors"
             value={teamSize}
             subtitle="Active contractors"
             icon={Users}
@@ -356,7 +356,7 @@ export function ManagerDashboard() {
           <MetricCard
             title="Pending Approvals"
             value={pendingCount}
-            subtitle="Awaiting your review"
+            subtitle="Awaiting admin review"
             icon={Clock}
             accentColor="yellow"
           />

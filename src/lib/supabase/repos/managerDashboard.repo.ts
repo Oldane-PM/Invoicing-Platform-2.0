@@ -29,40 +29,27 @@ export interface RecentSubmission {
  * Get dashboard metrics for a manager
  */
 export async function getDashboardMetrics(
-  managerId: string
+  _managerId: string
 ): Promise<DashboardMetrics> {
   const supabase = getSupabaseClient();
 
-  // Get team contractor IDs
+  // Get all active contractor profiles for "team size"
   const { data: teamData, error: teamError } = await supabase
-    .from("manager_teams")
-    .select("contractor_id")
-    .eq("manager_id", managerId);
+    .from("profiles")
+    .select("id")
+    .eq("role", "CONTRACTOR");
 
   if (teamError) {
-    console.error("[managerDashboard.repo] Team fetch error:", teamError);
+    console.error("[managerDashboard.repo] Profiles fetch error:", teamError);
     throw teamError;
   }
 
-  const teamContractorIds = (teamData || []).map((t: any) => t.contractor_id);
-  const teamSize = teamContractorIds.length;
+  const teamSize = teamData?.length || 0;
 
-  if (teamSize === 0) {
-    return {
-      teamSize: 0,
-      pendingApprovals: 0,
-      totalHours: 0,
-      totalInvoiced: 0,
-      approvedThisMonth: 0,
-      paidThisMonth: 0,
-    };
-  }
-
-  // Get all submissions for team
+  // Get all submissions
   const { data: submissions, error: subError } = await supabase
     .from("submissions")
-    .select("status, regular_hours, overtime_hours, total_amount, approved_at, paid_at")
-    .in("contractor_user_id", teamContractorIds);
+    .select("status, regular_hours, overtime_hours, total_amount, approved_at, paid_at");
 
   if (subError) {
     console.error("[managerDashboard.repo] Submissions fetch error:", subError);
@@ -112,22 +99,12 @@ export async function getDashboardMetrics(
  * Get recent submissions for dashboard
  */
 export async function getRecentSubmissions(
-  managerId: string,
+  _managerId: string,
   limit: number = 5
 ): Promise<RecentSubmission[]> {
   const supabase = getSupabaseClient();
 
-  // Get team contractor IDs
-  const { data: teamData } = await supabase
-    .from("manager_teams")
-    .select("contractor_id")
-    .eq("manager_id", managerId);
 
-  const teamContractorIds = (teamData || []).map((t: any) => t.contractor_id);
-
-  if (teamContractorIds.length === 0) {
-    return [];
-  }
 
   const { data, error } = await supabase
     .from("submissions")
@@ -143,7 +120,6 @@ export async function getRecentSubmissions(
       )
     `
     )
-    .in("contractor_user_id", teamContractorIds)
     .order("submitted_at", { ascending: false })
     .limit(limit);
 
@@ -166,32 +142,15 @@ export async function getRecentSubmissions(
  * Get submission counts by status
  */
 export async function getSubmissionCountsByStatus(
-  managerId: string
+  _managerId: string
 ): Promise<Record<string, number>> {
   const supabase = getSupabaseClient();
 
-  // Get team contractor IDs
-  const { data: teamData } = await supabase
-    .from("manager_teams")
-    .select("contractor_id")
-    .eq("manager_id", managerId);
 
-  const teamContractorIds = (teamData || []).map((t: any) => t.contractor_id);
-
-  if (teamContractorIds.length === 0) {
-    return {
-      PENDING: 0,
-      APPROVED: 0,
-      PAID: 0,
-      REJECTED: 0,
-      NEEDS_CLARIFICATION: 0,
-    };
-  }
 
   const { data, error } = await supabase
     .from("submissions")
-    .select("status")
-    .in("contractor_user_id", teamContractorIds);
+    .select("status");
 
   if (error) {
     console.error("[managerDashboard.repo] getSubmissionCountsByStatus error:", error);

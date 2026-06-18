@@ -5,7 +5,7 @@
  * Provides clear messaging and options to logout or refresh status.
  */
 
-import * as React from "react";
+
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { UserX, LogOut, RefreshCw, Loader2 } from "lucide-react";

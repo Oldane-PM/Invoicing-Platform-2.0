@@ -7,21 +7,13 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardFooter,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
-import { Loader2, Key } from "lucide-react";
 import { signIn } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
 export default function SignIn() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
 
   return (
     <Card className="max-w-md">
@@ -50,10 +42,10 @@ export default function SignIn() {
                     callbackURL: "/dashboard",
                   },
                   {
-                    onRequest: (ctx) => {
+                    onRequest: () => {
                       setLoading(true);
                     },
-                    onResponse: (ctx) => {
+                    onResponse: () => {
                       setLoading(false);
                     },
                   }

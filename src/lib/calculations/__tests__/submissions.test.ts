@@ -44,13 +44,6 @@ function assertEqual<T>(actual: T, expected: T, message?: string) {
   }
 }
 
-function assertClose(actual: number, expected: number, tolerance = 0.01, message?: string) {
-  if (Math.abs(actual - expected) > tolerance) {
-    throw new Error(
-      `${message ? message + ": " : ""}Expected ${expected} (±${tolerance}) but got ${actual}`
-    );
-  }
-}
 
 // ============================================================
 // Test Suite

@@ -51,27 +51,10 @@ export interface SubmissionFilters {
  * List submissions for manager's team
  */
 export async function listTeamSubmissions(
-  managerId: string,
+  _managerId: string,
   filters?: SubmissionFilters
 ): Promise<ManagerSubmission[]> {
   const supabase = getSupabaseClient();
-
-  // First get the contractor IDs in this manager's team
-  const { data: teamData, error: teamError } = await supabase
-    .from("manager_teams")
-    .select("contractor_id")
-    .eq("manager_id", managerId);
-
-  if (teamError) {
-    console.error("[managerSubmissions.repo] Team fetch error:", teamError);
-    throw teamError;
-  }
-
-  const teamContractorIds = (teamData || []).map((t: any) => t.contractor_id);
-
-  if (teamContractorIds.length === 0) {
-    return [];
-  }
 
   // Build submissions query - only join with profiles (which has proper FK relationship)
   // Contractor rates and contract type will be fetched separately
@@ -101,7 +84,6 @@ export async function listTeamSubmissions(
       )
     `
     )
-    .in("contractor_user_id", teamContractorIds)
     .order("submitted_at", { ascending: false });
 
   // Apply filters - convert uppercase frontend status to lowercase DB status
@@ -130,11 +112,14 @@ export async function listTeamSubmissions(
     throw error;
   }
 
+  // Get unique contractor IDs from the fetched submissions
+  const submissionContractorIds = [...new Set((data || []).map((s: any) => s.contractor_user_id).filter(Boolean))];
+
   // Fetch contractor rate information separately (contractors table uses contractor_id, not contractor_user_id)
   const { data: contractorsData } = await supabase
     .from("contractors")
     .select("contractor_id, hourly_rate, overtime_rate")
-    .in("contractor_id", teamContractorIds);
+    .in("contractor_id", submissionContractorIds.length > 0 ? submissionContractorIds : ['']);
 
   // Build a map of contractor_id -> rate info
   const contractorRatesMap = new Map<string, { hourlyRate: number | null; overtimeRate: number | null }>();
@@ -243,17 +228,9 @@ export async function listTeamSubmissions(
  */
 export async function getSubmissionDetails(
   submissionId: string,
-  managerId: string
+  _managerId: string
 ): Promise<ManagerSubmission | null> {
   const supabase = getSupabaseClient();
-
-  // First verify submission belongs to manager's team
-  const { data: teamData } = await supabase
-    .from("manager_teams")
-    .select("contractor_id")
-    .eq("manager_id", managerId);
-
-  const teamContractorIds = (teamData || []).map((t: any) => t.contractor_id);
 
   // Fetch submission with profile join only (contractors/contracts joins don't work)
   const { data, error } = await supabase
@@ -290,7 +267,7 @@ export async function getSubmissionDetails(
     throw error;
   }
 
-  if (!data || !teamContractorIds.includes(data.contractor_user_id)) {
+  if (!data) {
     return null;
   }
 
