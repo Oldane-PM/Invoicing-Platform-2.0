@@ -18,6 +18,7 @@ import {
   calculateTotalForStorage,
   DEFAULT_HOURLY_RATE,
   DEFAULT_OT_MULTIPLIER,
+  DEFAULT_FIXED_MONTHLY_HOURS,
   getDefaultOvertimeRate,
 } from "../calculations";
 
@@ -106,20 +107,15 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
   } | null> {
     if (!supabase) return null;
 
-    // Fetch from contractors table (rates)
-    const { data: contractorData, error: contractorError } = await supabase
+    // Fetch from contractors table (admin-managed rates / default project)
+    const { data: contractorData } = await supabase
       .from("contractors")
       .select("hourly_rate, overtime_rate, default_project_name")
       .eq("contractor_id", contractorUserId)
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
 
-    if (contractorError || !contractorData) {
-      console.log("[SupabaseSubmissionsDataSource] No active contractor details found, using defaults");
-      return null;
-    }
-
-    // Also fetch contract_type from contracts table
+    // Contract type / fixed amount on the active contract (admin-managed fallback)
     const { data: contractData } = await supabase
       .from("contracts")
       .select("contract_type, fixed_monthly_rate")
@@ -129,15 +125,47 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       .limit(1)
       .maybeSingle();
 
-    const contractType = contractData?.contract_type === "fixed" ? "fixed" : "hourly";
-    const hourlyRate = contractorData.hourly_rate || DEFAULT_HOURLY_RATE;
+    // The onboarding-entered rate is the source of truth for BOTH the amount and
+    // whether the contractor is fixed or hourly — this mirrors the Profile page
+    // (onboarding_rate / onboarding_rate_type) so submissions bill what the
+    // contractor actually sees.
+    const { data: profileData } = await supabase
+      .from("contractor_profiles")
+      .select("onboarding_rate, onboarding_rate_type")
+      .eq("user_id", contractorUserId)
+      .maybeSingle();
+
+    const onboardingRate =
+      profileData?.onboarding_rate != null ? Number(profileData.onboarding_rate) : null;
+
+    // Fixed when onboarding says fixed (preferred), or the contract is marked fixed.
+    const isFixed =
+      profileData?.onboarding_rate_type === "fixed" ||
+      contractData?.contract_type === "fixed";
+
+    // Hourly rate: prefer the onboarding rate (when hourly), else admin contract rate.
+    const hourlyRate =
+      !isFixed && onboardingRate != null
+        ? onboardingRate
+        : contractorData?.hourly_rate || DEFAULT_HOURLY_RATE;
+
+    // Overtime: derive from the onboarding hourly rate when it drives, else stored.
+    const overtimeRate =
+      !isFixed && onboardingRate != null
+        ? hourlyRate * DEFAULT_OT_MULTIPLIER
+        : contractorData?.overtime_rate || hourlyRate * DEFAULT_OT_MULTIPLIER;
+
+    // Fixed monthly amount: prefer the onboarding rate, else the contract column.
+    const fixedRate = isFixed
+      ? onboardingRate ?? contractData?.fixed_monthly_rate ?? null
+      : null;
 
     return {
       hourlyRate,
-      overtimeRate: contractorData.overtime_rate || (hourlyRate * DEFAULT_OT_MULTIPLIER),
-      fixedRate: contractData?.fixed_monthly_rate || null,
-      projectName: contractorData.default_project_name || "General Work",
-      contractType,
+      overtimeRate,
+      fixedRate,
+      projectName: contractorData?.default_project_name || "General Work",
+      contractType: isFixed ? "fixed" : "hourly",
     };
   }
 
@@ -343,12 +371,18 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
     const periodStart = format(startOfMonth(periodDate), "yyyy-MM-dd");
     const periodEnd = format(endOfMonth(periodDate), "yyyy-MM-dd");
 
+    // Fixed-rate submissions record the work-order standard of 160 hours
+    // (40h/week) instead of 0; hours don't affect the fixed total.
+    const regularHours =
+      contractType === "fixed" ? DEFAULT_FIXED_MONTHLY_HOURS : draft.hoursSubmitted;
+    const overtimeHours = contractType === "fixed" ? 0 : draft.overtimeHours;
+
     // Calculate total amount using centralized calculation
     // Handles both hourly and fixed-rate contractors
     const totalAmount = calculateTotalForStorage({
       payType: contractType,
-      regularHours: draft.hoursSubmitted,
-      overtimeHours: draft.overtimeHours,
+      regularHours,
+      overtimeHours,
       regularRate: hourlyRate,
       overtimeRate: overtimeRate,
       monthlyRate: fixedRate,
@@ -370,8 +404,8 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         period_end: periodEnd,
         work_period: draft.workPeriod,
         work_period_key: periodStart, // First day of month for sorting
-        regular_hours: draft.hoursSubmitted,
-        overtime_hours: draft.overtimeHours,
+        regular_hours: regularHours,
+        overtime_hours: overtimeHours,
         overtime_description: draft.overtimeDescription || null,
         excluded_dates: draft.excludedDates,
         total_amount: totalAmount,
@@ -379,6 +413,9 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
         // Store rates at submission time for invoice consistency
         regular_rate: hourlyRate,
         overtime_rate: overtimeRate,
+        // Snapshot the fixed monthly amount for fixed contracts so a later
+        // contract change never retroactively alters this submission's invoice.
+        monthly_rate: contractType === "fixed" ? fixedRate : null,
         rate_type: contractType,
         status: "submitted",
         submitted_at: new Date().toISOString(),
@@ -548,16 +585,28 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
 
     // Recalculate total if hours were updated - fetch actual contractor rates
     if (updatedData?.hoursSubmitted !== undefined || updatedData?.overtimeHours !== undefined) {
-      const regularHours = updatedData?.hoursSubmitted ?? existing.regular_hours ?? 0;
-      const overtimeHours = updatedData?.overtimeHours ?? existing.overtime_hours ?? 0;
-      
       // IMPORTANT: Get actual contractor rates from contract info, not hardcoded defaults
       const details = await this.getContractorDetails(contractorUserId);
       const hourlyRate = details?.hourlyRate || DEFAULT_HOURLY_RATE;
       const overtimeRate = details?.overtimeRate || getDefaultOvertimeRate(hourlyRate);
       const contractType = details?.contractType || "hourly";
       const fixedRate = details?.fixedRate;
-      
+
+      // Fixed-rate submissions keep the work-order standard of 160 hours; hours
+      // don't affect their total.
+      const regularHours =
+        contractType === "fixed"
+          ? DEFAULT_FIXED_MONTHLY_HOURS
+          : updatedData?.hoursSubmitted ?? existing.regular_hours ?? 0;
+      const overtimeHours =
+        contractType === "fixed"
+          ? 0
+          : updatedData?.overtimeHours ?? existing.overtime_hours ?? 0;
+
+      // Persist the resolved hours so fixed submissions never show 0 hours.
+      updatePayload.regular_hours = regularHours;
+      updatePayload.overtime_hours = overtimeHours;
+
       updatePayload.total_amount = calculateTotalForStorage({
         payType: contractType,
         regularHours,
@@ -570,6 +619,7 @@ class SupabaseSubmissionsDataSource implements SubmissionsDataSource {
       // Also update stored rates for invoice consistency
       updatePayload.regular_rate = hourlyRate;
       updatePayload.overtime_rate = overtimeRate;
+      updatePayload.monthly_rate = contractType === "fixed" ? fixedRate : null;
       updatePayload.rate_type = contractType;
     }
 

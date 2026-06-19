@@ -68,6 +68,7 @@ export async function generateInvoiceForSubmission(submissionId: string): Promis
       invoice_currency,
       regular_rate,
       overtime_rate,
+      monthly_rate,
       rate_type,
       payment_link
     `
@@ -137,27 +138,45 @@ export async function generateInvoiceForSubmission(submissionId: string): Promis
   ].filter(Boolean);
   const contractorAddress = addressParts.join('\n') || 'Address not provided';
 
+  // Fixed/salary contracts bill a constant monthly amount; hours are irrelevant
+  // to pay, so the invoice has a single line item with no per-hour breakdown.
+  const isFixed = submission.rate_type === 'fixed';
+
+  // Resolve the constant fixed amount. Prefer the snapshot stored on the
+  // submission; fall back to the stored total for legacy fixed submissions.
+  const fixedAmount =
+    submission.monthly_rate !== null && submission.monthly_rate !== undefined
+      ? submission.monthly_rate
+      : submission.total_amount || 0;
+
   const lineItems: InvoiceData['lineItems'] = [];
 
-  if (submission.regular_hours > 0) {
+  if (isFixed) {
     lineItems.push({
-      description: `${submission.project_name || 'General Work'} - Regular Hours`,
-      hours: submission.regular_hours,
-      rate: hourlyRate,
-      amount: submission.regular_hours * hourlyRate,
+      description: `${submission.project_name || 'General Work'} - Monthly Fixed Fee`,
+      amount: fixedAmount,
     });
-  }
+  } else {
+    if (submission.regular_hours > 0) {
+      lineItems.push({
+        description: `${submission.project_name || 'General Work'} - Regular Hours`,
+        hours: submission.regular_hours,
+        rate: hourlyRate,
+        amount: submission.regular_hours * hourlyRate,
+      });
+    }
 
-  if (submission.overtime_hours > 0) {
-    const otDescription = submission.overtime_description
-      ? `${submission.project_name || 'General Work'} - Overtime (${submission.overtime_description})`
-      : `${submission.project_name || 'General Work'} - Overtime Hours`;
-    lineItems.push({
-      description: otDescription,
-      hours: submission.overtime_hours,
-      rate: overtimeRate,
-      amount: submission.overtime_hours * overtimeRate,
-    });
+    if (submission.overtime_hours > 0) {
+      const otDescription = submission.overtime_description
+        ? `${submission.project_name || 'General Work'} - Overtime (${submission.overtime_description})`
+        : `${submission.project_name || 'General Work'} - Overtime Hours`;
+      lineItems.push({
+        description: otDescription,
+        hours: submission.overtime_hours,
+        rate: overtimeRate,
+        amount: submission.overtime_hours * overtimeRate,
+      });
+    }
   }
 
   const invoiceData: InvoiceData = {
@@ -176,7 +195,7 @@ export async function generateInvoiceForSubmission(submissionId: string): Promis
       country: DEFAULT_COMPANY_INFO.country,
     },
     lineItems,
-    totalAmount: submission.total_amount || 0,
+    totalAmount: isFixed ? fixedAmount : submission.total_amount || 0,
     banking: {
       payableTo: profile?.bank_account_name || profile?.full_name || userProfile?.full_name || 'N/A',
       bankName: profile?.bank_name || 'N/A',

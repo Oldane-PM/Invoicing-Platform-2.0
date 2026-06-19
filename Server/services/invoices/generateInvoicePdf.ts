@@ -30,11 +30,12 @@ export interface InvoiceData {
     country: string;
   };
 
-  // Line items
+  // Line items. hours/rate are optional: fixed/salary invoices bill a constant
+  // monthly amount with no per-hour breakdown, so those cells are left blank.
   lineItems: Array<{
     description: string;
-    hours: number;
-    rate: number;
+    hours?: number;
+    rate?: number;
     amount: number;
   }>;
 
@@ -245,8 +246,13 @@ function drawLineItemsTable(doc: PDFKit.PDFDocument, data: InvoiceData): void {
       width: columns.description.width - 20,
     });
 
-    doc.text(item.hours.toFixed(1), columns.hours.x + 10, rowY + 10);
-    doc.text(formatCurrency(item.rate, data.currency), columns.rate.x + 10, rowY + 10);
+    // Fixed/salary line items omit hours and rate — leave those cells blank.
+    if (item.hours !== undefined) {
+      doc.text(item.hours.toFixed(1), columns.hours.x + 10, rowY + 10);
+    }
+    if (item.rate !== undefined) {
+      doc.text(formatCurrency(item.rate, data.currency), columns.rate.x + 10, rowY + 10);
+    }
     doc.text(formatCurrency(item.amount, data.currency), columns.amount.x + 10, rowY + 10);
 
     rowY += rowHeight;
