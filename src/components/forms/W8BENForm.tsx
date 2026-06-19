@@ -83,7 +83,8 @@ export function W8BENForm({ onSuccess, isReadOnly = false }: W8BENFormProps) {
       const sessionResponse = await supabase?.auth.getSession();
       const token = sessionResponse?.data?.session?.access_token;
 
-      const resWithCreds = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/submit`, {
+      const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_AUTH_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5001' : '')).replace(/\/+$/, "");
+      const resWithCreds = await fetch(`${apiBase}/api/w8ben/submit`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
