@@ -43,6 +43,7 @@ export interface ContractInfo {
   contract_id: string;
   project_name: string | null;
   contract_type: string | null;
+  fixed_monthly_rate: number | null;
   start_date: string | null;
   end_date: string | null;
   hourly_rate: number | null;
@@ -123,6 +124,7 @@ export async function getContractInfo(userId: string): Promise<ContractInfo | nu
       id,
       project_name,
       contract_type,
+      fixed_monthly_rate,
       start_date,
       end_date
     `)
@@ -161,6 +163,7 @@ export async function getContractInfo(userId: string): Promise<ContractInfo | nu
     contract_id: contract?.id || "",
     project_name: contract?.project_name || contractor?.default_project_name || null,
     contract_type: contract?.contract_type || "hourly",
+    fixed_monthly_rate: contract?.fixed_monthly_rate ?? null,
     start_date: contract?.start_date || contractor?.contract_start || null,
     end_date: contract?.end_date || contractor?.contract_end || null,
     hourly_rate: contractor?.hourly_rate || null,

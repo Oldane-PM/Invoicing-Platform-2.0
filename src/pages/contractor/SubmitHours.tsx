@@ -38,6 +38,7 @@ import { INVOICE_QUERY_KEY } from "../../lib/hooks/invoices";
 import { replaceInvoiceAfterSubmissionEditApi } from "../../lib/api/invoiceClient";
 import { useSubmittedPeriods } from "../../lib/hooks/contractor/useSubmittedPeriods";
 import { useContractorProfile } from "../../lib/hooks/contractor/useContractorProfile";
+import { useVendorOnboarding } from "../../lib/hooks/contractor/useVendorOnboarding";
 import { useContractorProjects } from "../../lib/hooks/contractor/useContractorProjects";
 import { useNonWorkingDays } from "../../lib/hooks/adminCalendar";
 import type { SubmissionDraft, ContractorSubmission } from "../../lib/types";
@@ -140,9 +141,16 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   // Get already-submitted periods to prevent duplicates
   const { isMonthSubmitted, loading: loadingPeriods } = useSubmittedPeriods();
 
-  // Contractor profile hook available if needed for role-based filtering
-  // Currently all contractors use role="CONTRACTOR" for time-off filtering
+  // Contractor profile hook available for role-based filtering of time-off.
   useContractorProfile();
+
+  // Onboarding-entered rate is the source of truth for whether the contractor is
+  // fixed/salary (mirrors the Profile page). Fixed contractors are paid a constant
+  // monthly amount, so hours/day-selection are irrelevant to their invoice.
+  const { data: onboarding } = useVendorOnboarding();
+  const isFixedRate = onboarding?.onboarding_rate_type === "fixed";
+  const fixedMonthlyRate =
+    onboarding?.onboarding_rate != null ? Number(onboarding.onboarding_rate) : null;
 
   // Calculate range for non-working days based on selected month
   const monthRange = React.useMemo(() => {
@@ -297,10 +305,12 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
 
   // Update hours when working days change (only if not manually edited)
   React.useEffect(() => {
-    if (workingDaysCount > 0 && !isHoursManuallyEdited) {
+    // Fixed-rate contractors aren't paid by the hour, so never derive hours from
+    // selected working days for them.
+    if (!isFixedRate && workingDaysCount > 0 && !isHoursManuallyEdited) {
       setHoursSubmitted(autoCalculatedHours.toString());
     }
-  }, [workingDaysCount, autoCalculatedHours, isHoursManuallyEdited]);
+  }, [isFixedRate, workingDaysCount, autoCalculatedHours, isHoursManuallyEdited]);
 
   const handleMonthSelect = (monthIndex: number) => {
     setSelectedMonth(monthIndex);
@@ -350,7 +360,9 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       return;
     }
 
-    if (!hoursSubmitted || parseInt(hoursSubmitted) === 0) {
+    // Fixed/salary contractors are paid a constant monthly amount, so hours are
+    // optional and informational only.
+    if (!isFixedRate && (!hoursSubmitted || parseInt(hoursSubmitted) === 0)) {
       toast.error("Please enter hours submitted");
       return;
     }
@@ -396,7 +408,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     const draft: SubmissionDraft = {
       workPeriod,
       excludedDates: excludedDatesStrings,
-      hoursSubmitted: parseInt(hoursSubmitted),
+      hoursSubmitted: parseInt(hoursSubmitted) || 0,
       description: description.trim(),
       overtimeHours: parseInt(overtimeHours) || 0,
       overtimeDescription: overtimeDescription.trim() || null,
@@ -698,8 +710,9 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
               </Popover>
             </div>
 
-            {/* Interactive Calendar Section */}
-            {selectedMonth !== null && calendarDays.length > 0 && (
+            {/* Interactive Calendar Section — hidden for fixed-rate contractors,
+                who select only the work-period month (hours don't affect pay). */}
+            {!isFixedRate && selectedMonth !== null && calendarDays.length > 0 && (
               <div className="space-y-4 pt-2">
                 {/* Info Banner */}
                 <div className="bg-[#EEF3FF] border border-blue-200 rounded-[10px] p-4 flex gap-3">
@@ -853,29 +866,47 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
               </div>
             )}
 
-            {/* Hours Submitted */}
-            <div>
-              <Label
-                htmlFor="hours-submitted"
-                className="text-sm font-medium text-gray-900 mb-1.5 block"
-              >
-                Hours Submitted
-              </Label>
-              <Input
-                id="hours-submitted"
-                type="number"
-                value={hoursSubmitted}
-                onChange={handleHoursChange}
-                className="h-11 bg-white border-gray-300 rounded-lg"
-                placeholder="0"
-              />
-              {workingDaysCount > 0 && (
-                <p className="text-xs text-gray-500 mt-1.5">
-                  Auto-calculated: {workingDaysCount} days x 8 hours ={" "}
-                  {autoCalculatedHours} hours (editable)
-                </p>
-              )}
-            </div>
+            {/* Fixed-rate banner: invoice is a constant monthly amount, no hours */}
+            {isFixedRate && (
+              <div className="bg-[#EEF3FF] border border-blue-200 rounded-[10px] p-4 flex gap-3">
+                <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 text-sm text-blue-900 leading-relaxed">
+                  <span className="font-semibold">Fixed monthly rate</span>
+                  {fixedMonthlyRate != null
+                    ? ` of $${fixedMonthlyRate.toLocaleString()}`
+                    : ""}
+                  . Just choose the work-period month — your invoice is billed at
+                  this constant amount, so there are no hours or days to enter.
+                </div>
+              </div>
+            )}
+
+            {/* Hours Submitted — hidden for fixed-rate contractors (hours don't
+                affect their pay; they only pick the month). */}
+            {!isFixedRate && (
+              <div>
+                <Label
+                  htmlFor="hours-submitted"
+                  className="text-sm font-medium text-gray-900 mb-1.5 block"
+                >
+                  Hours Submitted
+                </Label>
+                <Input
+                  id="hours-submitted"
+                  type="number"
+                  value={hoursSubmitted}
+                  onChange={handleHoursChange}
+                  className="h-11 bg-white border-gray-300 rounded-lg"
+                  placeholder="0"
+                />
+                {workingDaysCount > 0 && (
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    Auto-calculated: {workingDaysCount} days x 8 hours ={" "}
+                    {autoCalculatedHours} hours (editable)
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Description */}
             <div>
@@ -895,24 +926,26 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
               />
             </div>
 
-            {/* Overtime Hours */}
-            <div>
-              <Label
-                htmlFor="overtime"
-                className="text-sm font-medium text-gray-900 mb-1.5 block"
-              >
-                Overtime Hours{" "}
-                <span className="text-gray-500 font-normal">(Optional)</span>
-              </Label>
-              <Input
-                id="overtime"
-                type="number"
-                value={overtimeHours}
-                onChange={(e) => setOvertimeHours(e.target.value)}
-                className="h-11 bg-white border-gray-300 rounded-lg"
-                placeholder="0"
-              />
-            </div>
+            {/* Overtime Hours — hidden for fixed-rate contractors (no hourly pay) */}
+            {!isFixedRate && (
+              <div>
+                <Label
+                  htmlFor="overtime"
+                  className="text-sm font-medium text-gray-900 mb-1.5 block"
+                >
+                  Overtime Hours{" "}
+                  <span className="text-gray-500 font-normal">(Optional)</span>
+                </Label>
+                <Input
+                  id="overtime"
+                  type="number"
+                  value={overtimeHours}
+                  onChange={(e) => setOvertimeHours(e.target.value)}
+                  className="h-11 bg-white border-gray-300 rounded-lg"
+                  placeholder="0"
+                />
+              </div>
+            )}
 
             {/* Overtime Description - Conditional with Animation */}
             <AnimatePresence>

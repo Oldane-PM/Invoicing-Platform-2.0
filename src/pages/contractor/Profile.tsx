@@ -1011,16 +1011,18 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                   <div className="text-gray-900">{contract?.project_name || "Not assigned"}</div>
                 </div>
 
-                {/* Contract Type */}
+                {/* Contract Type — driven by the onboarding rate type (source of
+                    truth) so it matches the rate shown above, falling back to the
+                    admin-managed contract. */}
                 <div>
                   <div className="text-sm text-gray-600 mb-2">Contract Type</div>
-                  <div className="text-gray-900 capitalize">{contract?.contract_type || "Not set"}</div>
-                </div>
-
-                {/* Reporting Manager */}
-                <div>
-                  <div className="text-sm text-gray-600 mb-2">Reporting Manager</div>
-                  <div className="text-gray-900">{contract?.reporting_manager_name || "Not assigned"}</div>
+                  <div className="text-gray-900 capitalize">
+                    {onboardingRate != null
+                      ? isFixedRate
+                        ? "Fixed"
+                        : "Hourly"
+                      : contract?.contract_type || "Not set"}
+                  </div>
                 </div>
               </div>
 

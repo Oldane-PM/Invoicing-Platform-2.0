@@ -46,6 +46,33 @@ export async function updateContractInfo(
     dbUpdates.overtime_rate = updates.overtime_rate;
   }
 
+  // contract_type and the fixed monthly amount live on the contracts table, not
+  // contractors. Persist them there so fixed/salary contracts are recognized by
+  // submission + invoice generation (which read contracts.contract_type /
+  // contracts.fixed_monthly_rate).
+  if (updates.rate_type !== undefined || updates.fixed_rate !== undefined) {
+    const contractUpdates: Record<string, unknown> = {};
+
+    if (updates.rate_type !== undefined) {
+      contractUpdates.contract_type =
+        updates.rate_type === "Fixed" ? "fixed" : updates.rate_type === "Hourly" ? "hourly" : null;
+    }
+    if (updates.fixed_rate !== undefined) {
+      contractUpdates.fixed_monthly_rate = updates.fixed_rate;
+    }
+
+    const { error: contractError } = await supabase
+      .from("contracts")
+      .update(contractUpdates)
+      .eq("contractor_user_id", contractor_id)
+      .eq("is_active", true);
+
+    if (contractError) {
+      console.error("[ContractInfo] Error updating contract type/fixed rate:", contractError);
+      throw new Error(`Failed to update contract type: ${contractError.message}`);
+    }
+  }
+
   console.log("[ContractInfo] Upserting contract info for:", contractor_id, dbUpdates);
 
   // Use upsert to handle both insert and update
