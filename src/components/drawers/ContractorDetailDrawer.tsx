@@ -129,7 +129,8 @@ export function ContractorDetailDrawer({
     if (!employee?.contractor_id) return;
     setW8benLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${employee.contractor_id}`, {
+      const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_AUTH_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5001' : '')).replace(/\/+$/, "");
+      const res = await fetch(`${apiBase}/api/w8ben/${employee.contractor_id}`, {
         credentials: 'include',
       });
       if (res.ok) {
@@ -149,7 +150,8 @@ export function ContractorDetailDrawer({
     if (!employee?.contractor_id) return;
     setReturning(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${employee.contractor_id}/return`, {
+      const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_AUTH_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5001' : '')).replace(/\/+$/, "");
+      const res = await fetch(`${apiBase}/api/w8ben/${employee.contractor_id}/return`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
