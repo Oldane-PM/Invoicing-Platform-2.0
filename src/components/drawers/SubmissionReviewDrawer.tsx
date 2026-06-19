@@ -16,6 +16,7 @@ import {
   DialogDescription,
 } from "../ui/dialog";
 import { CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { InvoiceButton } from "../shared/InvoiceButton";
 import { format } from "date-fns";
 import {
   useSubmissionDetails,
@@ -256,7 +257,7 @@ export function SubmissionReviewDrawer({
                     </div>
                     <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
                       <div className="text-xs text-purple-700 mb-1">Total Amount</div>
-                      <div className="text-lg font-semibold text-purple-900">${submission.totalAmount.toLocaleString()}</div>
+                      <div className="text-lg font-semibold text-purple-900 mb-3">${submission.totalAmount.toLocaleString()}</div>
                     </div>
                   </div>
                 </div>
@@ -287,6 +288,12 @@ export function SubmissionReviewDrawer({
                     </div>
                   </div>
                 )}
+
+                {/* Invoice Section */}
+                <div className="space-y-4 mb-6">
+                  <h3 className="text-sm font-semibold text-gray-900">Invoice</h3>
+                  <InvoiceButton submissionId={submission.id} />
+                </div>
 
                 {/* Rejection Reason (if rejected) */}
                 {submission.rejectionReason && (

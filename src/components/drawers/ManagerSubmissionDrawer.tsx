@@ -13,6 +13,7 @@ import {
 } from "../ui/dialog";
 import { toast } from "sonner";
 import { CheckCircle, XCircle, Mail, Briefcase, DollarSign, Clock } from "lucide-react";
+import { InvoiceButton } from "../shared/InvoiceButton";
 
 interface ManagerSubmission {
   id: string;
@@ -284,6 +285,14 @@ export function ManagerSubmissionDrawer({
                       <p className="text-sm text-gray-500 italic">No notes provided</p>
                     )}
                   </div>
+                </div>
+
+                {/* Invoice Section */}
+                <div className="space-y-4 mt-6 pt-6 border-t border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">
+                    Invoice
+                  </h3>
+                  <InvoiceButton submissionId={submission.id} />
                 </div>
 
                 {/* Current Status */}
