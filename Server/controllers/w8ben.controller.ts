@@ -79,8 +79,8 @@ export async function submitW8BenForm(req: Request, res: Response, next: NextFun
     let pdfUrl = '';
 
     if (body.pdfBase64) {
-      // Decode base64 to buffer
-      const base64Data = body.pdfBase64.replace(/^data:application\/pdf;base64,/, "");
+      // Safely extract the base64 data regardless of MIME type casing
+      const base64Data = body.pdfBase64.includes(',') ? body.pdfBase64.split(',')[1] : body.pdfBase64;
       const pdfBuffer = Buffer.from(base64Data, 'base64');
       const timestamp = Date.now();
       const storagePath = `tax-forms/${contractorId}/w8ben-upload-${timestamp}.pdf`;

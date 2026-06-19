@@ -93,18 +93,29 @@ export function W8BENForm({ onSuccess, isReadOnly = false }: W8BENFormProps) {
         credentials: "include",
       });
 
-      const data = await resWithCreds.json();
+      let data;
+      try {
+        const text = await resWithCreds.text();
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          console.error("Non-JSON response:", text);
+          throw new Error(`Server returned an invalid response (Status ${resWithCreds.status}).`);
+        }
+      } catch (e: any) {
+        throw new Error(e.message || "Failed to parse server response.");
+      }
 
-      if (data.success) {
+      if (resWithCreds.ok && data.success) {
         toast.success("W-8BEN Form uploaded successfully!");
         setSelectedFile(null);
         if (onSuccess) onSuccess();
       } else {
         toast.error(data.error || "Failed to upload W-8BEN document");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error("An unexpected error occurred while uploading.");
+      toast.error(error.message || "An unexpected error occurred while uploading.");
     } finally {
       setLoading(false);
     }
