@@ -277,6 +277,16 @@ export const DEFAULT_HOURLY_RATE = 75;
 export const DEFAULT_OT_MULTIPLIER = 1.5;
 
 /**
+ * Default monthly hours recorded for FIXED-rate submissions.
+ *
+ * Fixed contractors don't have their pay calculated from hours, but the work
+ * order specifies a 40-hour work week. We store 160 (40 × 4 weeks) so the
+ * submission/record reflects expected hours instead of 0; it does NOT affect
+ * the invoice total (which is always the fixed monthly rate).
+ */
+export const DEFAULT_FIXED_MONTHLY_HOURS = 160;
+
+/**
  * Get default overtime rate based on hourly rate
  */
 export function getDefaultOvertimeRate(hourlyRate: number | string | null | undefined): number {

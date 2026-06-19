@@ -25,4 +25,5 @@ export {
   // Constants
   DEFAULT_HOURLY_RATE,
   DEFAULT_OT_MULTIPLIER,
+  DEFAULT_FIXED_MONTHLY_HOURS,
 } from "./submissions";
