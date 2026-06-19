@@ -22,6 +22,7 @@ import { useUpdateContractInfo } from "../../lib/hooks/admin/useUpdateContractIn
 import { useContractorOnboarding } from "../../lib/hooks/admin/useContractorOnboarding";
 import { incrementInvoiceNumber } from "../../lib/invoiceSequence";
 import { groupSubmissionsByWorkPeriod } from "../../lib/utils";
+import { supabase } from "../../lib/supabase/client";
 
 interface ContractorDetailDrawerProps {
   open: boolean;
@@ -130,7 +131,14 @@ export function ContractorDetailDrawer({
     setW8benLoading(true);
     try {
       const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_AUTH_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5001' : '')).replace(/\/+$/, "");
+      
+      const sessionResponse = await supabase?.auth.getSession();
+      const token = sessionResponse?.data?.session?.access_token;
+
       const res = await fetch(`${apiBase}/api/w8ben/${employee.contractor_id}`, {
+        headers: {
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         credentials: 'include',
       });
       if (res.ok) {
@@ -151,9 +159,16 @@ export function ContractorDetailDrawer({
     setReturning(true);
     try {
       const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_AUTH_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5001' : '')).replace(/\/+$/, "");
+      
+      const sessionResponse = await supabase?.auth.getSession();
+      const token = sessionResponse?.data?.session?.access_token;
+
       const res = await fetch(`${apiBase}/api/w8ben/${employee.contractor_id}/return`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         credentials: 'include',
         body: JSON.stringify({ reason: returnReason }),
       });

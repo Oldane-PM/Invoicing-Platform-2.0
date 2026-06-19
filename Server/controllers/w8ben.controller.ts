@@ -256,6 +256,10 @@ export async function getW8BenForm(req: Request, res: Response, next: NextFuncti
       }
     }
 
+    console.log(`[getW8BenForm] Request for contractorId: ${contractorId}`);
+    console.log(`[getW8BenForm] Authenticated userId: ${userId}`);
+    console.log(`[getW8BenForm] targetContractorId used for query: ${targetContractorId}`);
+
     const { data: form, error } = await supabase
       .from('w8ben_forms')
       .select('*')
@@ -263,9 +267,12 @@ export async function getW8BenForm(req: Request, res: Response, next: NextFuncti
       .single();
 
     if (error || !form) {
+      console.log(`[getW8BenForm] Error or not found:`, error);
       res.status(404).json({ error: 'W-8BEN form not found' });
       return;
     }
+    
+    console.log(`[getW8BenForm] Found form ID: ${form.id}`);
 
     let signedUrl = null;
     if (form.pdf_url) {
