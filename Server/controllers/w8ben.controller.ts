@@ -5,63 +5,40 @@ import { auth } from '../../src/lib/auth';
 
 const W8BEN_BUCKET = process.env.SUPABASE_INVOICES_BUCKET || 'invoices'; // Reusing invoices bucket for now
 
+async function getUserFromRequest(req: Request) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const { data } = await getSupabaseAdmin().auth.getUser(token);
+    if (data.user) return data.user;
+  }
+  
+  // Fallback to better-auth
+  const session = await auth.api.getSession({
+    headers: req.headers as any,
+  });
+  return session?.user || null;
+}
+
 export async function submitW8BenForm(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    let userEmail = null;
-    let userId = null;
+    const user = await getUserFromRequest(req);
 
-    // First try Supabase Auth token (from frontend Demo login)
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const supabase = getSupabaseAdmin();
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      if (!error && user) {
-        userEmail = user.email;
-        userId = user.id;
-      }
-    }
-
-    // Fallback to Better Auth session
-    if (!userId) {
-      const session = await auth.api.getSession({
-        headers: req.headers as any,
-      });
-      if (session?.user) {
-        userEmail = session.user.email;
-        userId = session.user.id;
-      }
-    }
-
-    if (!userId || !userEmail) {
+    if (!user?.id) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    const supabase = getSupabaseAdmin();
-
-    // Get the real profile ID using the session email to link properly
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', userEmail)
-      .single();
-
-    if (profileError || !profileData) {
-      res.status(404).json({ error: 'User profile not found in database' });
-      return;
-    }
-
-    const contractorId = profileData.id;
+    const contractorId = user.id;
     const body = req.body;
 
     // Validate minimum required fields
-    if (!body.pdfBase64) {
-      if (!body.name || !body.citizenship || !body.residenceAddress || !body.signatureName) {
-        res.status(400).json({ error: 'Missing required W-8BEN fields or pdf document' });
-        return;
-      }
+    if (!body.name || !body.citizenship || !body.residenceAddress || !body.signatureName) {
+      res.status(400).json({ error: 'Missing required W-8BEN fields' });
+      return;
     }
+
+    const supabase = getSupabaseAdmin();
 
     // Check if there's an existing form that was returned for review
     const { data: existingForm } = await supabase
@@ -76,89 +53,58 @@ export async function submitW8BenForm(req: Request, res: Response, next: NextFun
       return;
     }
 
-    let pdfUrl = '';
+    // Generate PDF
+    const pdfData: W8BenData = {
+      name: body.name,
+      citizenship: body.citizenship,
+      residenceAddress: body.residenceAddress,
+      residenceCity: body.residenceCity,
+      residenceCountry: body.residenceCountry,
+      mailingAddress: body.mailingAddress,
+      mailingCity: body.mailingCity,
+      mailingCountry: body.mailingCountry,
+      usTaxId: body.usTaxId,
+      foreignTaxId: body.foreignTaxId,
+      referenceNumber: body.referenceNumber,
+      dob: body.dob,
+      treatyCountry: body.treatyCountry,
+      specialRatesArticle: body.specialRatesArticle,
+      specialRatesPercent: body.specialRatesPercent,
+      specialRatesIncomeType: body.specialRatesIncomeType,
+      specialRatesConditions: body.specialRatesConditions,
+      signatureName: body.signatureName,
+      signatureDate: new Date(),
+      ipAddress: req.ip || req.socket.remoteAddress,
+    };
 
-    if (body.pdfBase64) {
-      // Safely extract the base64 data regardless of MIME type casing
-      const base64Data = body.pdfBase64.includes(',') ? body.pdfBase64.split(',')[1] : body.pdfBase64;
-      const pdfBuffer = Buffer.from(base64Data, 'base64');
-      const timestamp = Date.now();
-      const storagePath = `tax-forms/${contractorId}/w8ben-upload-${timestamp}.pdf`;
+    const pdfBuffer = await generateW8BenPdf(pdfData);
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from(W8BEN_BUCKET)
-        .upload(storagePath, pdfBuffer, {
-          contentType: 'application/pdf',
-          upsert: true,
-        });
+    // Upload PDF
+    const timestamp = Date.now();
+    const storagePath = `tax-forms/${contractorId}/w8ben-${timestamp}.pdf`;
 
-      if (uploadError) {
-        console.error('[w8ben.controller] Base64 PDF Upload failed:', uploadError);
-        res.status(500).json({ error: 'Failed to upload W-8BEN PDF' });
-        return;
-      }
-      
-      pdfUrl = uploadData.path;
-    } else {
-      // Legacy PDF generation path
-      const pdfData: W8BenData = {
-        name: body.name,
-        citizenship: body.citizenship,
-        residenceAddress: body.residenceAddress,
-        residenceCity: body.residenceCity,
-        residenceCountry: body.residenceCountry,
-        mailingAddress: body.mailingAddress,
-        mailingCity: body.mailingCity,
-        mailingCountry: body.mailingCountry,
-        usTaxId: body.usTaxId,
-        foreignTaxId: body.foreignTaxId,
-        referenceNumber: body.referenceNumber,
-        dob: body.dob,
-        treatyCountry: body.treatyCountry,
-        specialRatesArticle: body.specialRatesArticle,
-        specialRatesPercent: body.specialRatesPercent,
-        specialRatesIncomeType: body.specialRatesIncomeType,
-        specialRatesConditions: body.specialRatesConditions,
-        signatureName: body.signatureName,
-        signatureDate: new Date(),
-        ipAddress: req.ip || req.socket.remoteAddress,
-      };
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(W8BEN_BUCKET)
+      .upload(storagePath, pdfBuffer, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
 
-      const pdfBuffer = await generateW8BenPdf(pdfData);
-
-      // Upload PDF
-      const timestamp = Date.now();
-      const storagePath = `tax-forms/${contractorId}/w8ben-${timestamp}.pdf`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from(W8BEN_BUCKET)
-        .upload(storagePath, pdfBuffer, {
-          contentType: 'application/pdf',
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('[w8ben.controller] PDF Upload failed:', uploadError);
-        res.status(500).json({ error: 'Failed to upload W-8BEN PDF' });
-        return;
-      }
-      
-      pdfUrl = uploadData.path;
+    if (uploadError) {
+      console.error('[w8ben.controller] PDF Upload failed:', uploadError);
+      res.status(500).json({ error: 'Failed to upload W-8BEN PDF' });
+      return;
     }
 
     const formRecord = {
       contractor_user_id: contractorId,
       form_data: body,
-      signature_data: body.signatureName ? {
-        name: body.signatureName,
-        date: new Date().toISOString(),
-        ip: req.ip || req.socket.remoteAddress,
-      } : {
-        name: 'Direct PDF Upload',
-        date: new Date().toISOString(),
-        ip: req.ip || req.socket.remoteAddress,
+      signature_data: {
+        name: pdfData.signatureName,
+        date: pdfData.signatureDate.toISOString(),
+        ip: pdfData.ipAddress,
       },
-      pdf_url: pdfUrl,
+      pdf_url: uploadData.path,
       status: 'submitted',
       updated_at: new Date().toISOString(),
     };
@@ -206,33 +152,9 @@ export async function submitW8BenForm(req: Request, res: Response, next: NextFun
 
 export async function getW8BenForm(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    let userEmail = null;
-    let userId = null;
+    const user = await getUserFromRequest(req);
 
-    // First try Supabase Auth token
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const supabase = getSupabaseAdmin();
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      if (!error && user) {
-        userEmail = user.email;
-        userId = user.id;
-      }
-    }
-
-    // Fallback to Better Auth session
-    if (!userId) {
-      const session = await auth.api.getSession({
-        headers: req.headers as any,
-      });
-      if (session?.user) {
-        userEmail = session.user.email;
-        userId = session.user.id;
-      }
-    }
-
-    if (!userId) {
+    if (!user?.id) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
@@ -241,38 +163,16 @@ export async function getW8BenForm(req: Request, res: Response, next: NextFuncti
 
     const supabase = getSupabaseAdmin();
 
-    let targetContractorId = contractorId;
-
-    // If the requested ID is the authenticated user's ID, map it to their Profile ID
-    if (contractorId === userId && userEmail) {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', userEmail)
-        .single();
-      
-      if (profileData) {
-        targetContractorId = profileData.id;
-      }
-    }
-
-    console.log(`[getW8BenForm] Request for contractorId: ${contractorId}`);
-    console.log(`[getW8BenForm] Authenticated userId: ${userId}`);
-    console.log(`[getW8BenForm] targetContractorId used for query: ${targetContractorId}`);
-
     const { data: form, error } = await supabase
       .from('w8ben_forms')
       .select('*')
-      .eq('contractor_user_id', targetContractorId)
+      .eq('contractor_user_id', contractorId)
       .single();
 
     if (error || !form) {
-      console.log(`[getW8BenForm] Error or not found:`, error);
       res.status(404).json({ error: 'W-8BEN form not found' });
       return;
     }
-    
-    console.log(`[getW8BenForm] Found form ID: ${form.id}`);
 
     let signedUrl = null;
     if (form.pdf_url) {
@@ -304,11 +204,9 @@ export async function getW8BenForm(req: Request, res: Response, next: NextFuncti
  */
 export async function returnW8BenForm(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const session = await auth.api.getSession({
-      headers: req.headers as any,
-    });
+    const user = await getUserFromRequest(req);
 
-    if (!session?.user?.id) {
+    if (!user?.id) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
@@ -322,7 +220,7 @@ export async function returnW8BenForm(req: Request, res: Response, next: NextFun
     const { data: callerProfile } = await supabase
       .from('profiles')
       .select('role')
-      .eq('email', session.user.email)
+      .eq('email', user.email)
       .single();
 
     if (!callerProfile || !['admin', 'manager'].includes(callerProfile.role.toLowerCase())) {
@@ -365,6 +263,113 @@ export async function returnW8BenForm(req: Request, res: Response, next: NextFun
     });
   } catch (error) {
     console.error('[w8ben.controller] Error returning W-8BEN:', error);
+    next(error);
+  }
+}
+
+/**
+ * Handle direct upload of a W-8BEN PDF form
+ */
+export async function uploadW8BenForm(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const user = await getUserFromRequest(req);
+
+    if (!user?.id) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const contractorId = user.id;
+    const file = req.file;
+
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    if (file.mimetype !== 'application/pdf') {
+      res.status(400).json({ error: 'Only PDF files are allowed' });
+      return;
+    }
+
+    const supabase = getSupabaseAdmin();
+
+    // Check if there's an existing form that was returned for review
+    const { data: existingForm } = await supabase
+      .from('w8ben_forms')
+      .select('id, status')
+      .eq('contractor_user_id', contractorId)
+      .single();
+
+    // If a form already exists and is NOT returned, block re-submission
+    if (existingForm && existingForm.status !== 'returned') {
+      res.status(409).json({ error: 'A W-8BEN form has already been submitted. It cannot be resubmitted unless returned for review.' });
+      return;
+    }
+
+    // Upload PDF
+    const timestamp = Date.now();
+    const storagePath = `tax-forms/${contractorId}/w8ben-uploaded-${timestamp}.pdf`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(W8BEN_BUCKET)
+      .upload(storagePath, file.buffer, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('[w8ben.controller] PDF Upload failed:', uploadError);
+      res.status(500).json({ error: 'Failed to upload W-8BEN PDF' });
+      return;
+    }
+
+    const formRecord = {
+      contractor_user_id: contractorId,
+      form_data: {}, // Empty since it's a direct upload
+      signature_data: {}, // Empty since signature is in the uploaded PDF
+      pdf_url: uploadData.path,
+      status: 'submitted',
+      updated_at: new Date().toISOString(),
+    };
+
+    let dbData;
+    let dbError;
+
+    if (existingForm) {
+      // Update the existing returned form
+      const result = await supabase
+        .from('w8ben_forms')
+        .update(formRecord)
+        .eq('id', existingForm.id)
+        .select()
+        .single();
+      dbData = result.data;
+      dbError = result.error;
+    } else {
+      // Insert new form
+      const result = await supabase
+        .from('w8ben_forms')
+        .insert(formRecord)
+        .select()
+        .single();
+      dbData = result.data;
+      dbError = result.error;
+    }
+
+    if (dbError) {
+      console.error('[w8ben.controller] DB Save failed:', dbError);
+      res.status(500).json({ error: 'Failed to save W-8BEN form record' });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'W-8BEN form uploaded successfully',
+      data: dbData,
+    });
+  } catch (error) {
+    console.error('[w8ben.controller] Error uploading W-8BEN:', error);
     next(error);
   }
 }
