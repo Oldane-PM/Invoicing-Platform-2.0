@@ -7,13 +7,16 @@ import invoiceRoutes from "./routes/invoice.routes";
 import oauthCallbackRoutes from "./routes/oauth-callback.routes";
 import userRoutes from "./routes/user.routes";
 import w8benRoutes from "./routes/w8ben.routes";
+import workOrderRoutes from "./routes/workOrder.routes";
 
 const app = express();
 const port = Number(process.env.PORT ?? 5001);
 
 // CORS configuration for cross-origin requests
 // Origin is scheme + host only (no path, no wildcards) - browser sends e.g. https://invoicing-platform-2-0.vercel.app
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim().replace(/\/+$/, "")).filter(Boolean) ?? [
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
+  .map((o) => o.trim().replace(/\/+$/, ""))
+  .filter(Boolean) ?? [
   "http://localhost:5173",
   "http://localhost:5001",
   "https://invoicing-platform-2-0.vercel.app",
@@ -23,7 +26,7 @@ app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-  })
+  }),
 );
 
 // IMPORTANT: Mount Better Auth handler BEFORE express.json()
@@ -31,7 +34,7 @@ app.use(
 app.use("/api/auth", toNodeHandler(auth));
 
 // Normal API routes can use JSON body parsing
-app.use(express.json());
+app.use(express.json({ limit: "15mb" }));
 
 // Health check endpoint
 app.get("/health", (_req, res) => {
@@ -39,10 +42,16 @@ app.get("/health", (_req, res) => {
 });
 
 // Redirect root to frontend (e.g. when OAuth redirects here with ?error=...)
-const frontendUrl = process.env.FRONTEND_URL || process.env.ALLOWED_ORIGINS?.split(",")[0]?.trim() || "https://invoicing-platform-2-0.vercel.app";
+const frontendUrl =
+  process.env.FRONTEND_URL ||
+  process.env.ALLOWED_ORIGINS?.split(",")[0]?.trim() ||
+  "https://invoicing-platform-2-0.vercel.app";
 app.get("/", (req, res) => {
   const url = new URL("/auth/callback", frontendUrl);
-  req.query && Object.entries(req.query).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+  req.query &&
+    Object.entries(req.query).forEach(([k, v]) =>
+      url.searchParams.set(k, String(v)),
+    );
   res.redirect(302, url.toString());
 });
 
@@ -54,6 +63,9 @@ app.use("/api/users", userRoutes);
 
 // W-8BEN routes
 app.use("/api/w8ben", w8benRoutes);
+
+// Work order extraction routes
+app.use("/api/work-order", workOrderRoutes);
 
 // OAuth callback routes (mounted separately to avoid conflict with Better Auth)
 app.use("/api/callback", oauthCallbackRoutes);
@@ -90,3 +102,4 @@ try {
   console.error("Failed to start server:", error);
   process.exit(1);
 }
+// Trigger nodemon reload

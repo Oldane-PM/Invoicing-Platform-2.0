@@ -3,7 +3,7 @@
     "module": "ESNext",
     "target": "ES2020",
     "outDir": "./dist",
-    "rootDir": "./Server",
+    "rootDir": "./",
     "moduleResolution": "node",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
