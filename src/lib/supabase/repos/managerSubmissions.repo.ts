@@ -78,6 +78,10 @@ export async function listTeamSubmissions(
       paid_at,
       created_at,
       rejection_reason,
+      rate_type,
+      regular_rate,
+      overtime_rate,
+      monthly_rate,
       profiles: contractor_user_id (
         full_name,
         email
@@ -170,17 +174,17 @@ export async function listTeamSubmissions(
     // Handle potential array or object return from joins
     const profile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
     
-    // Get contractor rates from the map
+    // Use snapshotted rates from submission if available, otherwise fallback to contractors map
     const contractorRates = contractorRatesMap.get(s.contractor_user_id);
-    const hourlyRate = contractorRates?.hourlyRate ?? null;
-    const overtimeRate = contractorRates?.overtimeRate ?? null;
+    const hourlyRate = s.regular_rate ?? contractorRates?.hourlyRate ?? null;
+    const overtimeRate = s.overtime_rate ?? contractorRates?.overtimeRate ?? null;
 
-    // Get contract type from the map (default to 'hourly' if not found)
-    const contractType = contractTypeMap.get(s.contract_id) === "fixed" ? "fixed" : "hourly";
+    // Get contract type from submission if available, otherwise fallback to contracts map
+    const contractType = (s.rate_type?.toLowerCase() === "fixed") ? "fixed" 
+                       : (contractTypeMap.get(s.contract_id) === "fixed" ? "fixed" : "hourly");
     
-    // For fixed contracts, the monthly rate would ideally come from a dedicated column
-    // For now, if contract type is fixed, we don't show hourly rates
-    const fixedMonthlyRate = contractType === "fixed" ? (s.total_amount || null) : null;
+    // For fixed contracts, use the snapshotted monthly rate or fallback to total_amount
+    const fixedMonthlyRate = contractType === "fixed" ? (s.monthly_rate || s.total_amount || null) : null;
 
     return {
       id: s.id,
@@ -253,6 +257,10 @@ export async function getSubmissionDetails(
       paid_at,
       created_at,
       rejection_reason,
+      rate_type,
+      regular_rate,
+      overtime_rate,
+      monthly_rate,
       profiles: contractor_user_id (
         full_name,
         email
@@ -286,10 +294,10 @@ export async function getSubmissionDetails(
     overtimeRate = contractorData.overtime_rate ?? null;
   }
 
-  // Fetch contract type separately
-  let contractType: "hourly" | "fixed" = "hourly";
+  // Fetch contract type separately (fallback)
+  let contractType: "hourly" | "fixed" = data.rate_type?.toLowerCase() === "fixed" ? "fixed" : "hourly";
   
-  if (data.contract_id) {
+  if (!data.rate_type && data.contract_id) {
     const { data: contractData } = await supabase
       .from("contracts")
       .select("contract_type")
@@ -318,8 +326,12 @@ export async function getSubmissionDetails(
   // Safe access to joined data
   const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
   
-  // For fixed contracts, use total_amount as proxy for monthly rate
-  const fixedMonthlyRate = contractType === "fixed" ? (data.total_amount || null) : null;
+  // Use snapshotted rates from submission if available, otherwise fallback
+  hourlyRate = data.regular_rate ?? hourlyRate;
+  overtimeRate = data.overtime_rate ?? overtimeRate;
+
+  // For fixed contracts, use snapshotted monthly rate or total_amount
+  const fixedMonthlyRate = contractType === "fixed" ? (data.monthly_rate || data.total_amount || null) : null;
 
   return {
     id: data.id,
