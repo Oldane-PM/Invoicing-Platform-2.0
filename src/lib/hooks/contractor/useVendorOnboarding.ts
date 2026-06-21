@@ -7,8 +7,9 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useAuth } from "../useAuth";
-import { isSupabaseConfigured } from "../../supabase/client";
+import { isSupabaseConfigured, getSupabaseClient } from "../../supabase/client";
 import {
   getVendorOnboarding,
   saveVendorOnboarding,
@@ -20,12 +21,14 @@ import {
 } from "../../data/vendorOnboarding";
 
 const QUERY_KEY = "vendorOnboarding";
+const API_BASE_URL = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
 
 export interface UseVendorOnboardingResult {
   data: VendorOnboardingData | null;
   isLoading: boolean;
   isSaving: boolean;
   isUploading: boolean;
+  isExtracting: boolean;
   error: Error | null;
   saveOnboarding: (
     patch: VendorOnboardingPatch
@@ -34,6 +37,17 @@ export interface UseVendorOnboardingResult {
     file: File
   ) => Promise<{ ok: boolean; error?: string; data?: VendorOnboardingData }>;
   getWorkOrderUrl: (path: string, filename: string | null) => Promise<WorkOrderRef>;
+  extractWorkOrder: (storagePath: string) => Promise<{
+    ok: boolean;
+    error?: string;
+    data?: {
+      role: string | null;
+      rate: number | null;
+      rateType: "hourly" | "fixed" | null;
+      startDate: string | null;
+      endDate: string | null;
+    };
+  }>;
   reload: () => void;
 }
 
@@ -41,6 +55,7 @@ export function useVendorOnboarding(): UseVendorOnboardingResult {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const userId = user?.id ?? null;
+  const [isExtracting, setIsExtracting] = useState(false);
 
   const queryKey = [QUERY_KEY, userId];
 
@@ -107,15 +122,58 @@ export function useVendorOnboarding(): UseVendorOnboardingResult {
     return getWorkOrderRef(path, filename);
   };
 
+  const extractWorkOrder = async (storagePath: string) => {
+    setIsExtracting(true);
+    try {
+      let token = null;
+      try {
+        const client = getSupabaseClient();
+        const sessionResponse = await client.auth.getSession();
+        token = sessionResponse?.data?.session?.access_token;
+      } catch (e) {
+        console.warn("Could not get Supabase session token:", e);
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/work-order/extract`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ storagePath }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          error: "Failed to extract details",
+        }));
+        throw new Error(errorData.error || "Failed to extract details from work order");
+      }
+
+      const responseData = await response.json();
+      return { ok: true, data: responseData.data };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : "Failed to extract work order details",
+      };
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
   return {
     data: data ?? null,
     isLoading,
     isSaving: saveMutation.isPending,
     isUploading: uploadMutation.isPending,
+    isExtracting,
     error: error instanceof Error ? error : null,
     saveOnboarding,
     uploadWorkOrderFile,
     getWorkOrderUrl,
+    extractWorkOrder,
     reload: () => {
       void refetch();
     },

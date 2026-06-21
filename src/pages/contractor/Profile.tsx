@@ -39,9 +39,11 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
     data: onboarding,
     isSaving: isSavingOnboarding,
     isUploading,
+    isExtracting,
     saveOnboarding,
     uploadWorkOrderFile,
     getWorkOrderUrl,
+    extractWorkOrder,
   } = useVendorOnboarding();
 
   const [activeTab, setActiveTab] = React.useState("personal");
@@ -87,6 +89,34 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
     const result = await uploadWorkOrderFile(file);
     if (result.ok) {
       toast.success("Work order uploaded");
+
+      const nextOnboarding = result.data;
+      const workOrderPath = nextOnboarding?.work_order_path;
+      if (workOrderPath) {
+        toast.promise(
+          async () => {
+            const extractResult = await extractWorkOrder(workOrderPath);
+            if (extractResult.ok && extractResult.data) {
+              const ext = extractResult.data;
+              if (ext.role) setWoRole(ext.role);
+              if (ext.rate != null) setWoRate(String(ext.rate));
+              if (ext.rateType === "fixed" || ext.rateType === "hourly") {
+                setWoRateType(ext.rateType);
+              }
+              if (ext.startDate) setWoStart(ext.startDate);
+              if (ext.endDate) setWoEnd(ext.endDate);
+              return extractResult.data;
+            } else {
+              throw new Error(extractResult.error || "Could not parse document details.");
+            }
+          },
+          {
+            loading: "AI is extracting contract details from the document...",
+            success: "AI successfully extracted contract details! Please review and save.",
+            error: (err) => `AI extraction warning: ${err.message || err}`,
+          }
+        );
+      }
     } else {
       const msg = result.error || "We couldn't process that document. Please try a different file.";
       setUploadError(msg);
@@ -226,7 +256,9 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
   const formatContractDate = (dateStr: string | null) => {
     if (!dateStr) return "Not set";
     try {
-      return format(new Date(dateStr), "MMM d, yyyy");
+      // Append T00:00:00 for simple YYYY-MM-DD strings to ensure local timezone parsing
+      const parsedDate = dateStr.includes("T") ? new Date(dateStr) : new Date(`${dateStr}T00:00:00`);
+      return format(parsedDate, "MMM d, yyyy");
     } catch {
       return dateStr;
     }
@@ -776,13 +808,18 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                 <Button
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
+                  disabled={isUploading || isExtracting}
                   className="h-11 px-6 rounded-lg border-gray-300"
                 >
                   {isUploading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Uploading...
+                    </>
+                  ) : isExtracting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Extracting Details...
                     </>
                   ) : (
                     <>
@@ -796,9 +833,17 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
 
             {/* Contract Details (manually entered) */}
             <div className="bg-white rounded-[14px] border border-gray-200 p-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                Contract Details
-              </h2>
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Contract Details
+                </h2>
+                {isExtracting && (
+                  <span className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full font-medium animate-pulse">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    AI Extracting...
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-600 mb-4">
                 Enter these from your work order. You can review and edit them before saving.
               </p>
