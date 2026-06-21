@@ -8,7 +8,7 @@
   --card-foreground: #111827;
   --popover: #FFFFFF;
   --popover-foreground: #111827;
-  --primary: #6366F1;
+  --primary: #0C5395;
   --primary-foreground: #FFFFFF;
   --secondary: #F3F4F6;
   --secondary-foreground: #111827;
@@ -24,19 +24,19 @@
   --switch-background: #D1D5DB;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: #6366F1;
+  --ring: #0C5395;
   
   /* Status Colors */
-  --color-blue: #3B82F6;
-  --color-blue-bg: #DBEAFE;
+  --color-blue: #0C5395;
+  --color-blue-bg: #edf4fa;
   --color-green: #22C55E;
   --color-green-bg: #DCFCE7;
   --color-yellow: #F59E0B;
   --color-yellow-bg: #FEF3C7;
   --color-red: #EF4444;
   --color-red-bg: #FEE2E2;
-  --color-purple: #6366F1;
-  --color-purple-bg: #E0E7FF;
+  --color-purple: #0C5395;
+  --color-purple-bg: #edf4fa;
   
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -100,6 +100,20 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  
+  /* Brand Overrides for Tailwind classes */
+  --color-blue-50: #edf4fa;
+  --color-blue-100: #d1e4f3;
+  --color-blue-500: #1a7abf;
+  --color-blue-600: #0C5395;
+  --color-blue-700: #094074;
+  
+  --color-purple-50: #edf4fa;
+  --color-purple-100: #d1e4f3;
+  --color-purple-500: #1a7abf;
+  --color-purple-600: #0C5395;
+  --color-purple-700: #094074;
+
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);

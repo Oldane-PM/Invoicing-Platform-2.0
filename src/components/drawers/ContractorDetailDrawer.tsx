@@ -130,16 +130,14 @@ export function ContractorDetailDrawer({
     if (!employee?.contractor_id) return;
     setW8benLoading(true);
     try {
-      const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_AUTH_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5001' : '')).replace(/\/+$/, "");
-      
       const sessionResponse = await supabase?.auth.getSession();
       const token = sessionResponse?.data?.session?.access_token;
-
-      const res = await fetch(`${apiBase}/api/w8ben/${employee.contractor_id}`, {
-        headers: {
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
+      
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${employee.contractor_id}`, {
         credentials: 'include',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
       if (res.ok) {
         const data = await res.json();
@@ -158,16 +156,14 @@ export function ContractorDetailDrawer({
     if (!employee?.contractor_id) return;
     setReturning(true);
     try {
-      const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_AUTH_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5001' : '')).replace(/\/+$/, "");
-      
       const sessionResponse = await supabase?.auth.getSession();
       const token = sessionResponse?.data?.session?.access_token;
 
-      const res = await fetch(`${apiBase}/api/w8ben/${employee.contractor_id}/return`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${employee.contractor_id}/return`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          Authorization: `Bearer ${token}`
         },
         credentials: 'include',
         body: JSON.stringify({ reason: returnReason }),
@@ -878,7 +874,39 @@ export function ContractorDetailDrawer({
                     )}
                   </div>
 
-                  {/* The form details were removed as this is now a pure PDF upload */}
+                  {/* Form Details */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Name</div>
+                        <div className="text-sm font-medium text-gray-900">{w8benData.form_data?.name || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Citizenship</div>
+                        <div className="text-sm font-medium text-gray-900">{w8benData.form_data?.citizenship || '-'}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Residence</div>
+                      <div className="text-sm text-gray-900">
+                        {w8benData.form_data?.residenceAddress}, {w8benData.form_data?.residenceCity}, {w8benData.form_data?.residenceCountry}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200">
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Signed by</div>
+                        <div className="text-sm font-medium text-gray-900">{w8benData.signature_data?.name || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">Signed on</div>
+                        <div className="text-sm text-gray-900">
+                          {w8benData.signature_data?.date
+                            ? new Date(w8benData.signature_data.date).toLocaleDateString()
+                            : '-'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Download PDF */}
                   {w8benData.signed_pdf_url && (
@@ -888,7 +916,7 @@ export function ContractorDetailDrawer({
                       onClick={() => window.open(w8benData.signed_pdf_url, '_blank')}
                     >
                       <Download className="w-4 h-4" />
-                      Download PDF
+                      Download Signed PDF
                     </Button>
                   )}
 

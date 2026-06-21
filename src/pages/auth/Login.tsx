@@ -161,7 +161,7 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-6">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 text-purple-600 animate-spin mx-auto mb-3" />
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-3" />
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -200,7 +200,7 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
               <input
                 type="password"
                 placeholder="Enter password"
-                className="w-full h-12 px-4 rounded-xl border border-gray-100 bg-[#F8FAFC] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
+                className="w-full h-12 px-4 rounded-xl border border-gray-100 bg-[#F8FAFC] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -215,7 +215,7 @@ export function Login({ authLoading, onDemoLogin }: LoginProps) {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-12 bg-[#9B1CFF] hover:bg-[#8614E0] text-white rounded-xl font-medium mt-2 transition-colors"
+              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium mt-2 transition-colors"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
