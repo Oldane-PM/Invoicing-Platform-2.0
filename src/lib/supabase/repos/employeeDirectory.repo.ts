@@ -118,6 +118,27 @@ export async function listEmployees({
     // Continue with partial data
   }
 
+  // Step 2.5: Fetch contractor profiles (onboarding data)
+  const { data: contractorProfiles, error: cpError } = await supabase
+    .from("contractor_profiles")
+    .select("user_id, onboarding_role, onboarding_rate, onboarding_rate_type, contract_start_date, contract_end_date")
+    .in("user_id", profileIds);
+
+  if (cpError) {
+    console.error("[employeeDirectory.repo] fetch contractor profiles error:", cpError);
+  }
+
+  // Step 2.6: Fetch active contracts (fixed rate details)
+  const { data: activeContracts, error: acError } = await supabase
+    .from("contracts")
+    .select("contractor_user_id, contract_type, fixed_monthly_rate, start_date, end_date, project_name")
+    .in("contractor_user_id", profileIds)
+    .eq("is_active", true);
+
+  if (acError) {
+    console.error("[employeeDirectory.repo] fetch active contracts error:", acError);
+  }
+
   // Step 3: Fetch manager assignments
   const { data: managerTeams, error: managersError } = await supabase
     .from("manager_teams")
@@ -149,6 +170,14 @@ export async function listEmployees({
   const contractorMap = new Map(
     (contractors || []).map((c) => [c.contractor_id, c])
   );
+
+  const contractorProfilesMap = new Map(
+    (contractorProfiles || []).map((cp) => [cp.user_id, cp])
+  );
+
+  const activeContractsMap = new Map(
+    (activeContracts || []).map((c) => [c.contractor_user_id, c])
+  );
   
   // Map contractor_id -> { manager_id, manager_name }
   const managerMap = new Map<string, { managerId: string; managerName: string }>();
@@ -166,9 +195,50 @@ export async function listEmployees({
   let rows: EmployeeDirectoryRow[] = profiles.map((profile) => {
     const contractor = contractorMap.get(profile.id);
     const managerData = managerMap.get(profile.id);
+    const cpData = contractorProfilesMap.get(profile.id);
+    const activeContract = activeContractsMap.get(profile.id);
 
     const isAdmin = profile.role?.toLowerCase() === "admin";
     const isStaff = profile.role && profile.role.toLowerCase() !== "contractor";
+
+    // Contract info priority: onboarding/work order info -> contracts table -> contractors table
+    const contractStart = isStaff 
+      ? undefined 
+      : (cpData?.contract_start_date || activeContract?.start_date || contractor?.contract_start);
+      
+    const contractEnd = isStaff 
+      ? undefined 
+      : (cpData?.contract_end_date || activeContract?.end_date || contractor?.contract_end);
+
+    // Rate Type priority: onboarding_rate_type -> contracts.contract_type -> fallback
+    let rateType: "Hourly" | "Fixed" | undefined = undefined;
+    if (!isStaff) {
+      if (cpData?.onboarding_rate_type === "fixed") {
+        rateType = "Fixed";
+      } else if (cpData?.onboarding_rate_type === "hourly") {
+        rateType = "Hourly";
+      } else if (activeContract?.contract_type === "fixed") {
+        rateType = "Fixed";
+      } else if (activeContract?.contract_type === "hourly") {
+        rateType = "Hourly";
+      } else if (contractor?.hourly_rate) {
+        rateType = "Hourly";
+      }
+    }
+
+    // Hourly Rate priority
+    const hourlyRate = isStaff
+      ? undefined
+      : (rateType === "Hourly" 
+          ? (cpData?.onboarding_rate || contractor?.hourly_rate)
+          : undefined);
+
+    // Fixed Rate priority
+    const fixedRate = isStaff
+      ? undefined
+      : (rateType === "Fixed" 
+          ? (cpData?.onboarding_rate || activeContract?.fixed_monthly_rate)
+          : undefined);
 
     return {
       contractor_id: profile.id, // ID is used as contractor_id in UI
@@ -179,14 +249,14 @@ export async function listEmployees({
       joined_at: profile.created_at,
       reporting_manager_id: isAdmin ? undefined : managerData?.managerId,
       reporting_manager_name: isAdmin ? undefined : managerData?.managerName,
-      contract_start: isStaff ? undefined : contractor?.contract_start,
-      contract_end: isStaff ? undefined : contractor?.contract_end,
-      hourly_rate: isStaff ? undefined : contractor?.hourly_rate,
-      fixed_rate: undefined, // Not currently stored in contractors table
-      rate_type: isStaff ? undefined : (contractor?.hourly_rate ? "Hourly" : undefined), 
+      contract_start: contractStart,
+      contract_end: contractEnd,
+      hourly_rate: hourlyRate,
+      fixed_rate: fixedRate,
+      rate_type: rateType,
       contract_type: isStaff ? "Employee" : "Contractor",
-      position: undefined, // Not currently stored in contractors table
-      department: undefined, // Not currently stored in contractors table
+      position: isStaff ? undefined : (cpData?.onboarding_role || activeContract?.project_name || undefined),
+      department: undefined,
     };
   });
 
