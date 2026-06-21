@@ -17,6 +17,7 @@ import {
   Briefcase,
   LogOut,
   User as UserIcon,
+  ClipboardList,
 } from "lucide-react";
 import { Login } from "./pages/auth/Login";
 import { OAuthCallback } from "./pages/auth/OAuthCallback";
@@ -26,10 +27,12 @@ import { ManagerTeamView } from "./pages/manager/Team";
 import { ContractorDashboard } from "./pages/contractor/Dashboard";
 import { ContractorProfile } from "./pages/contractor/Profile";
 import { SubmitHoursPage } from "./pages/contractor/SubmitHours";
+import { ContractorWorkOrders } from "./pages/contractor/WorkOrders";
 import { EmployeeDirectory } from "./pages/admin/EmployeeDirectory";
 import { UserAccessManagement } from "./pages/admin/UserAccessManagement";
 import { AdminCalendar } from "./pages/admin/Calendar";
 import { AdminProjects } from "./pages/admin/Projects";
+import { AdminWorkOrders } from "./pages/admin/WorkOrders";
 import { UnassignedDashboard } from "./pages/unassigned/Dashboard";
 import { NotificationBell } from "./components/shared/NotificationBell";
 import { NotificationDrawer } from "./components/shared/NotificationDrawer";
@@ -61,18 +64,31 @@ function roleToUserRole(role: string | null | undefined): UserRole {
   }
 }
 
-type Screen = "dashboard" | "directory" | "access" | "calendar" | "projects";
+type Screen =
+  | "dashboard"
+  | "directory"
+  | "access"
+  | "calendar"
+  | "projects"
+  | "work_orders";
 type ManagerScreen = "dashboard" | "team";
 type ContractorScreen =
   | "dashboard"
   | "profile"
-  | "submit-hours";
+  | "submit-hours"
+  | "work_orders";
 type UserRole = "Admin" | "Manager" | "Contractor" | "Unassigned" | null;
 type AppView = "login" | "oauth-callback" | "app";
 
 function App() {
   // Supabase auth — demo login now signs in with real seeded users.
-  const { isAuthenticated, user, signIn, signOut, loading: authLoading } = useAuth();
+  const {
+    isAuthenticated,
+    user,
+    signIn,
+    signOut,
+    loading: authLoading,
+  } = useAuth();
 
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
   const [currentView, setCurrentView] = React.useState<AppView>("login");
@@ -102,13 +118,13 @@ function App() {
     }
     return name.slice(0, 2).toUpperCase();
   };
-  
+
   // Use Demo Names if we are bypassed
   let displayName = "User";
   if (currentUser === "Admin") displayName = "Finance Officer";
   if (currentUser === "Manager") displayName = "Manager User";
   if (currentUser === "Contractor") displayName = "Contractor User";
-  
+
   const userInitials = getInitials(displayName);
 
   // Re-usable function to fetch user role from database
@@ -159,7 +175,7 @@ function App() {
   // Handle demo login — signs in with the seeded Supabase user for the role so a
   // real session exists and all role-scoped screens work through Supabase + RLS.
   const handleDemoLogin = async (
-    role: string
+    role: string,
   ): Promise<{ ok: boolean; error?: string }> => {
     const creds = DEMO_CREDENTIALS[role.toLowerCase()];
     if (!creds) {
@@ -189,10 +205,10 @@ function App() {
     setManagerScreen("dashboard");
     setContractorScreen("dashboard");
   };
-  
+
   // Refresh status for unassigned users - reuse fetchUserRole
   const [isRefreshingStatus, setIsRefreshingStatus] = React.useState(false);
-  
+
   const handleRefreshStatus = async () => {
     setIsRefreshingStatus(true);
     setTimeout(() => {
@@ -208,8 +224,10 @@ function App() {
   const handleSaveEmployee = (updatedEmployee: EmployeeDirectoryRow) => {
     setEmployees(
       employees.map((emp) =>
-        emp.contractor_id === updatedEmployee.contractor_id ? updatedEmployee : emp
-      )
+        emp.contractor_id === updatedEmployee.contractor_id
+          ? updatedEmployee
+          : emp,
+      ),
     );
   };
 
@@ -220,7 +238,8 @@ function App() {
       case "dashboard":
         return {
           title: `Welcome, ${displayName}`,
-          subtitle: "Finance Officer Dashboard — System overview and financial monitoring",
+          subtitle:
+            "Finance Officer Dashboard — System overview and financial monitoring",
         };
       case "directory":
         return {
@@ -242,6 +261,11 @@ function App() {
         return {
           title: "Projects",
           subtitle: "Manage projects and track resources",
+        };
+      case "work_orders":
+        return {
+          title: "Work Orders",
+          subtitle: "Manage work orders and requests",
         };
       default:
         return { title: "", subtitle: "" };
@@ -373,26 +397,32 @@ function App() {
         <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
           {managerScreen === "dashboard" && <ManagerDashboard />}
           {managerScreen === "team" && (
-            <ManagerTeamView 
+            <ManagerTeamView
               onContractorClick={(member) => {
                 // Map TeamContractor to EmployeeDirectoryRow format expected by the drawer
                 const mappedEmployee: EmployeeDirectoryRow = {
                   contractor_id: member.id, // ID is the profile ID in both cases
                   full_name: member.fullName,
                   email: member.email,
-                  role: 'Contractor', // default
-                  contract_start: member.contractStart ? new Date(member.contractStart).toISOString() : undefined,
-                  contract_end: member.contractEnd ? new Date(member.contractEnd).toISOString() : undefined,
-                  rate_type: 'Hourly', // default
+                  role: "Contractor", // default
+                  contract_start: member.contractStart
+                    ? new Date(member.contractStart).toISOString()
+                    : undefined,
+                  contract_end: member.contractEnd
+                    ? new Date(member.contractEnd).toISOString()
+                    : undefined,
+                  rate_type: "Hourly", // default
                   hourly_rate: member.hourlyRate || undefined,
                   fixed_rate: undefined,
                   contract_type: member.contractType,
                   reporting_manager_id: user?.id || undefined,
                   reporting_manager_name: displayName,
-                  position: 'Contractor',
-                  department: 'Engineering',
-                  status: 'Active', // required by type
-                  joined_at: member.contractStart ? new Date(member.contractStart).toISOString() : new Date().toISOString() // required by type
+                  position: "Contractor",
+                  department: "Engineering",
+                  status: "Active", // required by type
+                  joined_at: member.contractStart
+                    ? new Date(member.contractStart).toISOString()
+                    : new Date().toISOString(), // required by type
                 };
                 handleEmployeeClick(mappedEmployee);
               }}
@@ -406,8 +436,8 @@ function App() {
           onOpenChange={setNotificationsOpen}
           onNavigateToSubmission={(submissionId) => {
             // Admin: Navigate to dashboard (submission details handled by AdminDashboard component)
-            setCurrentScreen('dashboard');
-            console.log('[Admin] Navigate to submission:', submissionId);
+            setCurrentScreen("dashboard");
+            console.log("[Admin] Navigate to submission:", submissionId);
           }}
         />
         <ContractorDetailDrawer
@@ -438,12 +468,32 @@ function App() {
 
             {/* Right Section */}
             <div className="flex items-center gap-2 md:gap-3">
+              {/* Contractor Work Orders Button */}
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  setContractorScreen(
+                    contractorScreen === "work_orders"
+                      ? "dashboard"
+                      : "work_orders",
+                  )
+                }
+                className={`h-8 md:h-9 px-2 md:px-4 rounded-lg transition-colors ${
+                  contractorScreen === "work_orders"
+                    ? "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <ClipboardList className="w-4 h-4 md:w-5 md:h-5 md:mr-2" />
+                <span className="hidden md:inline">Work Orders</span>
+              </Button>
+
               {/* Contractor Profile Button */}
               <Button
                 variant="ghost"
                 onClick={() =>
                   setContractorScreen(
-                    contractorScreen === "profile" ? "dashboard" : "profile"
+                    contractorScreen === "profile" ? "dashboard" : "profile",
                   )
                 }
                 className={`h-8 md:h-9 px-2 md:px-4 rounded-lg transition-colors ${
@@ -525,6 +575,9 @@ function App() {
               }}
             />
           )}
+          {contractorScreen === "work_orders" && (
+            <ContractorWorkOrders onBack={() => setContractorScreen("dashboard")} />
+          )}
         </main>
 
         {/* Drawers */}
@@ -533,8 +586,8 @@ function App() {
           onOpenChange={setNotificationsOpen}
           onNavigateToSubmission={(submissionId) => {
             // Manager: Navigate to dashboard
-            setManagerScreen('dashboard');
-            console.log('[Manager] Navigate to submission:', submissionId);
+            setManagerScreen("dashboard");
+            console.log("[Manager] Navigate to submission:", submissionId);
           }}
         />
       </div>
@@ -661,21 +714,33 @@ function App() {
               <Briefcase className="w-4 h-4" />
               <span className="font-medium text-sm md:text-base">Projects</span>
             </button>
+            <button
+              onClick={() => setCurrentScreen("work_orders")}
+              className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
+                currentScreen === "work_orders"
+                  ? "border-purple-600 text-purple-600"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+              }`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              <span className="font-medium text-sm md:text-base">
+                Work Orders
+              </span>
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-        {currentScreen === "dashboard" && (
-          <AdminDashboard />
-        )}
+        {currentScreen === "dashboard" && <AdminDashboard />}
         {currentScreen === "directory" && (
           <EmployeeDirectory onEmployeeClick={handleEmployeeClick} />
         )}
         {currentScreen === "access" && <UserAccessManagement />}
         {currentScreen === "calendar" && <AdminCalendar />}
         {currentScreen === "projects" && <AdminProjects />}
+        {currentScreen === "work_orders" && <AdminWorkOrders />}
       </main>
 
       {/* Drawers */}
@@ -684,8 +749,8 @@ function App() {
         onOpenChange={setNotificationsOpen}
         onNavigateToSubmission={(submissionId) => {
           // Contractor: Navigate to dashboard
-          setContractorScreen('dashboard');
-          console.log('[Contractor] Navigate to submission:', submissionId);
+          setContractorScreen("dashboard");
+          console.log("[Contractor] Navigate to submission:", submissionId);
         }}
       />
       <ContractorDetailDrawer
