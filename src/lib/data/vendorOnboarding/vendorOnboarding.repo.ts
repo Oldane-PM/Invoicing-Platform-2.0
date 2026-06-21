@@ -138,14 +138,18 @@ export async function getWorkOrderRef(
 ): Promise<WorkOrderRef> {
   const supabase = getSupabaseClient();
 
-  const { data, error } = await supabase.storage
-    .from(WORK_ORDERS_BUCKET)
-    .createSignedUrl(path, SIGNED_URL_EXPIRY_SECONDS);
+  try {
+    const { data, error } = await supabase.storage
+      .from(WORK_ORDERS_BUCKET)
+      .createSignedUrl(path, SIGNED_URL_EXPIRY_SECONDS);
 
-  if (error || !data) {
-    console.error("[vendorOnboarding.repo] Failed to sign work order URL:", error);
-    throw new Error(`Failed to open work order: ${error?.message ?? "unknown error"}`);
+    if (error || !data) {
+      console.error("[vendorOnboarding.repo] Failed to sign work order URL:", error);
+      throw new Error(`Failed to open work order: ${error?.message ?? "unknown error"}`);
+    }
+
+    return { path, filename, url: data.signedUrl };
+  } catch (err) {
+    throw err;
   }
-
-  return { path, filename, url: data.signedUrl };
 }
