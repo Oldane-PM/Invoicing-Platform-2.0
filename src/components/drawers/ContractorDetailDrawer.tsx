@@ -525,26 +525,51 @@ export function ContractorDetailDrawer({
 
                     {/* Rates Row */}
                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200">
-                      <div>
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
-                          <DollarSign className="w-3.5 h-3.5" />
-                          <span>Hourly Rate</span>
-                        </div>
-                        <div className="font-medium text-sm text-gray-900">
-                          {formData.hourly_rate ? `$${formData.hourly_rate}/hour` : "-"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>Overtime Rate</span>
-                        </div>
-                        <div className="font-medium text-sm text-gray-900">
-                          {formData.hourly_rate
-                            ? `$${(formData.hourly_rate * 1.5).toFixed(2)}/hour`
-                            : "-"}
-                        </div>
-                      </div>
+                      {formData.rate_type === "Fixed" ? (
+                        <>
+                          <div>
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
+                              <DollarSign className="w-3.5 h-3.5" />
+                              <span>Fixed Rate</span>
+                            </div>
+                            <div className="font-medium text-sm text-gray-900">
+                              {formData.fixed_rate ? `$${formData.fixed_rate.toLocaleString()}/monthly` : "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>Rate Type</span>
+                            </div>
+                            <div className="font-medium text-sm text-gray-900">
+                              Fixed
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
+                              <DollarSign className="w-3.5 h-3.5" />
+                              <span>Hourly Rate</span>
+                            </div>
+                            <div className="font-medium text-sm text-gray-900">
+                              {formData.hourly_rate ? `$${formData.hourly_rate}/hour` : "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>Overtime Rate</span>
+                            </div>
+                            <div className="font-medium text-sm text-gray-900">
+                              {formData.hourly_rate
+                                ? `$${(formData.hourly_rate * 1.5).toFixed(2)}/hour`
+                                : "-"}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -584,9 +609,12 @@ export function ContractorDetailDrawer({
                       <div className="text-xs text-gray-500 mb-1.5">Signed Work Order</div>
                       {onboarding?.work_order_path ? (
                         <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <FileText className="w-4 h-4 text-purple-600 shrink-0" />
-                            <span className="text-sm text-gray-900 truncate">
+                          <div 
+                            className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer group"
+                            onClick={handleViewWorkOrder}
+                          >
+                            <FileText className="w-4 h-4 text-purple-600 shrink-0 group-hover:scale-105 transition-transform" />
+                            <span className="text-sm text-gray-900 truncate group-hover:text-purple-700 group-hover:underline">
                               {onboarding.work_order_filename || "Work order"}
                             </span>
                           </div>
@@ -594,7 +622,7 @@ export function ContractorDetailDrawer({
                             variant="ghost"
                             size="sm"
                             onClick={handleViewWorkOrder}
-                            className="h-8 px-2.5 text-purple-600 hover:bg-purple-50 shrink-0"
+                            className="h-8 px-2.5 text-purple-600 hover:bg-purple-50 shrink-0 cursor-pointer"
                           >
                             <ExternalLink className="w-3.5 h-3.5 mr-1" />
                             View

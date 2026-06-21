@@ -726,10 +726,13 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
 
               {onboarding?.work_order_path ? (
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FileText className="w-5 h-5 text-blue-600 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                  <div 
+                    className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer group"
+                    onClick={handleViewWorkOrder}
+                  >
+                    <FileText className="w-5 h-5 text-blue-600 shrink-0 group-hover:scale-105 transition-transform" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-700 group-hover:underline">
                         {onboarding.work_order_filename || "Work order"}
                       </p>
                       {onboarding.work_order_uploaded_at && (
@@ -742,7 +745,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                   <Button
                     variant="ghost"
                     onClick={handleViewWorkOrder}
-                    className="h-9 px-3 text-blue-600 hover:bg-blue-50 shrink-0"
+                    className="h-9 px-3 text-blue-600 hover:bg-blue-50 shrink-0 cursor-pointer"
                   >
                     <ExternalLink className="w-4 h-4 mr-1.5" />
                     View
