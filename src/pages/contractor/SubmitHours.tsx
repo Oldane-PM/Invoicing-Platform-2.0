@@ -152,6 +152,41 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   const fixedMonthlyRate =
     onboarding?.onboarding_rate != null ? Number(onboarding.onboarding_rate) : null;
 
+  const isMonthWithinContractRange = React.useCallback((monthIndex: number, year: number) => {
+    if (!onboarding) return true; // Default to open if onboarding is still loading
+    const start = onboarding.contract_start_date;
+    const end = onboarding.contract_end_date;
+    if (!start) return true;
+
+    const periodStr = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+    const startPeriod = start.substring(0, 7);
+    const endPeriod = end ? end.substring(0, 7) : null;
+
+    if (periodStr < startPeriod) return false;
+    if (endPeriod && periodStr > endPeriod) return false;
+    return true;
+  }, [onboarding]);
+
+  const isTargetMonthAllowed = React.useCallback((monthIndex: number, year: number) => {
+    const isWithinContract = isMonthWithinContractRange(monthIndex, year);
+    const alreadySubmitted = isMonthSubmitted(monthIndex, year);
+    const isEditingThisMonth = isEditMode && editingSubmission?.workPeriod === `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+    return isWithinContract || alreadySubmitted || isEditingThisMonth;
+  }, [isMonthWithinContractRange, isMonthSubmitted, isEditMode, editingSubmission]);
+
+  const { canGoPrev, canGoNext } = React.useMemo(() => {
+    if (selectedMonth === null) return { canGoPrev: false, canGoNext: false };
+    const pm = selectedMonth === 0 ? 11 : selectedMonth - 1;
+    const py = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
+    const nm = selectedMonth === 11 ? 0 : selectedMonth + 1;
+    const ny = selectedMonth === 11 ? selectedYear + 1 : selectedYear;
+    
+    return {
+      canGoPrev: isTargetMonthAllowed(pm, py),
+      canGoNext: isTargetMonthAllowed(nm, ny),
+    };
+  }, [selectedMonth, selectedYear, isTargetMonthAllowed]);
+
   // Calculate range for non-working days based on selected month
   const monthRange = React.useMemo(() => {
     if (selectedMonth === null) {
@@ -664,6 +699,10 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
                     <div className="grid grid-cols-3 gap-2">
                       {MONTHS.map((month, index) => {
                         const alreadySubmitted = isMonthSubmitted(index, selectedYear);
+                        const isWithinContract = isMonthWithinContractRange(index, selectedYear);
+                        const isEditingThisMonth = isEditMode && editingSubmission?.workPeriod === `${selectedYear}-${String(index + 1).padStart(2, "0")}`;
+                        const isDisabled = !isEditingThisMonth && (alreadySubmitted || !isWithinContract);
+
                         return (
                           <Button
                             key={month}
@@ -672,15 +711,23 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
                             }
                             size="sm"
                             onClick={() => handleMonthSelect(index)}
-                            disabled={alreadySubmitted}
+                            disabled={isDisabled}
                             className={`h-9 relative ${
                               alreadySubmitted
                                 ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200 hover:bg-gray-100"
-                                : selectedMonth === index
-                                  ? "bg-purple-600 hover:bg-purple-700 text-white"
-                                  : "hover:bg-gray-100"
+                                : !isWithinContract && !isEditingThisMonth
+                                  ? "bg-gray-50 text-gray-300 cursor-not-allowed border-gray-200 hover:bg-gray-50"
+                                  : selectedMonth === index
+                                    ? "bg-purple-600 hover:bg-purple-700 text-white"
+                                    : "hover:bg-gray-100"
                             }`}
-                            title={alreadySubmitted ? "Already submitted" : undefined}
+                            title={
+                              alreadySubmitted
+                                ? "Already submitted"
+                                : !isWithinContract && !isEditingThisMonth
+                                  ? "Outside contract period"
+                                  : undefined
+                            }
                           >
                             {month.slice(0, 3)}
                             {alreadySubmitted && (
@@ -746,6 +793,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
                         setExcludedDates([]);
                         setIsHoursManuallyEdited(false);
                       }}
+                      disabled={!canGoPrev}
                       className="h-8 w-8 hover:bg-gray-100 rounded-lg"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -766,6 +814,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
                         setExcludedDates([]);
                         setIsHoursManuallyEdited(false);
                       }}
+                      disabled={!canGoNext}
                       className="h-8 w-8 hover:bg-gray-100 rounded-lg"
                     >
                       <ChevronRight className="h-4 w-4" />
