@@ -1,6 +1,6 @@
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Sheet, SheetContent, SheetHeader } from "../ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import { Calendar, Clock, DollarSign, FileText, AlertCircle, Edit } from "lucide-react";
 import { format, parse } from "date-fns";
 import type { ContractorSubmission, SubmissionStatus } from "../../lib/types";
@@ -72,19 +72,19 @@ export function ContractorSubmissionDrawer({
   );
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:w-[460px] sm:max-w-[40%] p-0 bg-white border-l border-gray-200 overflow-y-auto flex flex-col">
-        {/* Drawer Header */}
-        <SheetHeader className="px-6 pt-6 pb-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-          <div className="mb-3">
-            <div className="text-lg font-semibold text-gray-900 mb-1">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] p-0 bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden">
+        {/* Dialog Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 bg-white z-10 flex-shrink-0">
+          <div className="mb-1">
+            <DialogTitle className="text-lg font-semibold text-gray-900">
               Submission Details
-            </div>
-            <div className="text-sm text-gray-600">
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-600 mt-1">
               Review your submitted hours
-            </div>
+            </DialogDescription>
           </div>
-        </SheetHeader>
+        </DialogHeader>
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -237,7 +237,7 @@ export function ContractorSubmissionDrawer({
             </div>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

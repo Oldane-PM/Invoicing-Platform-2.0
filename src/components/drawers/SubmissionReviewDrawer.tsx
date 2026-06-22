@@ -4,11 +4,6 @@ import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Badge } from "../ui/badge";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-} from "../ui/sheet";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -159,19 +154,19 @@ export function SubmissionReviewDrawer({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:w-[440px] sm:max-w-[40%] p-0 bg-white border-l border-gray-200 overflow-y-auto flex flex-col">
-          {/* Drawer Header */}
-          <SheetHeader className="px-6 pt-6 pb-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-            <div className="mb-3">
-              <div className="text-lg font-semibold text-gray-900 mb-1">
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] p-0 bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden">
+          {/* Dialog Header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 bg-white z-10 flex-shrink-0">
+            <div className="mb-1">
+              <DialogTitle className="text-lg font-semibold text-gray-900">
                 Submission Review
-              </div>
-              <div className="text-sm text-gray-600">
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-600 mt-1">
                 Evaluate contractor submission for payment
-              </div>
+              </DialogDescription>
             </div>
-          </SheetHeader>
+          </DialogHeader>
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -413,8 +408,8 @@ export function SubmissionReviewDrawer({
               )}
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* Clarification Modal */}
       <Dialog open={clarificationModalOpen} onOpenChange={setClarificationModalOpen}>
