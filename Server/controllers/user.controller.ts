@@ -1,11 +1,6 @@
 import { Request, Response } from "express";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "../clients/supabase.server";
 
-// Initialize Supabase Admin client
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 interface CreateUserRequest {
   firstName: string;
@@ -21,6 +16,7 @@ interface CreateUserRequest {
  * POST /api/users
  */
 export async function createUser(req: Request, res: Response) {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const {
       firstName,

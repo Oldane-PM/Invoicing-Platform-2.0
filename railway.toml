@@ -3,9 +3,10 @@
 # Railway sets PORT automatically; the server reads process.env.PORT
 
 [build]
-buildCommand = "npm install"
+buildCommand = "pnpm install"
 
 [deploy]
-startCommand = "npm run start:server"
+startCommand = "pnpm run start:server"
 healthcheckPath = "/health"
 healthcheckTimeout = 100
+

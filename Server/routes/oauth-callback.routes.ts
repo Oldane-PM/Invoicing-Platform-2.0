@@ -1,20 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { auth } from '../../src/lib/auth';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '../clients/supabase.server';
 
 const router = Router();
 
-// Initialize Supabase client with service role key for admin operations
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
 
 /**
  * Gets or creates an auth user for the given email.
@@ -26,7 +15,9 @@ async function getOrCreateAuthUser(
   email: string,
   metadata?: { full_name?: string; role?: string }
 ): Promise<string> {
+  const supabase = getSupabaseAdmin();
   const normalizedEmail = email.toLowerCase();
+
 
   // 1) Check if user already exists via profiles table (mirrors auth.users)
   const { data: existingProfile } = await supabase
@@ -89,7 +80,9 @@ async function getOrCreateAuthUser(
  */
 router.post('/supabase', async (req: Request, res: Response) => {
   console.log('[OAuth Callback Route] POST /supabase endpoint hit!');
+  const supabase = getSupabaseAdmin();
   try {
+
     console.log('[OAuth Callback] Starting Supabase session creation...');
 
     // Step 1: Get Better Auth session
