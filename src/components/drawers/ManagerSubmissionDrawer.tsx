@@ -3,7 +3,7 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Badge } from "../ui/badge";
-import { Sheet, SheetContent, SheetHeader } from "../ui/sheet";
+
 import {
   Dialog,
   DialogContent,
@@ -138,20 +138,24 @@ export function ManagerSubmissionDrawer({
 
   return (
     <>
-      {/* Always mount the Sheet so it can open even while submission is loading/null */}
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent
-          side="right"
-          className="w-full sm:w-[720px] lg:w-[860px] sm:max-w-[60vw] p-0 bg-white border-l border-gray-200 overflow-y-auto flex flex-col"
+      {/* Always mount the Dialog so it can open even while submission is loading/null */}
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="w-full sm:max-w-[720px] lg:max-w-[860px] p-0 bg-white border border-gray-200 overflow-y-auto max-h-[90vh] flex flex-col gap-0"
+          aria-describedby="review-submission-description"
         >
-          <SheetHeader className="px-6 pt-6 pb-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-            <div className="mb-3">
+          <DialogTitle className="sr-only">Review Submission</DialogTitle>
+          <DialogDescription id="review-submission-description" className="sr-only">
+            Evaluate and approve contractor hours
+          </DialogDescription>
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 sticky top-0 bg-white z-10 text-left">
+            <div className="mb-0 text-left">
               <div className="text-lg font-semibold text-gray-900 mb-1">Review Submission</div>
               <div className="text-sm text-gray-600">
                 Evaluate and approve contractor hours
               </div>
             </div>
-          </SheetHeader>
+          </DialogHeader>
 
           {/* Body */}
           <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -403,8 +407,8 @@ export function ManagerSubmissionDrawer({
               </div>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* Reject Modal */}
       <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>

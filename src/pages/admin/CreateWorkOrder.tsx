@@ -35,7 +35,7 @@ export function CreateWorkOrder({ onCancel }: CreateWorkOrderProps) {
   const [workSchedule, setWorkSchedule] = React.useState("40 hours per week (Minimum)");
   
   const defaultTerms = `<ul>
-  <li>Invoices must be sent to invoices@intellibus.com at the end of each month along with Intellibus Reporting Manager approval.</li>
+  <li>Invoices must be sent to <a href="mailto:invoices@intellibus.com" class="text-blue-600 hover:underline">invoices@intellibus.com</a> at the end of each month along with Intellibus Reporting Manager approval.</li>
   <li>Payment details must be clearly included in the invoice.</li>
   <li>Any payment detail changes must be highlighted in the invoice and submission email.</li>
   <li>Invoices are processed per CSA payment terms.</li>

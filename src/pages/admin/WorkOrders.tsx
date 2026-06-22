@@ -2,7 +2,7 @@ import * as React from "react";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { Loader2, Plus, FileSignature } from "lucide-react";
+import { Loader2, Plus, FileSignature, CopyPlus } from "lucide-react";
 import { format } from "date-fns";
 import {
   Table,
@@ -15,6 +15,8 @@ import {
 import { useAdminWorkOrders } from "../../lib/hooks/useSystemWorkOrders";
 import { CreateWorkOrder } from "./CreateWorkOrder";
 import { ReviewWorkOrder } from "./ReviewWorkOrder";
+import { Checkbox } from "../../components/ui/checkbox";
+import { BulkRenewDialog } from "./BulkRenewDialog";
 
 export function AdminWorkOrders() {
   const { data: workOrders, isLoading } = useAdminWorkOrders();
@@ -22,6 +24,33 @@ export function AdminWorkOrders() {
   const [isCreating, setIsCreating] = React.useState(false);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = React.useState<string | null>(null);
   const [isReviewing, setIsReviewing] = React.useState(false);
+  
+  const [selectedForRenewal, setSelectedForRenewal] = React.useState<string[]>([]);
+  const [isBulkRenewing, setIsBulkRenewing] = React.useState(false);
+
+  const handleSelectAll = (checked: boolean | "indeterminate") => {
+    if (checked === true && workOrders) {
+      setSelectedForRenewal(workOrders.map((wo: any) => wo.id));
+    } else {
+      setSelectedForRenewal([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedForRenewal(prev => [...prev, id]);
+    } else {
+      setSelectedForRenewal(prev => prev.filter(wId => wId !== id));
+    }
+  };
+
+  const allSelected = workOrders && workOrders.length > 0 && selectedForRenewal.length === workOrders.length;
+  const isIndeterminate = selectedForRenewal.length > 0 && selectedForRenewal.length < (workOrders?.length || 0);
+
+  const selectedWorkOrdersObjects = React.useMemo(() => {
+    if (!workOrders) return [];
+    return workOrders.filter((wo: any) => selectedForRenewal.includes(wo.id));
+  }, [workOrders, selectedForRenewal]);
 
   const handleRowClick = (id: string) => {
     setSelectedWorkOrderId(id);
@@ -75,13 +104,25 @@ export function AdminWorkOrders() {
           <h2 className="text-xl font-semibold text-gray-900">Work Orders</h2>
           <p className="text-sm text-gray-600">Manage work orders and requests</p>
         </div>
-        <Button 
-          onClick={() => setIsCreating(true)}
-          className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Generate Work Order
-        </Button>
+        <div className="flex gap-3">
+          {selectedForRenewal.length > 0 && (
+            <Button 
+              onClick={() => setIsBulkRenewing(true)}
+              variant="outline"
+              className="border-purple-200 text-purple-700 hover:bg-purple-50"
+            >
+              <CopyPlus className="w-4 h-4 mr-2" />
+              Bulk Renew ({selectedForRenewal.length})
+            </Button>
+          )}
+          <Button 
+            onClick={() => setIsCreating(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Generate Work Order
+          </Button>
+        </div>
       </div>
       
       <Card className="border border-gray-200 rounded-[14px] bg-white overflow-hidden">
@@ -89,6 +130,13 @@ export function AdminWorkOrders() {
           <Table>
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-gray-50">
+                <TableHead className="w-12 px-6">
+                  <Checkbox 
+                    checked={allSelected ? true : isIndeterminate ? "indeterminate" : false}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium px-6">
                   Period
                 </TableHead>
@@ -109,7 +157,7 @@ export function AdminWorkOrders() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-64 text-center">
+                  <TableCell colSpan={6} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <Loader2 className="w-8 h-8 mb-3 animate-spin" />
                       <div className="text-gray-600 font-medium">Loading work orders...</div>
@@ -118,7 +166,7 @@ export function AdminWorkOrders() {
                 </TableRow>
               ) : !workOrders || workOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-64 text-center">
+                  <TableCell colSpan={6} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <FileSignature className="w-16 h-16 mb-3 text-gray-300" strokeWidth={1.5} />
                       <div className="text-gray-600 font-medium">No work orders found</div>
@@ -133,6 +181,13 @@ export function AdminWorkOrders() {
                     className="h-16 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
                     onClick={() => handleRowClick(wo.id)}
                   >
+                    <TableCell className="px-6" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox 
+                        checked={selectedForRenewal.includes(wo.id)}
+                        onCheckedChange={(checked) => handleSelectOne(wo.id, !!checked)}
+                        aria-label={`Select work order ${wo.id}`}
+                      />
+                    </TableCell>
                     <TableCell className="px-6 text-sm text-gray-600">
                       {format(new Date(wo.start_date), "MMM d, yyyy")} - {format(new Date(wo.end_date), "MMM d, yyyy")}
                     </TableCell>
@@ -156,6 +211,15 @@ export function AdminWorkOrders() {
           </Table>
         </div>
       </Card>
+
+      <BulkRenewDialog 
+        open={isBulkRenewing} 
+        onClose={() => {
+          setIsBulkRenewing(false);
+          setSelectedForRenewal([]);
+        }} 
+        selectedWorkOrders={selectedWorkOrdersObjects} 
+      />
     </div>
   );
 }

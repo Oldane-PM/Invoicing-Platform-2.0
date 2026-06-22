@@ -1,9 +1,11 @@
 import * as React from "react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-} from "../ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../ui/dialog";
 import { EmployeeDirectoryRow } from "../../lib/types";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -284,29 +286,36 @@ export function ContractorDetailDrawer({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:w-[440px] sm:max-w-[40%] p-0 bg-white border-l border-gray-200">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent 
+        className="w-full sm:max-w-[500px] lg:max-w-[600px] p-0 bg-white border border-gray-200 overflow-y-auto max-h-[90vh] flex flex-col gap-0"
+        aria-describedby="contractor-detail-description"
+      >
+        <DialogTitle className="sr-only">Contractor Details</DialogTitle>
+        <DialogDescription id="contractor-detail-description" className="sr-only">
+          Details and submissions for the contractor
+        </DialogDescription>
         {/* Header */}
-        <SheetHeader className="px-6 pt-6 pb-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-          <div className="flex items-center justify-between mb-3">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 sticky top-0 bg-white z-10 text-left">
+          <div className="flex items-center justify-between mb-3 text-left">
             <Badge className="bg-purple-100 text-purple-700 border-purple-200 px-3 py-1">
               {employee.contract_type || "Contractor"}
             </Badge>
           </div>
-          <div>
-            <div className="flex items-center gap-4">
+          <div className="text-left">
+            <div className="flex items-center gap-4 text-left">
               <Avatar className="h-16 w-16 bg-purple-100 text-purple-700">
                 <AvatarFallback className="bg-purple-100 text-purple-700 text-xl font-medium">
                   {getInitials(employee.full_name)}
                 </AvatarFallback>
               </Avatar>
-              <div>
+              <div className="text-left">
                 <h2 className="text-xl font-bold text-gray-900">{employee.full_name}</h2>
                 <div className="text-sm text-gray-500">{employee.email}</div>
               </div>
             </div>
           </div>
-        </SheetHeader>
+        </DialogHeader>
 
         {/* Segmented Control Tabs */}
         <div className="px-6 pt-5 pb-4">
@@ -345,7 +354,7 @@ export function ContractorDetailDrawer({
         </div>
 
         {/* Tab Content */}
-        <ScrollArea className="h-[calc(100vh-240px)] px-6 pb-6">
+        <ScrollArea className="flex-1 min-h-[400px] max-h-[60vh] px-6 pb-6">
           {activeTab === "submissions" && (
             <div>
               <h3 className="text-base font-semibold text-gray-900 mb-4">
@@ -968,7 +977,7 @@ export function ContractorDetailDrawer({
             </div>
           )}
         </ScrollArea>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

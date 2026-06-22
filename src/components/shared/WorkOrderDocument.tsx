@@ -100,7 +100,14 @@ export function WorkOrderDocument({ workOrder }: WorkOrderDocumentProps) {
         <p className="font-bold text-[15px] mb-4">Additional terms and conditions:</p>
         <div 
           className="text-black text-[15px] leading-[1.6] [&_ul]:list-disc [&_ul]:pl-6 [&_ul_ul]:list-[circle] [&_ul_ul]:mt-2 [&_ul_ul]:mb-2 [&_li]:mb-1.5 ml-1"
-          dangerouslySetInnerHTML={{ __html: workOrder.additional_terms || "<ul><li>Standard terms apply.</li></ul>" }}
+          dangerouslySetInnerHTML={{ 
+            __html: (workOrder.additional_terms || "<ul><li>Standard terms apply.</li></ul>").includes('href="mailto:invoices@intellibus.com"') 
+              ? workOrder.additional_terms || "<ul><li>Standard terms apply.</li></ul>"
+              : (workOrder.additional_terms || "<ul><li>Standard terms apply.</li></ul>").replace(
+                  /invoices@intellibus\.com/g, 
+                  '<a href="mailto:invoices@intellibus.com" class="text-blue-600 hover:underline">invoices@intellibus.com</a>'
+                )
+          }}
         />
       </div>
 
