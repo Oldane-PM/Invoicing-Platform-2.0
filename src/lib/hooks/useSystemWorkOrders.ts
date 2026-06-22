@@ -54,6 +54,24 @@ export function useCreateWorkOrder() {
   });
 }
 
+export function useBulkCreateWorkOrders() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (dataList: Parameters<typeof createWorkOrder>[0][]) => {
+      const results = await Promise.all(dataList.map(data => createWorkOrder(data, supabase!)));
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin_work_orders"] });
+      toast.success("Work orders generated successfully");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to generate work orders");
+    },
+  });
+}
+
 export function useSignWorkOrderContractor() {
   const queryClient = useQueryClient();
 
