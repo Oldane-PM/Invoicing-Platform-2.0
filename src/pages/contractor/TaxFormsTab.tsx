@@ -22,7 +22,8 @@ export function TaxFormsTab() {
       if (!sessionResponse?.data?.session?.user?.id) return;
       const token = sessionResponse.data.session.access_token;
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${sessionResponse.data.session.user.id}`, {
+      const baseUrl = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
+      const res = await fetch(`${baseUrl}/api/w8ben/${sessionResponse.data.session.user.id}`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`
@@ -107,7 +108,8 @@ export function TaxFormsTab() {
       const sessionResponse = await supabase?.auth.getSession();
       const token = sessionResponse?.data?.session?.access_token;
 
-      const resWithCreds = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/upload`, {
+      const baseUrl = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
+      const resWithCreds = await fetch(`${baseUrl}/api/w8ben/upload`, {
         method: "POST",
         body: formData,
         credentials: "include",
