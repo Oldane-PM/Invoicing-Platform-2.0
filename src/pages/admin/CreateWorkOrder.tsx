@@ -3,8 +3,9 @@ import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Combobox } from "../../components/shared/Combobox";
+import { MultiSelectCombobox } from "../../components/shared/MultiSelectCombobox";
 import { Loader2, ArrowLeft } from "lucide-react";
-import { useCreateWorkOrder } from "../../lib/hooks/useSystemWorkOrders";
+import { useBulkCreateWorkOrders } from "../../lib/hooks/useSystemWorkOrders";
 import { useAuth } from "../../lib/hooks/useAuth";
 import { useUserAccessUsers } from "../../lib/hooks/userAccess/useUserAccessUsers";
 import { toast } from "sonner";
@@ -17,7 +18,7 @@ interface CreateWorkOrderProps {
 export function CreateWorkOrder({ onCancel }: CreateWorkOrderProps) {
   const { user } = useAuth();
   const { data: users, isLoading: usersLoading } = useUserAccessUsers();
-  const createMutation = useCreateWorkOrder();
+  const bulkCreateMutation = useBulkCreateWorkOrders();
 
   const contractorOptions = React.useMemo(() => {
     if (!users) return [];
@@ -26,7 +27,7 @@ export function CreateWorkOrder({ onCancel }: CreateWorkOrderProps) {
       .map((u) => ({ label: u.fullName || u.email, value: u.id }));
   }, [users]);
 
-  const [contractorId, setContractorId] = React.useState("");
+  const [contractorIds, setContractorIds] = React.useState<string[]>([]);
   const [role, setRole] = React.useState("Consultant");
   const [payType, setPayType] = React.useState("Fixed");
   const [payAmount, setPayAmount] = React.useState("");
@@ -56,29 +57,28 @@ export function CreateWorkOrder({ onCancel }: CreateWorkOrderProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id) return;
-    if (!contractorId) {
-      toast.error("Please select a contractor");
+    if (contractorIds.length === 0) {
+      toast.error("Please select at least one contractor");
       return;
     }
 
-    createMutation.mutate(
-      {
-        contractor_user_id: contractorId,
-        created_by_id: user.id,
-        role,
-        pay_type: payType,
-        pay_amount: parseFloat(payAmount),
-        start_date: startDate,
-        end_date: endDate,
-        work_schedule: workSchedule,
-        additional_terms: defaultTerms,
-      },
-      {
-        onSuccess: () => {
-          onCancel();
-        }
+    const dataList = contractorIds.map((id) => ({
+      contractor_user_id: id,
+      created_by_id: user.id,
+      role,
+      pay_type: payType,
+      pay_amount: parseFloat(payAmount),
+      start_date: startDate,
+      end_date: endDate,
+      work_schedule: workSchedule,
+      additional_terms: defaultTerms,
+    }));
+
+    bulkCreateMutation.mutate(dataList, {
+      onSuccess: () => {
+        onCancel();
       }
-    );
+    });
   };
 
   return (
@@ -98,12 +98,12 @@ export function CreateWorkOrder({ onCancel }: CreateWorkOrderProps) {
           <form id="create-work-order-form" onSubmit={handleSubmit} className="space-y-8">
             
             <div>
-              <Label className="mb-2 block font-medium">Contractor</Label>
-              <Combobox
-                value={contractorId}
-                onValueChange={setContractorId}
+              <Label className="mb-2 block font-medium">Contractor(s)</Label>
+              <MultiSelectCombobox
+                values={contractorIds}
+                onValuesChange={setContractorIds}
                 options={contractorOptions}
-                placeholder={usersLoading ? "Loading contractors..." : "Select Contractor"}
+                placeholder={usersLoading ? "Loading contractors..." : "Select Contractors"}
               />
             </div>
 
@@ -186,10 +186,10 @@ export function CreateWorkOrder({ onCancel }: CreateWorkOrderProps) {
               </Button>
               <Button
                 type="submit"
-                disabled={createMutation.isPending}
+                disabled={bulkCreateMutation.isPending}
                 className="bg-purple-600 hover:bg-purple-700 text-white min-w-[150px]"
               >
-                {createMutation.isPending ? (
+                {bulkCreateMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : null}
                 Generate & Send
