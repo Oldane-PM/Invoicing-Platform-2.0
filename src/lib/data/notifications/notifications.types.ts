@@ -11,11 +11,16 @@ export type NotificationEventType =
   | 'needs_clarification'
   | 'resubmitted'
   | 'manager_approved'
-  | 'manager_rejected';
+  | 'manager_rejected'
+  | 'paid'
+  | 'work_order_sent'
+  | 'w8ben_uploaded';
 
 export interface Notification {
   id: string;
-  submissionId: string;
+  submissionId?: string | null;
+  workOrderId?: string | null;
+  w8benId?: string | null;
   eventType: NotificationEventType;
   message: string;
   isRead: boolean;

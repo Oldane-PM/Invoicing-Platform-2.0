@@ -24,14 +24,14 @@ import {
   useMarkAllNotificationsRead,
 } from '../../lib/hooks/notifications';
 import type { Notification } from '../../lib/data/notifications';
-
 interface NotificationDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onNavigateToSubmission?: (submissionId: string) => void;
+  onNavigateToNotification?: (notification: Notification) => void;
 }
 
-export function NotificationDrawer({ open, onOpenChange, onNavigateToSubmission }: NotificationDrawerProps) {
+export function NotificationDrawer({ open, onOpenChange, onNavigateToSubmission, onNavigateToNotification }: NotificationDrawerProps) {
   const { data: notifications = [], isLoading } = useNotifications({ limit: 50 });
   const markAsReadMutation = useMarkNotificationRead();
   const markAllAsReadMutation = useMarkAllNotificationsRead();
@@ -58,8 +58,10 @@ export function NotificationDrawer({ open, onOpenChange, onNavigateToSubmission 
     // Close drawer
     onOpenChange(false);
 
-    // Navigate to submission if callback provided
-    if (onNavigateToSubmission) {
+    // Navigate to submission or notification
+    if (onNavigateToNotification) {
+      onNavigateToNotification(notification);
+    } else if (onNavigateToSubmission && notification.submissionId) {
       onNavigateToSubmission(notification.submissionId);
     }
   };

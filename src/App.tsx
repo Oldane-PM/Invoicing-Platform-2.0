@@ -434,10 +434,12 @@ function App() {
         <NotificationDrawer
           open={notificationsOpen}
           onOpenChange={setNotificationsOpen}
-          onNavigateToSubmission={(submissionId) => {
-            // Admin: Navigate to dashboard (submission details handled by AdminDashboard component)
-            setCurrentScreen("dashboard");
-            console.log("[Admin] Navigate to submission:", submissionId);
+          onNavigateToNotification={(notification) => {
+            if (notification.eventType === "w8ben_uploaded") {
+              setManagerScreen("team");
+            } else {
+              setManagerScreen("dashboard");
+            }
           }}
         />
         <ContractorDetailDrawer
@@ -584,10 +586,12 @@ function App() {
         <NotificationDrawer
           open={notificationsOpen}
           onOpenChange={setNotificationsOpen}
-          onNavigateToSubmission={(submissionId) => {
-            // Manager: Navigate to dashboard
-            setManagerScreen("dashboard");
-            console.log("[Manager] Navigate to submission:", submissionId);
+          onNavigateToNotification={(notification) => {
+            if (notification.eventType === "work_order_sent") {
+              setContractorScreen("work_orders");
+            } else {
+              setContractorScreen("dashboard");
+            }
           }}
         />
       </div>
@@ -747,10 +751,12 @@ function App() {
       <NotificationDrawer
         open={notificationsOpen}
         onOpenChange={setNotificationsOpen}
-        onNavigateToSubmission={(submissionId) => {
-          // Contractor: Navigate to dashboard
-          setContractorScreen("dashboard");
-          console.log("[Contractor] Navigate to submission:", submissionId);
+        onNavigateToNotification={(notification) => {
+          if (notification.eventType === "w8ben_uploaded") {
+            setCurrentScreen("directory");
+          } else {
+            setCurrentScreen("dashboard");
+          }
         }}
       />
       <ContractorDetailDrawer
