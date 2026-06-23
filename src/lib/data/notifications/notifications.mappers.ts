@@ -13,6 +13,8 @@ export function mapDbRowToNotification(row: any): Notification {
   return {
     id: row.id,
     submissionId: row.submission_id,
+    workOrderId: row.work_order_id,
+    w8benId: row.w8ben_id,
     eventType: row.event_type,
     message: row.message,
     isRead: row.is_read,

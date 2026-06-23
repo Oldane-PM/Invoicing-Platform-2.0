@@ -38,14 +38,10 @@ async function run() {
   await client.connect();
   console.log("Connected to PostgreSQL successfully!");
   
-  const sql = `
-    DROP POLICY IF EXISTS "system_work_orders_select_for_managers" ON public.system_work_orders;
-    CREATE POLICY "system_work_orders_select_for_managers" ON public.system_work_orders
-      FOR SELECT USING (public.is_manager());
-  `;
+  const sql = fs.readFileSync(path.join("supabase", "migrations", "061_add_in_app_notifications_triggers.sql"), "utf-8");
 
   await client.query(sql);
-  console.log("SQL policy executed successfully!");
+  console.log("SQL migration 061 executed successfully!");
   await client.end();
 }
 
