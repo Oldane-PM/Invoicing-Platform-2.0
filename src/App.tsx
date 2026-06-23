@@ -42,13 +42,6 @@ import { useAuth } from "./lib/hooks/useAuth";
 import { getUserProfile } from "./lib/supabase/repos/auth.repo";
 import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 
-// Demo credentials seeded by supabase/migrations/054_demo_users.sql
-const DEMO_CREDENTIALS: Record<string, { email: string; password: string }> = {
-  admin: { email: "admin@demo.local", password: "Demo123!" },
-  "finance officer": { email: "admin@demo.local", password: "Demo123!" },
-  manager: { email: "manager@demo.local", password: "Demo123!" },
-  contractor: { email: "contractor@demo.local", password: "Demo123!" },
-};
 
 // Map a profile role (any casing) to the app's UserRole.
 function roleToUserRole(role: string | null | undefined): UserRole {
@@ -85,7 +78,6 @@ function App() {
   const {
     isAuthenticated,
     user,
-    signIn,
     signOut,
     loading: authLoading,
   } = useAuth();
@@ -172,30 +164,7 @@ function App() {
     setCurrentView("app");
   };
 
-  // Handle demo login — signs in with the seeded Supabase user for the role so a
-  // real session exists and all role-scoped screens work through Supabase + RLS.
-  const handleDemoLogin = async (
-    role: string,
-  ): Promise<{ ok: boolean; error?: string }> => {
-    const creds = DEMO_CREDENTIALS[role.toLowerCase()];
-    if (!creds) {
-      return { ok: false, error: "Unknown demo user." };
-    }
-
-    const result = await signIn(creds.email, creds.password);
-    if (!result.success) {
-      return {
-        ok: false,
-        error:
-          result.error ||
-          "Could not sign in. Did you run migration 054 to seed the demo users?",
-      };
-    }
-
-    setCurrentUser(roleToUserRole(result.role));
-    setCurrentView("app");
-    return { ok: true };
-  };
+  // Handle demo login was removed for BetterAuth
 
   // Handle logout for all user types
   const handleLogout = async () => {
@@ -288,7 +257,7 @@ function App() {
 
   // Show login screen if not authenticated
   if (!currentUser) {
-    return <Login onDemoLogin={handleDemoLogin} authLoading={authLoading} />;
+    return <Login authLoading={authLoading} />;
   }
 
   // Unassigned User Portal - Users without a role assignment

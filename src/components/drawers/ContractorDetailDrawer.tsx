@@ -16,9 +16,9 @@ import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import { Pencil, Calendar, DollarSign, Clock, User, FileText, ExternalLink, Hash, Download, RotateCcw, CheckCircle2, Loader2 } from "lucide-react";
+import { Pencil, Calendar, DollarSign, Clock, FileText, ExternalLink, Hash, Download, RotateCcw, CheckCircle2, Loader2 } from "lucide-react";
 import { useContractorSubmissions } from "../../lib/hooks/admin/useContractorSubmissions";
-import { useManagerOptions } from "../../lib/hooks/admin/useManagerOptions";
+
 import { useUpdateManagerAssignment } from "../../lib/hooks/admin/useUpdateManagerAssignment";
 import { useUpdateContractInfo } from "../../lib/hooks/admin/useUpdateContractInfo";
 import { useContractorOnboarding } from "../../lib/hooks/admin/useContractorOnboarding";
@@ -95,7 +95,7 @@ export function ContractorDetailDrawer({
   );
 
   // Fetch manager options for combobox
-  const { data: managerOptions = [], isLoading: isLoadingManagers } = useManagerOptions();
+
 
   // Mutation to update manager assignment
   const updateManagerAssignment = useUpdateManagerAssignment();
@@ -596,17 +596,7 @@ export function ContractorDetailDrawer({
                         {formData.department}
                       </div>
                     </div>
-                    {formData.role?.toLowerCase() !== "admin" && (
-                      <div>
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-                          <User className="w-3.5 h-3.5" />
-                          <span>Reporting Manager</span>
-                        </div>
-                        <div className="font-medium text-sm text-gray-900">
-                          {formData.reporting_manager_name || "-"}
-                        </div>
-                      </div>
-                    )}
+
                   </div>
 
                   {/* Onboarding (read-only) — work order + contractor-entered details */}
@@ -820,27 +810,6 @@ export function ContractorDetailDrawer({
                       className="bg-gray-50 border-gray-200 rounded-lg h-10 text-sm"
                     />
                   </div>
-                  {formData.role?.toLowerCase() !== "admin" && (
-                    <div>
-                      <Label htmlFor="manager" className="text-xs text-gray-700 mb-1.5 block">
-                        Reporting Manager
-                      </Label>
-                      <Combobox
-                        value={formData.reporting_manager_id || ""}
-                        onValueChange={(value) =>
-                          setFormData({
-                            ...formData,
-                            reporting_manager_id: value || undefined,
-                            reporting_manager_name: managerOptions.find((m) => m.id === value)?.label,
-                          })
-                        }
-                        options={managerOptions.map((m) => ({ value: m.id, label: m.label }))}
-                        placeholder={isLoadingManagers ? "Loading managers..." : "Select a manager"}
-                        searchPlaceholder="Search managers..."
-                        emptyText="No managers found."
-                      />
-                    </div>
-                  )}
                 </div>
               )}
             </div>

@@ -1,8 +1,4 @@
-import { createRequire } from 'module';
 import mammoth from 'mammoth';
-
-const require = createRequire(import.meta.url);
-const { PDFParse } = require('pdf-parse');
 
 export interface ExtractedWorkOrderDetails {
   role: string | null;
@@ -30,6 +26,7 @@ export async function extractDetailsFromFile(
 
   let extractedText = '';
   let isImage = false;
+  let isPdf = false;
 
   // 1. Extract content based on file type
   if (
@@ -41,14 +38,9 @@ export async function extractDetailsFromFile(
     mimeType === 'application/pdf' ||
     extension === 'pdf'
   ) {
-    try {
-      const parser = new PDFParse(new Uint8Array(fileBuffer));
-      const parsedPdf = await parser.getText();
-      extractedText = parsedPdf.text || '';
-    } catch (err) {
-      console.error('[workOrderExtractor] PDF parsing failed:', err);
-      throw new Error('Failed to parse text from PDF file.');
-    }
+    // PDFs are sent directly as base64 to the vision model for much better accuracy
+    // than error-prone text extraction libraries
+    isPdf = true;
   } else if (
     mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     extension === 'docx'
@@ -73,11 +65,13 @@ export async function extractDetailsFromFile(
 
   // 2. Prepare payload for OpenRouter
   const systemPrompt = `You are a precise data extraction agent. Analyze the provided work order document and extract these exact contract fields:
-1. role: The job title or position (e.g., "Software Engineer", "QA Engineer").
-2. rate: The contract billing rate as a numeric value. Use null if not specified.
-3. rateType: How the rate is charged. Must be exactly "hourly" or "fixed". If daily, monthly, or annual, use "fixed".
-4. startDate: The contract start date in ISO format (YYYY-MM-DD). Use null if not found.
-5. endDate: The contract end or expiry date in ISO format (YYYY-MM-DD). Use null if not found.
+1. role: The job title or position (e.g., "Software Engineer", "Consultant", "QA Engineer").
+2. rate: The contract billing rate as a numeric value. If the document says "$15 (USD) / Hour", the rate is 15. If it says "$500/month", the rate is 500. Use null if not specified.
+3. rateType: How the rate is charged. Must be exactly "hourly" or "fixed". If the document mentions "per hour", "/hour", or "hourly rate", use "hourly". If it mentions "monthly", "fixed", "salary", "per month", use "fixed". Default to "hourly" if unclear.
+4. startDate: The contract start date in ISO format (YYYY-MM-DD). Parse dates carefully — "July 1, 2026" is "2026-07-01", "November 30, 2026" is "2026-11-30". Use null if not found.
+5. endDate: The contract end or expiry date in ISO format (YYYY-MM-DD). Parse dates carefully. Use null if not found.
+
+IMPORTANT: Read the document text very carefully. Do NOT guess or make up values. If the document says "Hourly Rate: $15 (USD) / Hour", then rate=15 and rateType="hourly". Pay close attention to month names when converting dates.
 
 Return ONLY a JSON object with these exact keys:
 {
@@ -91,9 +85,12 @@ Do not write any markdown code block backticks (like \`\`\`json), explanations, 
 
   let messages: any[] = [];
 
-  if (isImage) {
+  if (isImage || isPdf) {
+    // Send images and PDFs directly as base64 to the vision model
     const base64Data = fileBuffer.toString('base64');
-    const dataUrl = `data:${mimeType || 'image/jpeg'};base64,${base64Data}`;
+    const mediaType = isPdf ? 'application/pdf' : (mimeType || 'image/jpeg');
+    const dataUrl = `data:${mediaType};base64,${base64Data}`;
+    console.log(`[workOrderExtractor] Sending ${isPdf ? 'PDF' : 'image'} as base64 to vision model (${(base64Data.length / 1024).toFixed(0)}KB)`);
     messages = [
       {
         role: 'user',
@@ -117,6 +114,7 @@ Do not write any markdown code block backticks (like \`\`\`json), explanations, 
         'The document contains no readable text. If this is a scanned PDF, please upload it as an image file (PNG/JPG).'
       );
     }
+    console.log(`[workOrderExtractor] Extracted text (first 500 chars): ${extractedText.substring(0, 500)}`);
     messages = [
       {
         role: 'system',
