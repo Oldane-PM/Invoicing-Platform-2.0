@@ -134,8 +134,9 @@ export function ContractorDetailDrawer({
     try {
       const sessionResponse = await supabase?.auth.getSession();
       const token = sessionResponse?.data?.session?.access_token;
+      const baseUrl = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/+$/, '');
       
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${employee.contractor_id}`, {
+      const res = await fetch(`${baseUrl}/api/w8ben/${employee.contractor_id}`, {
         credentials: 'include',
         headers: {
           Authorization: `Bearer ${token}`
@@ -160,8 +161,9 @@ export function ContractorDetailDrawer({
     try {
       const sessionResponse = await supabase?.auth.getSession();
       const token = sessionResponse?.data?.session?.access_token;
+      const baseUrl = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/+$/, '');
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/w8ben/${employee.contractor_id}/return`, {
+      const res = await fetch(`${baseUrl}/api/w8ben/${employee.contractor_id}/return`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
