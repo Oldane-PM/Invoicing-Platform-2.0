@@ -58,18 +58,6 @@ export function EmployeeDirectory({ onEmployeeClick }: EmployeeDirectoryProps) {
 
   const filteredAndSortedEmployees = React.useMemo(() => {
     if (!employees) return [];
-
-    // Client-side sorting for manager_name if needed
-    if (sortBy === "manager_name") {
-      return [...employees].sort((a, b) => {
-        const aValue = a.reporting_manager_name || "";
-        const bValue = b.reporting_manager_name || "";
-        if (aValue < bValue) return sortDir === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortDir === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-
     return employees;
   }, [employees, sortBy, sortDir]);
 
@@ -155,23 +143,13 @@ export function EmployeeDirectory({ onEmployeeClick }: EmployeeDirectoryProps) {
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
                   Contract Type
                 </TableHead>
-                <TableHead
-                  className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort("manager_name")}
-                >
-                  Reporting Manager
-                  {sortBy === "manager_name" && (
-                    <span className="ml-2">
-                      {sortDir === "asc" ? "↑" : "↓"}
-                    </span>
-                  )}
-                </TableHead>
+
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-64 text-center">
+                  <TableCell colSpan={7} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
                       <div className="text-gray-600 font-medium mt-3">
@@ -182,7 +160,7 @@ export function EmployeeDirectory({ onEmployeeClick }: EmployeeDirectoryProps) {
                 </TableRow>
               ) : filteredAndSortedEmployees.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-64 text-center">
+                  <TableCell colSpan={7} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <Users className="w-16 h-16 mb-3" strokeWidth={1.5} />
                       <div className="text-gray-600 font-medium">
@@ -247,9 +225,7 @@ export function EmployeeDirectory({ onEmployeeClick }: EmployeeDirectoryProps) {
                     <TableCell className="text-gray-700">
                       {employee.contract_type || "-"}
                     </TableCell>
-                    <TableCell className="text-gray-500">
-                      {employee.reporting_manager_name || "-"}
-                    </TableCell>
+
                   </TableRow>
                 ))
               )}

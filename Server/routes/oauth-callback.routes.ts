@@ -18,7 +18,6 @@ async function getOrCreateAuthUser(
   const supabase = getSupabaseAdmin();
   const normalizedEmail = email.toLowerCase();
 
-
   // 1) Check if user already exists via profiles table (mirrors auth.users)
   const { data: existingProfile } = await supabase
     .from('profiles')
@@ -31,7 +30,7 @@ async function getOrCreateAuthUser(
     return existingProfile.id;
   }
 
-  // 2) User doesn't exist - create new auth user
+  // 2) User doesn't exist in profiles - try to create new auth user
   console.log('[OAuth Callback] Creating new auth user for:', email);
   const { data, error } = await supabase.auth.admin.createUser({
     email: normalizedEmail,
@@ -40,25 +39,43 @@ async function getOrCreateAuthUser(
   });
 
   if (error) {
-    // Handle race condition: user was created between our check and create
+    // Handle case: user exists in auth.users but profile was deleted (e.g. manual cleanup)
     if (error.code === 'email_exists' || error.status === 422) {
-      console.log('[OAuth Callback] User was created by another request, fetching from profiles');
-      
-      // Wait a moment for the trigger to create the profile
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const { data: raceProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', normalizedEmail)
-        .maybeSingle();
+      console.log('[OAuth Callback] Email already exists in auth.users, recovering user ID via generateLink...');
 
-      if (raceProfile) {
-        return raceProfile.id;
+      // Use generateLink to discover the existing auth user's ID.
+      // generateLink always works for existing auth users and returns the user object.
+      const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: normalizedEmail,
+      });
+
+      if (linkErr || !linkData?.user) {
+        console.error('[OAuth Callback] generateLink fallback failed:', linkErr);
+        throw new Error(`Cannot recover auth user for: ${email}`);
       }
-      
-      // If still not found, the trigger might not have run yet - throw
-      throw new Error(`User exists but profile not found for: ${email}`);
+
+      const recoveredId = linkData.user.id;
+      console.log('[OAuth Callback] Recovered auth user ID:', recoveredId);
+
+      // The profile is missing — create it manually so downstream logic works
+      console.log('[OAuth Callback] Recreating missing profile for recovered user...');
+      const { error: profileCreateErr } = await supabase
+        .from('profiles')
+        .upsert({
+          id: recoveredId,
+          email: normalizedEmail,
+          full_name: metadata?.full_name || normalizedEmail.split('@')[0],
+          role: metadata?.role || 'contractor',
+          is_active: true,
+        }, { onConflict: 'id' });
+
+      if (profileCreateErr) {
+        console.error('[OAuth Callback] Error recreating profile:', profileCreateErr);
+        // Non-fatal — the caller will upsert the profile again later
+      }
+
+      return recoveredId;
     }
     throw error;
   }
@@ -310,6 +327,47 @@ router.post('/supabase', async (req: Request, res: Response) => {
         }
       } else {
         console.log('[OAuth Callback] Contractor record already exists, skipping creation');
+      }
+
+      // Step 5b: Ensure an active contracts record exists (required by the submission flow)
+      const { data: existingContract } = await supabase
+        .from('contracts')
+        .select('id')
+        .eq('contractor_user_id', authUserId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (!existingContract) {
+        const contractStart = isContractorFromInvitation
+          ? invitation.contract_start_date
+          : new Date().toISOString().split('T')[0];
+        const contractEnd = isContractorFromInvitation
+          ? invitation.contract_end_date
+          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        console.log('[OAuth Callback] Creating contracts record for:', email);
+        const { error: contractError2 } = await supabase
+          .from('contracts')
+          .insert({
+            contractor_user_id: authUserId,
+            project_name: 'General Work',
+            contract_type: 'hourly',
+            start_date: contractStart,
+            end_date: contractEnd,
+            is_active: true,
+          });
+
+        if (contractError2) {
+          if (contractError2.code === '23505') {
+            console.log('[OAuth Callback] Contract record already exists (race condition handled)');
+          } else {
+            console.error('[OAuth Callback] Error creating contract record:', contractError2);
+          }
+        } else {
+          console.log('[OAuth Callback] Contract record created');
+        }
+      } else {
+        console.log('[OAuth Callback] Contract record already exists, skipping');
       }
     }
 

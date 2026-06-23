@@ -19,9 +19,10 @@ import {
   ChevronsUpDown,
   ArrowLeft,
   Loader2,
-
   X,
+  AlertCircle,
 } from "lucide-react";
+import { Alert, AlertDescription } from "../../components/ui/alert";
 import {
   format,
   parse,
@@ -556,6 +557,16 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
             }
           </p>
         </div>
+
+        {/* Message for New Users */}
+        {!isEditMode && (
+          <Alert className="mb-6 bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 ml-2">
+              Before submitting your hours, please upload your W-8BEN and work orders in the Contractor Profile.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Form Content */}
         <div className="bg-white rounded-[14px] border border-gray-200 p-4 md:p-6">
