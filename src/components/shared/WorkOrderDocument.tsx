@@ -10,7 +10,10 @@ export function WorkOrderDocument({ workOrder }: WorkOrderDocumentProps) {
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return "";
     try {
-      return format(new Date(dateString), "MMMM d, yyyy");
+      const parsedDate = dateString.includes("T")
+        ? new Date(dateString)
+        : new Date(dateString.substring(0, 10) + "T12:00:00Z");
+      return format(parsedDate, "MMMM d, yyyy");
     } catch {
       return dateString;
     }
@@ -19,7 +22,10 @@ export function WorkOrderDocument({ workOrder }: WorkOrderDocumentProps) {
   const formatSignatureDate = (dateString?: string | null) => {
     if (!dateString) return "";
     try {
-      return format(new Date(dateString), "MM/dd/yyyy");
+      const parsedDate = dateString.includes("T")
+        ? new Date(dateString)
+        : new Date(dateString.substring(0, 10) + "T12:00:00Z");
+      return format(parsedDate, "MM/dd/yyyy");
     } catch {
       return dateString;
     }

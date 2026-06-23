@@ -134,7 +134,7 @@ export function ContractorWorkOrders({ onBack }: ContractorWorkOrdersProps) {
                     onClick={() => handleRowClick(wo.id)}
                   >
                     <TableCell className="px-6 text-sm text-gray-600">
-                      {format(new Date(wo.start_date), "MMM d, yyyy")} - {format(new Date(wo.end_date), "MMM d, yyyy")}
+                      {format(new Date(wo.start_date.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")} - {format(new Date(wo.end_date.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell className="text-sm font-medium text-gray-900">{wo.role}</TableCell>
                     <TableCell className="text-sm font-medium text-gray-900">

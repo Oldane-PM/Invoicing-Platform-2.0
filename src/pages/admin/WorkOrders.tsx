@@ -189,7 +189,7 @@ export function AdminWorkOrders() {
                       />
                     </TableCell>
                     <TableCell className="px-6 text-sm text-gray-600">
-                      {format(new Date(wo.start_date), "MMM d, yyyy")} - {format(new Date(wo.end_date), "MMM d, yyyy")}
+                      {format(new Date(wo.start_date.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")} - {format(new Date(wo.end_date.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell>
                       <div className="font-medium text-gray-900">{wo.contractor_name || "Unknown"}</div>

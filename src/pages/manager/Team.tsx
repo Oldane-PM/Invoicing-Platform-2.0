@@ -12,10 +12,9 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { toast } from "sonner";
-import { Search, Users, Copy, Loader2, RefreshCw, UserPlus } from "lucide-react";
+import { Search, Users, Copy, Loader2, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { useTeam } from "../../lib/hooks/manager/useTeam";
-import { AddContractorDialog } from "../../components/modals/AddContractorDialog";
 import type { TeamContractor } from "../../lib/supabase/repos/team.repo";
 
 interface ManagerTeamViewProps {
@@ -29,7 +28,6 @@ export function ManagerTeamView({ onContractorClick }: ManagerTeamViewProps) {
   const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">(
     "asc"
   );
-  const [addDialogOpen, setAddDialogOpen] = React.useState(false);
 
   // Use live data hook
   const {
@@ -37,15 +35,6 @@ export function ManagerTeamView({ onContractorClick }: ManagerTeamViewProps) {
     loading,
     error,
     refetch,
-    // Available contractors (for add dialog)
-    availableContractors,
-    availableLoading,
-    availableError,
-    fetchAvailable,
-    searchAvailable,
-    // Actions
-    addToTeam,
-    adding,
   } = useTeam();
 
   const handleCopyEmail = (e: React.MouseEvent, email: string) => {
@@ -63,15 +52,6 @@ export function ManagerTeamView({ onContractorClick }: ManagerTeamViewProps) {
     }
   };
 
-  const handleAddContractor = async (contractorId: string): Promise<boolean> => {
-    const success = await addToTeam(contractorId);
-    if (success) {
-      toast.success("Contractor added to team");
-    } else {
-      toast.error("Failed to add contractor");
-    }
-    return success;
-  };
 
   const filteredTeam = React.useMemo(() => {
     let filtered = contractors.filter((member) => {
@@ -115,10 +95,10 @@ export function ManagerTeamView({ onContractorClick }: ManagerTeamViewProps) {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
-              Team Members ({contractors.length})
+              Contractors ({contractors.length})
             </h2>
             <p className="text-sm text-gray-500">
-              Manage contractors in your team
+              View all contractors on the platform
             </p>
           </div>
           <div className="flex gap-2">
@@ -127,7 +107,7 @@ export function ManagerTeamView({ onContractorClick }: ManagerTeamViewProps) {
               size="sm"
               onClick={() => {
                 refetch();
-                toast.success("Team data refreshed");
+                toast.success("Contractor data refreshed");
               }}
               disabled={loading}
               className="h-9"
@@ -247,22 +227,12 @@ export function ManagerTeamView({ onContractorClick }: ManagerTeamViewProps) {
                     <TableCell colSpan={6} className="text-center py-12">
                       <div className="flex flex-col items-center gap-2">
                         <Users className="h-12 w-12 text-gray-300" />
-                        <p className="text-gray-600">No team members found</p>
+                        <p className="text-gray-600">No contractors found</p>
                         <p className="text-sm text-gray-500">
                           {searchQuery
                             ? "Try adjusting your search"
-                            : "Click 'Add Contractor' to build your team"}
+                            : "No contractors are currently registered on the platform"}
                         </p>
-                        {!searchQuery && (
-                          <Button
-                            size="sm"
-                            onClick={() => setAddDialogOpen(true)}
-                            className="mt-2 bg-blue-600 hover:bg-blue-700"
-                          >
-                            <UserPlus className="w-4 h-4 mr-2" />
-                            Add Your First Contractor
-                          </Button>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -302,19 +272,19 @@ export function ManagerTeamView({ onContractorClick }: ManagerTeamViewProps) {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-medium text-gray-900">
-                        ${member.hourlyRate || 0}/hr
+                        ${member.hourlyRate || 0}/{member.contractType === "Fixed" ? "mo" : "hr"}
                       </TableCell>
                       <TableCell className="text-gray-700">
                         {member.projectName || "-"}
                       </TableCell>
                       <TableCell className="text-gray-700">
                         {member.contractStart
-                          ? format(new Date(member.contractStart), "MMM d, yyyy")
+                          ? format(new Date(member.contractStart.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")
                           : "-"}
                       </TableCell>
                       <TableCell className="text-gray-700">
                         {member.contractEnd
-                          ? format(new Date(member.contractEnd), "MMM d, yyyy")
+                          ? format(new Date(member.contractEnd.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")
                           : "-"}
                       </TableCell>
                     </TableRow>
@@ -326,18 +296,7 @@ export function ManagerTeamView({ onContractorClick }: ManagerTeamViewProps) {
         </Card>
       </div>
 
-      {/* Add Contractor Dialog */}
-      <AddContractorDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-        availableContractors={availableContractors}
-        loading={availableLoading}
-        error={availableError}
-        adding={adding}
-        onSearch={searchAvailable}
-        onFetchAll={fetchAvailable}
-        onAdd={handleAddContractor}
-      />
+
     </>
   );
 }
