@@ -386,7 +386,7 @@ function App() {
               >
                 <Users className="w-4 h-4" />
                 <span className="font-medium text-sm md:text-base">
-                  My Team
+                  Contractors
                 </span>
               </button>
             </div>
@@ -411,9 +411,9 @@ function App() {
                   contract_end: member.contractEnd
                     ? new Date(member.contractEnd).toISOString()
                     : undefined,
-                  rate_type: "Hourly", // default
-                  hourly_rate: member.hourlyRate || undefined,
-                  fixed_rate: undefined,
+                  rate_type: member.contractType as "Hourly" | "Fixed",
+                  hourly_rate: member.contractType === "Hourly" ? member.hourlyRate : undefined,
+                  fixed_rate: member.contractType === "Fixed" ? member.hourlyRate : undefined,
                   contract_type: member.contractType,
                   reporting_manager_id: user?.id || undefined,
                   reporting_manager_name: displayName,

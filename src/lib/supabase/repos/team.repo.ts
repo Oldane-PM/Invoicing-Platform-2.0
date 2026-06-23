@@ -45,6 +45,24 @@ function logSupabaseError(context: string, error: any): void {
 }
 
 /**
+ * Helper to select the active or latest completed work order for a contractor
+ */
+function getCurrentWorkOrder(workOrders: any[]): any | null {
+  if (!workOrders || workOrders.length === 0) return null;
+
+  const todayStr = new Date().toISOString().substring(0, 10);
+
+  // 1. Try to find an active one (start_date <= today and end_date >= today)
+  const activeOrder = workOrders.find(
+    (wo: any) => wo.start_date <= todayStr && wo.end_date >= todayStr
+  );
+  if (activeOrder) return activeOrder;
+
+  // 2. If no active one, find the one with the latest start_date
+  return [...workOrders].sort((a, b) => b.start_date.localeCompare(a.start_date))[0] || null;
+}
+
+/**
  * List all contractors in the manager's team
  * Uses two-step query to avoid PostgREST relationship issues
  */
@@ -98,16 +116,40 @@ export async function listTeamContractors(
     // Don't throw - contractors table may be empty, we can still show profiles
   }
 
+  // Step 3.5: Get completed system work orders for these contractors
+  const { data: workOrdersData, error: workOrdersError } = await supabase
+    .from("system_work_orders")
+    .select("contractor_user_id, pay_type, pay_amount, start_date, end_date, status")
+    .in("contractor_user_id", contractorIds)
+    .eq("status", "COMPLETED");
+
+  if (workOrdersError) {
+    logSupabaseError(
+      "listTeamContractors - system_work_orders query",
+      workOrdersError
+    );
+  }
+
   // Step 4: Merge results
   const profilesMap = new Map((profilesData || []).map((p: any) => [p.id, p]));
   const contractorsMap = new Map(
     (contractorsData || []).map((c: any) => [c.contractor_id, c])
   );
 
+  // Group work orders by contractor
+  const workOrdersMap = new Map<string, any[]>();
+  (workOrdersData || []).forEach((wo: any) => {
+    const list = workOrdersMap.get(wo.contractor_user_id) || [];
+    list.push(wo);
+    workOrdersMap.set(wo.contractor_user_id, list);
+  });
+
   return contractorIds
     .map((contractorId: string) => {
       const profile = profilesMap.get(contractorId);
       const contractor = contractorsMap.get(contractorId);
+      const contractorWorkOrders = workOrdersMap.get(contractorId) || [];
+      const currentWorkOrder = getCurrentWorkOrder(contractorWorkOrders);
 
       // If no profile found (shouldn't happen due to FKs but possible with bad RLS), skip
       if (!profile) return null;
@@ -116,16 +158,45 @@ export async function listTeamContractors(
         id: contractorId,
         fullName: profile?.full_name || "Unknown",
         email: profile?.email || "",
-        hourlyRate: contractor?.hourly_rate || 0,
-        overtimeRate: contractor?.overtime_rate || 0,
+        hourlyRate: currentWorkOrder ? currentWorkOrder.pay_amount : (contractor?.hourly_rate || 0),
+        overtimeRate: currentWorkOrder && currentWorkOrder.pay_type === "Hourly"
+          ? currentWorkOrder.pay_amount * 1.5
+          : (contractor?.overtime_rate || 0),
         projectName: contractor?.default_project_name || null,
-        contractType: "Hourly", // Default
-        contractStart: contractor?.contract_start || null,
-        contractEnd: contractor?.contract_end || null,
+        contractType: currentWorkOrder ? currentWorkOrder.pay_type : "Hourly",
+        contractStart: currentWorkOrder ? currentWorkOrder.start_date : (contractor?.contract_start || null),
+        contractEnd: currentWorkOrder ? currentWorkOrder.end_date : (contractor?.contract_end || null),
         isActive: contractor?.is_active ?? true,
       };
     })
     .filter((c: TeamContractor | null): c is TeamContractor => c !== null);
+}
+
+/**
+ * List all contractors on the platform
+ */
+export async function listAllContractors(): Promise<TeamContractor[]> {
+  const supabase = getSupabaseClient();
+  const sessionResponse = await supabase.auth.getSession();
+  const token = sessionResponse?.data?.session?.access_token;
+  
+  const baseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
+
+  const response = await fetch(`${baseUrl}/api/users/contractors`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: "Failed to fetch contractors" }));
+    throw new Error(errorData.error || "Failed to fetch contractors");
+  }
+
+  return response.json();
 }
 
 /**

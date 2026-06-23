@@ -5,15 +5,10 @@
  * Uses React Query for caching and mutations.
  */
 
-import { useState, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  listTeamContractors,
-  getAvailableContractors,
-  searchContractors,
-  addContractorToTeam,
-  removeContractorFromTeam,
+  listAllContractors,
   type TeamContractor,
   type AvailableContractor,
 } from "../../supabase/repos/team.repo";
@@ -48,20 +43,13 @@ interface UseTeamResult {
 
 export function useTeam(): UseTeamResult {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const managerId = user?.id ?? null;
 
-  // Search query state (for available contractors search)
-  const [searchQuery, setSearchQuery] = useState<string | null>(null);
-
-  // Fetch team contractors
+  // Fetch all contractors on the platform
   const teamQuery = useQuery({
-    queryKey: [MANAGER_TEAM_KEY, managerId],
+    queryKey: [MANAGER_TEAM_KEY],
     queryFn: async () => {
-      if (!managerId) return { contractors: [] as TeamContractor[], size: 0 };
-      const [contractorsData] = await Promise.all([
-        listTeamContractors(managerId)
-      ]);
+      const contractorsData = await listAllContractors();
       return { contractors: contractorsData, size: contractorsData.length };
     },
     enabled: !!managerId,
@@ -72,96 +60,15 @@ export function useTeam(): UseTeamResult {
     retry: 1,
   });
 
-  // Fetch available contractors
-  const availableQuery = useQuery({
-    queryKey: [MANAGER_AVAILABLE_CONTRACTORS_KEY, managerId, searchQuery],
-    queryFn: async () => {
-      if (!managerId) return [];
-      if (searchQuery) {
-        return searchContractors(managerId, searchQuery);
-      }
-      return getAvailableContractors(managerId);
-    },
-    enabled: false, // Only fetch on demand
-    staleTime: 30000,
-    gcTime: 300000,
-    retry: 1,
-  });
+  // Fetch available contractors - dummy implementation since not used
+  const fetchAvailable = useCallback(async () => {}, []);
+  const searchAvailable = useCallback(async (_query: string) => {}, []);
 
-  // Add contractor mutation
-  const addMutation = useMutation({
-    mutationFn: async (contractorId: string) => {
-      if (!managerId) throw new Error("Not authenticated");
-      await addContractorToTeam(managerId, contractorId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [MANAGER_TEAM_KEY] });
-      queryClient.invalidateQueries({ queryKey: [MANAGER_AVAILABLE_CONTRACTORS_KEY] });
-      toast.success("Contractor added to team");
-    },
-    onError: (error: Error) => {
-      console.error("[useTeam] Error adding contractor:", error);
-      toast.error(error.message || "Failed to add contractor");
-    },
-  });
+  // Add to team wrapper - dummy implementation
+  const addToTeam = useCallback(async (_contractorId: string): Promise<boolean> => true, []);
 
-  // Remove contractor mutation
-  const removeMutation = useMutation({
-    mutationFn: async (contractorId: string) => {
-      if (!managerId) throw new Error("Not authenticated");
-      await removeContractorFromTeam(managerId, contractorId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [MANAGER_TEAM_KEY] });
-      queryClient.invalidateQueries({ queryKey: [MANAGER_AVAILABLE_CONTRACTORS_KEY] });
-      toast.success("Contractor removed from team");
-    },
-    onError: (error: Error) => {
-      console.error("[useTeam] Error removing contractor:", error);
-      toast.error(error.message || "Failed to remove contractor");
-    },
-  });
-
-  // Fetch available contractors
-  const fetchAvailable = useCallback(async () => {
-    setSearchQuery(null);
-    await availableQuery.refetch();
-  }, [availableQuery]);
-
-  // Search available contractors
-  const searchAvailable = useCallback(
-    async (query: string) => {
-      setSearchQuery(query);
-      await availableQuery.refetch();
-    },
-    [availableQuery]
-  );
-
-  // Add to team wrapper
-  const addToTeam = useCallback(
-    async (contractorId: string): Promise<boolean> => {
-      try {
-        await addMutation.mutateAsync(contractorId);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    [addMutation]
-  );
-
-  // Remove from team wrapper
-  const removeFromTeam = useCallback(
-    async (contractorId: string): Promise<boolean> => {
-      try {
-        await removeMutation.mutateAsync(contractorId);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    [removeMutation]
-  );
+  // Remove from team wrapper - dummy implementation
+  const removeFromTeam = useCallback(async (_contractorId: string): Promise<boolean> => true, []);
 
   const refetch = async () => {
     await teamQuery.refetch();
@@ -175,18 +82,19 @@ export function useTeam(): UseTeamResult {
     error: teamQuery.error instanceof Error ? teamQuery.error : teamQuery.error ? new Error("Failed to fetch team") : null,
     refetch,
 
-    // Available contractors
-    availableContractors: availableQuery.data ?? [],
-    availableLoading: availableQuery.isFetching,
-    availableError: availableQuery.error instanceof Error ? availableQuery.error : availableQuery.error ? new Error("Failed to fetch contractors") : null,
+    // Available contractors (dummies)
+    availableContractors: [],
+    availableLoading: false,
+    availableError: null,
     fetchAvailable,
     searchAvailable,
 
-    // Actions
+    // Actions (dummies)
     addToTeam,
     removeFromTeam,
-    adding: addMutation.isPending,
-    removing: removeMutation.isPending,
-    actionError: addMutation.error ?? removeMutation.error ?? null,
+    adding: false,
+    removing: false,
+    actionError: null,
   };
 }
+
