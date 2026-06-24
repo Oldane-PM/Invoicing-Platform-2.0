@@ -212,10 +212,31 @@ router.get("/contractors", requireManagerOrAdmin, async (_req: Request, res: Res
       console.error("[GetContractors] Work orders query error:", workOrdersError);
     }
 
+    // 4. Get contractor profiles (onboarding data)
+    const { data: contractorProfiles, error: cpError } = await supabase
+      .from("contractor_profiles")
+      .select("user_id, onboarding_role, onboarding_rate, onboarding_rate_type, contract_start_date, contract_end_date")
+      .in("user_id", contractorIds);
+
+    if (cpError) {
+      console.error("[GetContractors] Contractor profiles query error:", cpError);
+    }
+
+    // 5. Fetch active contracts (fixed rate details)
+    const { data: activeContracts, error: acError } = await supabase
+      .from("contracts")
+      .select("contractor_user_id, contract_type, fixed_monthly_rate, start_date, end_date, project_name")
+      .in("contractor_user_id", contractorIds)
+      .eq("is_active", true);
+
+    if (acError) {
+      console.error("[GetContractors] Contracts query error:", acError);
+    }
+
     const profilesMap = new Map((profilesData || []).map((p: any) => [p.id, p]));
-    const contractorsMap = new Map(
-      (contractorsData || []).map((c: any) => [c.contractor_id, c])
-    );
+    const contractorsMap = new Map((contractorsData || []).map((c: any) => [c.contractor_id, c]));
+    const contractorProfilesMap = new Map((contractorProfiles || []).map((cp: any) => [cp.user_id, cp]));
+    const activeContractsMap = new Map((activeContracts || []).map((ac: any) => [ac.contractor_user_id, ac]));
 
     // Group work orders by contractor
     const workOrdersMap = new Map<string, any[]>();
@@ -231,21 +252,50 @@ router.get("/contractors", requireManagerOrAdmin, async (_req: Request, res: Res
         const contractor = contractorsMap.get(contractorId);
         const contractorWorkOrders = workOrdersMap.get(contractorId) || [];
         const currentWorkOrder = getCurrentWorkOrder(contractorWorkOrders);
+        const cpData = contractorProfilesMap.get(contractorId);
+        const activeContract = activeContractsMap.get(contractorId);
 
         if (!profile) return null;
+
+        const contractStart = cpData?.contract_start_date || activeContract?.start_date || (currentWorkOrder ? currentWorkOrder.start_date : (contractor?.contract_start || null));
+        const contractEnd = cpData?.contract_end_date || activeContract?.end_date || (currentWorkOrder ? currentWorkOrder.end_date : (contractor?.contract_end || null));
+
+        let rateType = "Hourly";
+        if (cpData?.onboarding_rate_type === "fixed") {
+          rateType = "Fixed";
+        } else if (cpData?.onboarding_rate_type === "hourly") {
+          rateType = "Hourly";
+        } else if (activeContract?.contract_type === "fixed") {
+          rateType = "Fixed";
+        } else if (activeContract?.contract_type === "hourly") {
+          rateType = "Hourly";
+        } else if (currentWorkOrder) {
+          rateType = currentWorkOrder.pay_type;
+        }
+
+        let hourlyRate = 0;
+        if (cpData?.onboarding_rate != null) {
+          hourlyRate = cpData.onboarding_rate;
+        } else if (activeContract?.contract_type === "fixed" && activeContract?.fixed_monthly_rate != null) {
+          hourlyRate = activeContract.fixed_monthly_rate;
+        } else if (currentWorkOrder) {
+          hourlyRate = currentWorkOrder.pay_amount;
+        } else if (contractor?.hourly_rate != null) {
+          hourlyRate = contractor.hourly_rate;
+        }
+
+        const overtimeRate = rateType === "Hourly" ? hourlyRate * 1.5 : (contractor?.overtime_rate || 0);
 
         return {
           id: contractorId,
           fullName: profile.full_name || "Unknown",
           email: profile.email || "",
-          hourlyRate: currentWorkOrder ? currentWorkOrder.pay_amount : (contractor?.hourly_rate || 0),
-          overtimeRate: currentWorkOrder && currentWorkOrder.pay_type === "Hourly"
-            ? currentWorkOrder.pay_amount * 1.5
-            : (contractor?.overtime_rate || 0),
-          projectName: contractor?.default_project_name || null,
-          contractType: currentWorkOrder ? currentWorkOrder.pay_type : "Hourly",
-          contractStart: currentWorkOrder ? currentWorkOrder.start_date : (contractor?.contract_start || null),
-          contractEnd: currentWorkOrder ? currentWorkOrder.end_date : (contractor?.contract_end || null),
+          hourlyRate,
+          overtimeRate,
+          projectName: activeContract?.project_name || contractor?.default_project_name || null,
+          contractType: rateType,
+          contractStart,
+          contractEnd,
           isActive: contractor?.is_active ?? true,
         };
       })
