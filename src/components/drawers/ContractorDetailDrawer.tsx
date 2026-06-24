@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import { Pencil, Calendar, DollarSign, Clock, FileText, ExternalLink, Hash, Download, RotateCcw, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { Pencil, Calendar, DollarSign, Clock, FileText, ExternalLink, Hash, Download, RotateCcw, CheckCircle2, Loader2 } from "lucide-react";
 import { useContractorSubmissions } from "../../lib/hooks/admin/useContractorSubmissions";
 
 import { useUpdateManagerAssignment } from "../../lib/hooks/admin/useUpdateManagerAssignment";
@@ -484,29 +484,7 @@ export function ContractorDetailDrawer({
                     Edit
                   </Button>
                 ) : (
-                  <div className="flex gap-2 items-center">
-                    {onboarding && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (onboarding) {
-                            setFormData(prev => prev ? {
-                              ...prev,
-                              contract_start: onboarding.contract_start_date || prev.contract_start,
-                              contract_end: onboarding.contract_end_date || prev.contract_end,
-                              rate_type: onboarding.onboarding_rate_type === 'fixed' ? 'Fixed' : 'Hourly',
-                              hourly_rate: (onboarding.onboarding_rate_type === 'hourly' ? onboarding.onboarding_rate : prev.hourly_rate) ?? undefined,
-                              fixed_rate: (onboarding.onboarding_rate_type === 'fixed' ? onboarding.onboarding_rate : prev.fixed_rate) ?? undefined,
-                            } : prev);
-                          }
-                        }}
-                        className="border-blue-200 text-blue-700 hover:bg-blue-50 h-9 mr-2"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                        Sync from Work Order
-                      </Button>
-                    )}
+                  <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
