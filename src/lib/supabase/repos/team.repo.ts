@@ -180,7 +180,7 @@ export async function listAllContractors(): Promise<TeamContractor[]> {
   const sessionResponse = await supabase.auth.getSession();
   const token = sessionResponse?.data?.session?.access_token;
   
-  const baseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
+  const baseUrl = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
 
   const response = await fetch(`${baseUrl}/api/users/contractors`, {
     method: "GET",
