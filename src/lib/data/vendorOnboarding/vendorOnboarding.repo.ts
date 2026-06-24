@@ -84,6 +84,39 @@ export async function saveVendorOnboarding(
     );
   }
 
+  // Auto-sync extracted work order data into the official contract tables so they match perfectly
+  try {
+    const isHourly = patch.onboarding_rate_type === "hourly";
+    const isFixed = patch.onboarding_rate_type === "fixed";
+    
+    // Only sync if there are rate or date fields provided
+    if (patch.onboarding_rate !== undefined || patch.contract_start_date !== undefined || patch.contract_end_date !== undefined) {
+      // Inline the update logic to avoid circular imports or complex deps
+      const dbUpdates: any = { contractor_id: userId, is_active: true };
+      if (patch.contract_start_date !== undefined) dbUpdates.contract_start = patch.contract_start_date;
+      if (patch.contract_end_date !== undefined) dbUpdates.contract_end = patch.contract_end_date;
+      if (isHourly && patch.onboarding_rate != null) {
+        dbUpdates.hourly_rate = patch.onboarding_rate;
+        dbUpdates.overtime_rate = patch.onboarding_rate * 1.5;
+      }
+      
+      await supabase.from("contractors").upsert(dbUpdates, { onConflict: "contractor_id" });
+      
+      if (isHourly || isFixed) {
+        const contractUpdates: any = {};
+        if (isHourly) contractUpdates.contract_type = "hourly";
+        if (isFixed) {
+            contractUpdates.contract_type = "fixed";
+            if (patch.onboarding_rate != null) contractUpdates.fixed_monthly_rate = patch.onboarding_rate;
+        }
+        await supabase.from("contracts").update(contractUpdates).eq("contractor_user_id", userId).eq("is_active", true);
+      }
+      console.log(`[vendorOnboarding.repo] Auto-synced work order data to official contract for user ${userId}`);
+    }
+  } catch (syncError) {
+    console.error("[vendorOnboarding.repo] Failed to auto-sync contract info:", syncError);
+  }
+
   return getVendorOnboarding(userId);
 }
 
