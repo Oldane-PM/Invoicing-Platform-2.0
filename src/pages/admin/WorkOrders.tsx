@@ -99,12 +99,12 @@ export function AdminWorkOrders() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center h-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 min-h-[40px]">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Work Orders</h2>
           <p className="text-sm text-gray-600">Manage work orders and requests</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           {selectedForRenewal.length > 0 && (
             <Button 
               onClick={() => setIsBulkRenewing(true)}

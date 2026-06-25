@@ -282,16 +282,16 @@ function App() {
         {/* Manager Header */}
         <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
           <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
-                  Welcome, {displayName}
-                </h1>
-                <p className="text-xs md:text-sm text-gray-600">
-                  Admin Portal — Review and approve submissions
-                </p>
-              </div>
-              <div className="flex items-center gap-2 md:gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
+                Welcome, {displayName}
+              </h1>
+              <p className="text-xs md:text-sm text-gray-600">
+                Admin Portal — Review and approve submissions
+              </p>
+            </div>
+            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
                 <NotificationBell onClick={() => setNotificationsOpen(true)} />
                 <ThemeToggle />
                 <Button
@@ -333,7 +333,7 @@ function App() {
         {/* Manager Navigation Tabs */}
         <div className="bg-white border-b border-gray-200">
           <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
-            <div className="flex gap-1 overflow-x-auto">
+            <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <button
                 onClick={() => setManagerScreen("dashboard")}
                 className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
@@ -431,16 +431,17 @@ function App() {
 
         {/* Contractor Header */}
         <header className="sticky top-0 z-50 bg-white border-b border-[#EAEAEA]">
-          <div className="max-w-[1440px] mx-auto px-4 md:px-6 h-16 md:h-[72px] flex items-center justify-between">
-            {/* Left Section */}
-            <div>
-              <p className="font-semibold text-gray-900 text-sm md:text-base">
-                Welcome, {displayName}
-              </p>
-            </div>
+          <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
+              {/* Left Section */}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm md:text-base">
+                  Welcome, {displayName}
+                </p>
+              </div>
 
-            {/* Right Section */}
-            <div className="flex items-center gap-2 md:gap-3">
+              {/* Right Section */}
+              <div className="flex items-center gap-2 md:gap-3 flex-shrink-0 flex-wrap">
               {/* Contractor Work Orders Button */}
               <Button
                 variant="ghost"
@@ -513,6 +514,7 @@ function App() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            </div>
           </div>
         </header>
 
@@ -577,8 +579,8 @@ function App() {
       {/* Sticky Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
-          <div className="flex items-start justify-between">
-            <div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
+            <div className="flex-1 min-w-0">
               <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
                 {pageInfo.title}
               </h1>
@@ -586,7 +588,7 @@ function App() {
                 {pageInfo.subtitle}
               </p>
             </div>
-            <div className="flex items-center gap-2 md:gap-3">
+            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
               <NotificationBell onClick={() => setNotificationsOpen(true)} />
               <ThemeToggle />
               <Button
@@ -627,7 +629,7 @@ function App() {
       {/* Navigation Tabs */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex gap-1 overflow-x-auto">
+          <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
               onClick={() => setCurrentScreen("dashboard")}
               className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${

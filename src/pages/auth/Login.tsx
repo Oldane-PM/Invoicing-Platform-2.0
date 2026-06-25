@@ -132,13 +132,15 @@ export function Login({ authLoading }: LoginProps) {
 
       {/* Right Panel - Login Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-slate-50 lg:bg-white relative">
-        {/* Mobile Logo Only */}
-        <div className="absolute top-8 left-8 lg:hidden">
-          <img src="/intellibus-logo.png" alt="Intellibus" className="h-8" />
-        </div>
-
         <div className="w-full max-w-[420px] space-y-8">
           <div className="text-center">
+            {/* Mobile Logo Only */}
+            <div className="flex justify-center mb-6 lg:hidden">
+              <div className="bg-white p-2.5 rounded-2xl shadow-sm border border-gray-100 inline-block">
+                <img src="/intellibus-logo.png" alt="Intellibus" className="h-8 object-contain" />
+              </div>
+            </div>
+
             <h2 className="text-3xl font-bold text-slate-900 tracking-tight">
               Invoicing Platform
             </h2>

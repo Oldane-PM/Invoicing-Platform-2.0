@@ -58,7 +58,7 @@ export function SignWorkOrder({
 
   return (
     <div className="space-y-6 flex flex-col h-full bg-gray-50/50 -mx-8 px-8 py-4 print:p-0 print:m-0 print:bg-white">
-      <div className="flex justify-between items-center h-10 print:hidden">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 min-h-[40px] print:hidden">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
             <ArrowLeft className="w-5 h-5 text-gray-600" />

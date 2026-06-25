@@ -319,7 +319,7 @@ export function SubmitHoursModal({ open, onOpenChange }: SubmitHoursModalProps) 
               </div>
 
               {/* Legend */}
-              <div className="flex items-center justify-center gap-6 text-xs text-gray-600">
+              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs text-gray-600">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-blue-500" />
                   <span>Working Day</span>
