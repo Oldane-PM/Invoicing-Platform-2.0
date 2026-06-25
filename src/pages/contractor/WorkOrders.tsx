@@ -81,7 +81,7 @@ export function ContractorWorkOrders({ onBack }: ContractorWorkOrdersProps) {
           </Button>
         </div>
       )}
-      <div className="flex justify-between items-center h-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 min-h-[40px]">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Work Orders</h2>
           <p className="text-sm text-gray-600">Review and sign your work orders.</p>

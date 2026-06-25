@@ -194,10 +194,10 @@ export function AdminDashboard() {
   return (
     <div className="space-y-6">
       {/* Header Actions */}
-      <div className="flex justify-between items-center h-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center min-h-[40px] gap-4 sm:gap-0">
         <div>
           {selectedSubmissionIds.length > 0 && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full">
                 {selectedSubmissionIds.length} selected
               </span>

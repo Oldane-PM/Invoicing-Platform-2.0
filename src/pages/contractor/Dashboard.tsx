@@ -153,12 +153,12 @@ export function ContractorDashboard({
         <div className="max-w-[1040px] mx-auto px-6 pt-8 pb-6">
           <Button
             onClick={() => onNavigateToSubmit?.()}
-            className="h-11 bg-purple-600 hover:bg-purple-700 rounded-[10px] px-6"
+            className="h-11 w-full sm:w-auto bg-purple-600 hover:bg-purple-700 rounded-[10px] px-6"
           >
             <Plus className="w-4 h-4 mr-2" />
             Submit Hours
           </Button>
-          <p className="text-sm text-gray-600 mt-2">
+          <p className="text-sm text-gray-600 mt-3 sm:mt-2 text-center sm:text-left">
             Submit your work hours for the selected period
           </p>
         </div>

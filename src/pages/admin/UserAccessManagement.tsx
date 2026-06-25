@@ -231,7 +231,7 @@ export function UserAccessManagement() {
     <TooltipProvider>
       <div className="space-y-6">
         {/* Header with New User Button */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
           <div>
             <h2 className="text-2xl font-semibold text-gray-900">User Access Management</h2>
             <p className="text-sm text-gray-600 mt-1">Manage user roles and access permissions</p>

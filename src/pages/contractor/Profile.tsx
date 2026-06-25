@@ -505,7 +505,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                 </div>
 
                 {/* State/Parish & Country */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="stateParish" className="text-sm font-medium text-gray-900 mb-1.5 block">
                       State / Parish
@@ -544,7 +544,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                 </div>
 
                 {/* Email & Phone */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="email" className="text-sm font-medium text-gray-900 mb-1.5 block">
                       Email Address <span className="text-red-600">*</span>
@@ -573,19 +573,19 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
                 <Button
                   variant="outline"
                   onClick={handleCancel}
                   disabled={isSaving}
-                  className="h-11 px-6 rounded-lg border-gray-300"
+                  className="h-11 px-6 w-full sm:w-auto rounded-lg border-gray-300"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSavePersonal}
                   disabled={isSaving}
-                  className="h-11 px-6 rounded-lg bg-blue-600 hover:bg-blue-700"
+                  className="h-11 px-6 w-full sm:w-auto rounded-lg bg-blue-600 hover:bg-blue-700"
                 >
                   {isSaving ? (
                     <>
@@ -636,7 +636,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                 </div>
 
                 {/* SWIFT Code & ABA/Wire Routing */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="swiftCode" className="text-sm font-medium text-gray-900 mb-1.5 block">
                       SWIFT Code
@@ -662,7 +662,7 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
                 </div>
 
                 {/* Account Type & Currency */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="accountType" className="text-sm font-medium text-gray-900 mb-1.5 block">
                       Account Type
@@ -711,19 +711,19 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
                 <Button
                   variant="outline"
                   onClick={handleCancel}
                   disabled={isSaving}
-                  className="h-11 px-6 rounded-lg border-gray-300"
+                  className="h-11 px-6 w-full sm:w-auto rounded-lg border-gray-300"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSaveBanking}
                   disabled={isSaving}
-                  className="h-11 px-6 rounded-lg bg-blue-600 hover:bg-blue-700"
+                  className="h-11 px-6 w-full sm:w-auto rounded-lg bg-blue-600 hover:bg-blue-700"
                 >
                   {isSaving ? (
                     <>
@@ -963,19 +963,19 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
 
             {/* Actions */}
             <div className="bg-white rounded-[14px] border border-gray-200 p-4">
-              <div className="flex justify-end gap-3">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
                 <Button
                   variant="outline"
                   onClick={onCancel}
                   disabled={isSavingOnboarding}
-                  className="h-11 px-6 rounded-lg border-gray-300"
+                  className="h-11 px-6 w-full sm:w-auto rounded-lg border-gray-300"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSaveOnboarding}
                   disabled={isSavingOnboarding}
-                  className="h-11 px-6 rounded-lg bg-blue-600 hover:bg-blue-700"
+                  className="h-11 px-6 w-full sm:w-auto rounded-lg bg-blue-600 hover:bg-blue-700"
                 >
                   {isSavingOnboarding ? (
                     <>
@@ -1075,11 +1075,11 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
                 <Button
                   variant="outline"
                   onClick={handleCancel}
-                  className="h-11 px-6 rounded-lg border-gray-300"
+                  className="h-11 px-6 w-full sm:w-auto rounded-lg border-gray-300"
                 >
                   Back to Dashboard
                 </Button>

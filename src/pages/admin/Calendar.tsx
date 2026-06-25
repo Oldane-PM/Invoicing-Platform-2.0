@@ -295,7 +295,7 @@ export function AdminCalendar() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1440px] mx-auto px-6 py-8">
         {/* Page Header */}
-        <div className="flex justify-between items-start mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-8">
           <div>
             <h1 className="text-gray-900 mb-1">Calendar</h1>
             <p className="text-sm text-gray-600">
@@ -316,8 +316,8 @@ export function AdminCalendar() {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl border border-gray-200 p-6">
               {/* Calendar Header */}
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-6">
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
                   <Button
                     variant="outline"
                     size="icon"
@@ -338,7 +338,7 @@ export function AdminCalendar() {
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <Button
                     variant={viewMode === "month" ? "default" : "outline"}
                     size="sm"

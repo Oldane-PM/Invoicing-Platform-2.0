@@ -72,7 +72,7 @@ export function NotificationDrawer({ open, onOpenChange, onNavigateToSubmission,
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[400px] sm:w-[440px] p-0">
+      <SheetContent className="w-full sm:w-[440px] p-0">
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
