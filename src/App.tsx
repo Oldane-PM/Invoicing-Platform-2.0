@@ -80,6 +80,7 @@ function App() {
     user,
     signOut,
     loading: authLoading,
+    profile,
   } = useAuth();
 
   const [currentUser, setCurrentUser] = React.useState<UserRole>(null);
@@ -111,11 +112,12 @@ function App() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  // Use Demo Names if we are bypassed
-  let displayName = "User";
-  if (currentUser === "Admin") displayName = "Finance Officer";
-  if (currentUser === "Manager") displayName = "Manager User";
-  if (currentUser === "Contractor") displayName = "Contractor User";
+  // Use profile full name if available, otherwise fall back to demo/role names
+  const displayName = profile?.fullName || (
+    currentUser === "Admin" ? "Finance Officer" :
+    currentUser === "Manager" ? "Manager User" :
+    currentUser === "Contractor" ? "Contractor User" : "User"
+  );
 
   const userInitials = getInitials(displayName);
 
