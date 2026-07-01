@@ -16,6 +16,7 @@ import {
   FileText,
   ExternalLink,
   Hash,
+  Trash2,
 } from "lucide-react";
 import { useContractorProfile } from "../../lib/hooks/contractor/useContractorProfile";
 import { useVendorOnboarding } from "../../lib/hooks/contractor/useVendorOnboarding";
@@ -45,6 +46,7 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
     uploadWorkOrderFile,
     getWorkOrderUrl,
     extractWorkOrder,
+    extractPreviousInvoice,
   } = useVendorOnboarding();
 
   const [activeTab, setActiveTab] = React.useState(initialTab || "personal");
@@ -64,7 +66,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
   const [lastInvoiceNumber, setLastInvoiceNumber] = React.useState("");
   const [onboardingInitialized, setOnboardingInitialized] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [invoiceUploadError, setInvoiceUploadError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const invoiceFileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Initialize onboarding form from stored data once it loads
   React.useEffect(() => {
@@ -86,6 +90,14 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
     e.target.value = "";
     if (!file) return;
 
+    // Check if the file is a PDF
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      const msg = "Invalid file type. Only PDF work orders are supported.";
+      setUploadError(msg);
+      toast.error(msg);
+      return;
+    }
+
     if (file.size > WORK_ORDER_MAX_BYTES) {
       const msg = "File is too large. Maximum size is 10MB.";
       setUploadError(msg);
@@ -105,6 +117,15 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
             const extractResult = await extractWorkOrder(workOrderPath);
             if (extractResult.ok && extractResult.data) {
               const ext = extractResult.data;
+
+              // Check validation result
+              if (ext.isValid === false) {
+                const reasonsList = ext.reasons && ext.reasons.length > 0
+                  ? ext.reasons.join(" ")
+                  : "Work order validation failed.";
+                throw new Error(reasonsList);
+              }
+
               if (ext.role) setWoRole(ext.role);
               if (ext.rate != null) setWoRate(String(ext.rate));
               if (ext.rateType === "fixed" || ext.rateType === "hourly") {
@@ -118,15 +139,70 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
             }
           },
           {
-            loading: "AI is extracting contract details from the document...",
-            success: "AI successfully extracted contract details! Please review and save.",
-            error: (err) => `AI extraction warning: ${err.message || err}`,
+            loading: "AI is extracting and validating contract details from the document...",
+            success: "AI successfully verified work order details! Please review and save.",
+            error: (err) => `Validation Error: ${err.message || err}`,
           }
         );
       }
     } else {
       const msg = result.error || "We couldn't process that document. Please try a different file.";
       setUploadError(msg);
+      toast.error("Upload failed", { description: msg });
+    }
+  };
+
+  const handlePreviousInvoiceSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInvoiceUploadError(null);
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (file.size > WORK_ORDER_MAX_BYTES) {
+      const msg = "File is too large. Maximum size is 10MB.";
+      setInvoiceUploadError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const result = await uploadWorkOrderFile(file);
+    if (result.ok) {
+      toast.success("Previous invoice uploaded successfully");
+
+      const storagePath = result.data?.work_order_path;
+      if (storagePath) {
+        toast.promise(
+          async () => {
+            const extractResult = await extractPreviousInvoice(storagePath);
+            if (extractResult.ok && extractResult.data) {
+              const ext = extractResult.data;
+              
+              if (ext.bankName) setBankName(ext.bankName);
+              if (ext.bankAddress) setBankAddress(ext.bankAddress);
+              if (ext.swiftCode) setSwiftCode(ext.swiftCode);
+              if (ext.routingNumber) setRoutingNumber(ext.routingNumber);
+              if (ext.accountType === "Checking" || ext.accountType === "Savings") {
+                setAccountType(ext.accountType);
+              }
+              if (ext.currency) setCurrency(ext.currency);
+              if (ext.accountNumber) setAccountNumber(ext.accountNumber);
+              if (ext.invoiceNumber) setLastInvoiceNumber(ext.invoiceNumber);
+
+              return ext;
+            } else {
+              throw new Error(extractResult.error || "Could not parse invoice details.");
+            }
+          },
+          {
+            loading: "AI is extracting banking and invoice numbering details from the document...",
+            success: "AI successfully extracted banking details! Please review them below.",
+            error: (err) => `Extraction Error: ${err.message || err}`,
+          }
+        );
+      }
+    } else {
+      const msg = result.error || "We couldn't process that document. Please try a different file.";
+      setInvoiceUploadError(msg);
       toast.error("Upload failed", { description: msg });
     }
   };
@@ -144,6 +220,34 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
       toast.error("Could not open work order", {
         description: err instanceof Error ? err.message : undefined,
       });
+    }
+  };
+
+  const handleRemoveWorkOrder = async () => {
+    try {
+      const result = await saveOnboarding({
+        work_order_path: null,
+        work_order_filename: null,
+        work_order_uploaded_at: null,
+        onboarding_role: null,
+        onboarding_rate: null,
+        onboarding_rate_type: "hourly",
+        contract_start_date: null,
+        contract_end_date: null,
+      });
+
+      if (result.ok) {
+        setWoRole("");
+        setWoRate("");
+        setWoRateType("hourly");
+        setWoStart("");
+        setWoEnd("");
+        toast.success("Work order document removed successfully");
+      } else {
+        toast.error(result.error || "Failed to remove work order");
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred while removing the work order");
     }
   };
 
@@ -609,6 +713,61 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
 
           {/* Banking Details Tab */}
           <TabsContent value="banking" className="space-y-6">
+            {/* Previous Invoice Upload for Senior Contractors */}
+            <div className="bg-white rounded-[14px] border border-gray-200 p-4">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                Senior Contractor Auto-Fill
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Been collecting via bank transfer? Upload your previous invoice (PDF, Word, or image — max 10MB) to automatically populate your banking details and last invoice number.
+              </p>
+
+              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+                <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">
+                  Upload your previous invoice (PDF, Word, or image)
+                </p>
+              </div>
+
+              {invoiceUploadError && (
+                <p className="mt-3 text-sm text-red-600">{invoiceUploadError}</p>
+              )}
+
+              <input
+                ref={invoiceFileInputRef}
+                type="file"
+                accept={WORK_ORDER_ACCEPT}
+                className="hidden"
+                onChange={handlePreviousInvoiceSelect}
+              />
+
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => invoiceFileInputRef.current?.click()}
+                  disabled={isUploading || isExtracting}
+                  className="h-11 px-6 rounded-lg border-gray-300"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : isExtracting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Extracting Details...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Previous Invoice
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
             <div className="bg-white rounded-[14px] border border-gray-200 p-4">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Banking Details
@@ -781,14 +940,24 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                       )}
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    onClick={handleViewWorkOrder}
-                    className="h-9 px-3 text-blue-600 hover:bg-blue-50 shrink-0 cursor-pointer"
-                  >
-                    <ExternalLink className="w-4 h-4 mr-1.5" />
-                    View
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={handleViewWorkOrder}
+                      className="h-9 px-3 text-blue-600 hover:bg-blue-50 shrink-0 cursor-pointer"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-1.5" />
+                      View
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={handleRemoveWorkOrder}
+                      className="h-9 px-3 text-red-600 hover:bg-red-50 shrink-0 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1.5" />
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
@@ -852,7 +1021,7 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 )}
               </div>
               <p className="text-sm text-gray-600 mb-4">
-                Enter these from your work order. You can review and edit them before saving.
+                These fields are extracted automatically by AI from your uploaded signed work order and are read-only.
               </p>
 
               <div className="space-y-5">
@@ -865,8 +1034,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                     id="woRole"
                     value={woRole}
                     onChange={(e) => setWoRole(e.target.value)}
-                    placeholder="e.g. Software Engineer"
-                    className="h-11 bg-white border-gray-300 rounded-lg"
+                    placeholder="Extracted role will appear here"
+                    disabled
+                    className="h-11 bg-gray-50 border-gray-300 rounded-lg cursor-not-allowed"
                   />
                 </div>
 
@@ -879,8 +1049,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                     <Select
                       value={woRateType}
                       onValueChange={(value) => setWoRateType(value as "hourly" | "fixed")}
+                      disabled
                     >
-                      <SelectTrigger id="woRateType" className="h-11 bg-white border-gray-300 rounded-lg">
+                      <SelectTrigger id="woRateType" className="h-11 bg-gray-50 border-gray-300 rounded-lg cursor-not-allowed">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -900,8 +1071,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                       step="0.01"
                       value={woRate}
                       onChange={(e) => setWoRate(e.target.value)}
-                      placeholder={woRateType === "fixed" ? "e.g. 5000.00" : "e.g. 75.00"}
-                      className="h-11 bg-white border-gray-300 rounded-lg"
+                      placeholder="Extracted rate will appear here"
+                      disabled
+                      className="h-11 bg-gray-50 border-gray-300 rounded-lg cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -917,7 +1089,8 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                       type="date"
                       value={woStart}
                       onChange={(e) => setWoStart(e.target.value)}
-                      className="h-11 bg-white border-gray-300 rounded-lg"
+                      disabled
+                      className="h-11 bg-gray-50 border-gray-300 rounded-lg cursor-not-allowed"
                     />
                   </div>
                   <div>
@@ -929,7 +1102,8 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                       type="date"
                       value={woEnd}
                       onChange={(e) => setWoEnd(e.target.value)}
-                      className="h-11 bg-white border-gray-300 rounded-lg"
+                      disabled
+                      className="h-11 bg-gray-50 border-gray-300 rounded-lg cursor-not-allowed"
                     />
                   </div>
                 </div>

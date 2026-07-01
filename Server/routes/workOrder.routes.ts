@@ -5,7 +5,7 @@
  */
 
 import { Router } from 'express';
-import { extractWorkOrderHandler } from '../controllers/workOrder.controller';
+import { extractWorkOrderHandler, extractInvoiceHandler } from '../controllers/workOrder.controller';
 
 const router = Router();
 
@@ -14,5 +14,11 @@ const router = Router();
  * Authenticated contractor/admin only — extracts details from an uploaded work order.
  */
 router.post('/extract', extractWorkOrderHandler);
+
+/**
+ * POST /api/work-order/extract-invoice
+ * Authenticated contractor/admin only — extracts details from a previous invoice.
+ */
+router.post('/extract-invoice', extractInvoiceHandler);
 
 export default router;
