@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { getSupabaseAdmin } from '../clients/supabase.server';
 import { generateW8BenPdf, W8BenData } from '../services/documents/generateW8BenPdf';
 import { auth } from '../../src/lib/auth';
+import { validateW8BenFromFile } from '../services/w8benValidator';
 
 const W8BEN_BUCKET = process.env.SUPABASE_INVOICES_BUCKET || 'invoices'; // Reusing invoices bucket for now
 
@@ -307,6 +308,16 @@ export async function uploadW8BenForm(req: Request, res: Response, next: NextFun
       return;
     }
 
+    // Perform validation on the uploaded tax form document
+    const validationResult = await validateW8BenFromFile(file.buffer, file.mimetype, file.originalname);
+    if (!validationResult.isValid) {
+      res.status(400).json({
+        error: 'W-8BEN document validation failed.',
+        reasons: validationResult.reasons,
+      });
+      return;
+    }
+
     // Upload PDF
     const timestamp = Date.now();
     const storagePath = `tax-forms/${contractorId}/w8ben-uploaded-${timestamp}.pdf`;
@@ -326,7 +337,16 @@ export async function uploadW8BenForm(req: Request, res: Response, next: NextFun
 
     const formRecord = {
       contractor_user_id: contractorId,
-      form_data: {}, // Empty since it's a direct upload
+      form_data: {
+        isDirectUpload: true,
+        validation: {
+          isValid: validationResult.isValid,
+          confidenceScore: validationResult.confidenceScore,
+          validationStatus: validationResult.validationStatus,
+          reasons: validationResult.reasons,
+          validationDetails: validationResult.validationDetails,
+        }
+      },
       signature_data: {}, // Empty since signature is in the uploaded PDF
       pdf_url: uploadData.path,
       status: 'submitted',

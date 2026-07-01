@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { getSupabaseAdmin } from '../clients/supabase.server';
 import { auth } from '../../src/lib/auth';
-import { extractDetailsFromFile } from '../services/workOrderExtractor';
+import { extractDetailsFromFile, extractInvoiceDetailsFromFile } from '../services/workOrderExtractor';
 
 const WORK_ORDERS_BUCKET = 'work-orders';
 
@@ -118,7 +118,7 @@ export async function extractWorkOrderHandler(
     const buffer = Buffer.from(arrayBuffer);
 
     // 5. Run extraction
-    const extractedData = await extractDetailsFromFile(buffer, contentType, fileName);
+    const extractedData = await extractDetailsFromFile(buffer, contentType, fileName, userId);
 
     res.status(200).json({
       success: true,
@@ -128,6 +128,94 @@ export async function extractWorkOrderHandler(
     console.error('[workOrder.controller] Extraction endpoint failed:', err);
     res.status(500).json({
       error: err instanceof Error ? err.message : 'An unknown error occurred during extraction.',
+    });
+  }
+}
+
+/**
+ * POST /api/work-order/extract-invoice
+ * Extracts banking and invoice number details from a previous invoice uploaded to storage.
+ */
+export async function extractInvoiceHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const { storagePath } = req.body;
+    if (!storagePath) {
+      res.status(400).json({ error: 'Missing required field: storagePath' });
+      return;
+    }
+
+    let userId: string | null = null;
+
+    // 1. Authenticate user: First try Supabase Auth token
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const supabase = getSupabaseAdmin();
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (!error && user) {
+        userId = user.id;
+      }
+    }
+
+    // Fallback to Better Auth session
+    if (!userId) {
+      const session = await auth.api.getSession({
+        headers: req.headers as any,
+      });
+      if (session?.user) {
+        userId = session.user.id;
+      }
+    }
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    // 2. Security Check: verify storagePath starts with user_id to prevent path traversal
+    const pathOwner = storagePath.split('/')[0];
+    if (pathOwner !== userId) {
+      res.status(403).json({ error: 'Forbidden: You do not have access to this document.' });
+      return;
+    }
+
+    // 3. Query audit table / get file metadata
+    const supabase = getSupabaseAdmin();
+    const { data: auditData } = await supabase
+      .from('vendor_work_orders')
+      .select('*')
+      .eq('storage_path', storagePath)
+      .maybeSingle();
+
+    const fileName = auditData?.file_name || storagePath.split('/').pop() || 'invoice_document';
+    const contentType = auditData?.content_type || getMimeTypeFromFileName(fileName);
+
+    // 4. Download file from storage
+    const { data: fileBlob, error: downloadError } = await supabase.storage
+      .from(WORK_ORDERS_BUCKET)
+      .download(storagePath);
+
+    if (downloadError || !fileBlob) {
+      console.error('[workOrder.controller] Supabase storage download failed:', downloadError);
+      res.status(404).json({ error: 'Uploaded invoice document not found in storage.' });
+      return;
+    }
+
+    // Convert Blob to Buffer
+    const arrayBuffer = await fileBlob.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // 5. Run extraction
+    const extractedData = await extractInvoiceDetailsFromFile(buffer, contentType, fileName);
+
+    res.status(200).json({
+      success: true,
+      data: extractedData,
+    });
+  } catch (err) {
+    console.error('[workOrder.controller] Invoice extraction endpoint failed:', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'An unknown error occurred during invoice extraction.',
     });
   }
 }

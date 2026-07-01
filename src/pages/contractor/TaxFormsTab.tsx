@@ -100,38 +100,49 @@ export function TaxFormsTab() {
       return;
     }
 
-    try {
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('w8ben', selectedFile);
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('w8ben', selectedFile);
 
-      const sessionResponse = await supabase?.auth.getSession();
-      const token = sessionResponse?.data?.session?.access_token;
+    toast.promise(
+      async () => {
+        try {
+          const sessionResponse = await supabase?.auth.getSession();
+          const token = sessionResponse?.data?.session?.access_token;
+          const baseUrl = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
+          
+          const resWithCreds = await fetch(`${baseUrl}/api/w8ben/upload`, {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
 
-      const baseUrl = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
-      const resWithCreds = await fetch(`${baseUrl}/api/w8ben/upload`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`
+          const data = await resWithCreds.json().catch(() => ({
+            error: "Server connection failed."
+          }));
+
+          if (!resWithCreds.ok || !data.success) {
+            const reasonsList = data.reasons && data.reasons.length > 0
+              ? data.reasons.join(" ")
+              : (data.error || "Failed to upload W-8BEN form");
+            throw new Error(reasonsList);
+          }
+
+          fetchForm();
+          return data;
+        } finally {
+          setUploading(false);
         }
-      });
-
-      const data = await resWithCreds.json();
-
-      if (data.success) {
-        toast.success("W-8BEN Form uploaded successfully!");
-        fetchForm();
-      } else {
-        toast.error(data.error || "Failed to upload W-8BEN form");
+      },
+      {
+        loading: "AI is verifying your uploaded W-8BEN tax form...",
+        success: "W-8BEN Form uploaded and verified successfully!",
+        error: (err) => `Validation Error: ${err.message || err}`,
       }
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast.error("An unexpected error occurred while uploading.");
-    } finally {
-      setUploading(false);
-    }
+    );
   };
 
   if (loading) {
