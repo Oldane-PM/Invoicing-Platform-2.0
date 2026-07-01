@@ -413,19 +413,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       return;
     }
 
-    if (!paymentLink.trim()) {
-      toast.error("Please provide a Payment Link");
-      return;
-    }
 
-    if (paymentLink.trim()) {
-      try {
-        new URL(paymentLink);
-      } catch (e) {
-        toast.error("Please enter a valid URL for the Payment Link (e.g., https://paypal.me/...)");
-        return;
-      }
-    }
 
     // Build the submission draft
     const workPeriod = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}`;
@@ -573,90 +561,6 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
 
 
           <div className="space-y-5">
-            {/* Projects Multi-Select */}
-            <div>
-              <Label
-                htmlFor="project"
-                className="text-sm font-medium text-gray-900 mb-1.5 block"
-              >
-                Projects{" "}
-                <span className="text-gray-500 font-normal">(Optional)</span>
-              </Label>
-              <Popover open={projectPickerOpen} onOpenChange={setProjectPickerOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="project"
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={projectPickerOpen}
-                    disabled={loadingProjects || !hasProjectsForDropdown}
-                    className="w-full h-11 justify-between text-left font-normal bg-white border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    <span className={selectedProjectIds.length === 0 ? "text-gray-500" : ""}>
-                      {loadingProjects
-                        ? "Loading projects..."
-                        : selectedProjectIds.length === 0
-                          ? "Select one or more projects"
-                          : selectedProjectIds.length === 1
-                            ? selectedProjects[0]?.name
-                            : `${selectedProjectIds.length} projects selected`}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 text-gray-500 flex-shrink-0" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[var(--radix-popover-trigger-width)] p-1.5"
-                  align="start"
-                >
-                  <div className="max-h-64 overflow-y-auto space-y-0.5">
-                    {projectsForDropdown.map((project) => {
-                      const checked = selectedProjectIds.includes(project.id);
-                      return (
-                        <button
-                          key={project.id}
-                          type="button"
-                          onClick={() => toggleProject(project.id)}
-                          className="w-full flex items-center gap-2.5 rounded-md px-2 py-2 text-sm text-left hover:bg-gray-100 transition-colors"
-                        >
-                          <Checkbox
-                            checked={checked}
-                            className="pointer-events-none"
-                            tabIndex={-1}
-                          />
-                          <span className="flex-1 text-gray-900">
-                            {project.name}{" "}
-                            <span className="text-gray-500">({project.client})</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </PopoverContent>
-              </Popover>
-
-              {/* Selected project chips */}
-              {selectedProjects.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2.5">
-                  {selectedProjects.map((project) => (
-                    <span
-                      key={project.id}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 text-purple-700 text-xs font-medium pl-3 pr-1.5 py-1"
-                    >
-                      {project.name}
-                      <button
-                        type="button"
-                        onClick={() => toggleProject(project.id)}
-                        aria-label={`Remove ${project.name}`}
-                        className="rounded-full p-0.5 hover:bg-purple-100 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* Work Period - Month & Year Picker */}
             <div>
               <Label
@@ -1044,19 +948,19 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
                 htmlFor="payment-link"
                 className="text-sm font-medium text-gray-900 mb-1.5 block"
               >
-                Payment Link{" "}
-                <span className="text-red-600">*</span>
+                Payment Link / Email Address{" "}
+                <span className="text-gray-400 font-normal">(optional)</span>
               </Label>
               <Input
                 id="payment-link"
-                type="url"
+                type="text"
                 value={paymentLink}
                 onChange={(e) => setPaymentLink(e.target.value)}
                 className="h-11 bg-white border-gray-300 rounded-lg"
-                placeholder="e.g., https://paypal.me/yourname, Payoneer, Wise..."
+                placeholder="e.g., https://paypal.me/yourname or your@email.com"
               />
               <p className="text-xs text-gray-500 mt-1.5">
-                Include a link to accept payments directly. Must be a valid URL.
+                Include a link or email address to accept payments directly.
               </p>
             </div>
           </div>

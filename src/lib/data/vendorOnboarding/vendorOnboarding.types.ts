@@ -25,6 +25,12 @@ export interface VendorOnboardingData {
   work_order_filename: string | null;
   work_order_uploaded_at: string | null;
 
+  w8_ben_path: string | null;
+  w8_ben_filename: string | null;
+
+  initial_invoice_path: string | null;
+  initial_invoice_filename: string | null;
+
   onboarding_completed_at: string | null;
 }
 
@@ -59,6 +65,10 @@ export function emptyVendorOnboarding(userId: string): VendorOnboardingData {
     work_order_path: null,
     work_order_filename: null,
     work_order_uploaded_at: null,
+    w8_ben_path: null,
+    w8_ben_filename: null,
+    initial_invoice_path: null,
+    initial_invoice_filename: null,
     onboarding_completed_at: null,
   };
 }

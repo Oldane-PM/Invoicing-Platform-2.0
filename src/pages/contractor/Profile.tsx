@@ -3,8 +3,19 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../../components/ui/tabs";
 import { toast } from "sonner";
 import {
   Calendar,
@@ -33,8 +44,12 @@ interface ContractorProfileProps {
   initialTab?: string;
 }
 
-export function ContractorProfile({ onCancel, initialTab }: ContractorProfileProps) {
-  const { profile, contract, isLoading, isSaving, error, saveProfile } = useContractorProfile();
+export function ContractorProfile({
+  onCancel,
+  initialTab,
+}: ContractorProfileProps) {
+  const { profile, contract, isLoading, isSaving, error, saveProfile } =
+    useContractorProfile();
 
   // Onboarding (work order + contract details + invoice sequence)
   const {
@@ -60,11 +75,14 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
   // Onboarding form state (manually entered / reviewed before submission)
   const [woRole, setWoRole] = React.useState("");
   const [woRate, setWoRate] = React.useState("");
-  const [woRateType, setWoRateType] = React.useState<"hourly" | "fixed">("hourly");
+  const [woRateType, setWoRateType] = React.useState<"hourly" | "fixed">(
+    "hourly",
+  );
   const [woStart, setWoStart] = React.useState("");
   const [woEnd, setWoEnd] = React.useState("");
   const [lastInvoiceNumber, setLastInvoiceNumber] = React.useState("");
-  const [onboardingInitialized, setOnboardingInitialized] = React.useState(false);
+  const [onboardingInitialized, setOnboardingInitialized] =
+    React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [invoiceUploadError, setInvoiceUploadError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -74,8 +92,14 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
   React.useEffect(() => {
     if (onboarding && !onboardingInitialized) {
       setWoRole(onboarding.onboarding_role || "");
-      setWoRate(onboarding.onboarding_rate != null ? String(onboarding.onboarding_rate) : "");
-      setWoRateType(onboarding.onboarding_rate_type === "fixed" ? "fixed" : "hourly");
+      setWoRate(
+        onboarding.onboarding_rate != null
+          ? String(onboarding.onboarding_rate)
+          : "",
+      );
+      setWoRateType(
+        onboarding.onboarding_rate_type === "fixed" ? "fixed" : "hourly",
+      );
       setWoStart(onboarding.contract_start_date || "");
       setWoEnd(onboarding.contract_end_date || "");
       setLastInvoiceNumber(onboarding.last_invoice_number || "");
@@ -83,7 +107,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
     }
   }, [onboarding, onboardingInitialized]);
 
-  const handleWorkOrderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWorkOrderSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     setUploadError(null);
     const file = e.target.files?.[0];
     // Allow re-selecting the same file later
@@ -135,18 +161,22 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
               if (ext.endDate) setWoEnd(ext.endDate);
               return extractResult.data;
             } else {
-              throw new Error(extractResult.error || "Could not parse document details.");
+              throw new Error(
+                extractResult.error || "Could not parse document details.",
+              );
             }
           },
           {
             loading: "AI is extracting and validating contract details from the document...",
             success: "AI successfully verified work order details! Please review and save.",
             error: (err) => `Validation Error: ${err.message || err}`,
-          }
+          },
         );
       }
     } else {
-      const msg = result.error || "We couldn't process that document. Please try a different file.";
+      const msg =
+        result.error ||
+        "We couldn't process that document. Please try a different file.";
       setUploadError(msg);
       toast.error("Upload failed", { description: msg });
     }
@@ -210,7 +240,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
   const handleViewWorkOrder = async () => {
     if (!onboarding?.work_order_path) return;
     try {
-      const ref = await getWorkOrderUrl(onboarding.work_order_path, onboarding.work_order_filename);
+      const ref = await getWorkOrderUrl(
+        onboarding.work_order_path,
+        onboarding.work_order_filename,
+      );
       if (ref.url) {
         window.open(ref.url, "_blank", "noopener,noreferrer");
       } else {
@@ -275,7 +308,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
     if (result.ok) {
       toast.success("Work order details saved");
     } else {
-      toast.error("Failed to save work order details", { description: result.error });
+      toast.error("Failed to save work order details", {
+        description: result.error,
+      });
     }
   };
 
@@ -286,8 +321,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
 
   // Contract Information tab reflects onboarding-entered values when present,
   // falling back to the admin-managed contract data.
-  const displayStartDate = onboarding?.contract_start_date || contract?.start_date || null;
-  const displayEndDate = onboarding?.contract_end_date || contract?.end_date || null;
+  const displayStartDate =
+    onboarding?.contract_start_date || contract?.start_date || null;
+  const displayEndDate =
+    onboarding?.contract_end_date || contract?.end_date || null;
   const displayRole = onboarding?.onboarding_role || contract?.position || null;
   const onboardingRate = onboarding?.onboarding_rate ?? null;
   const isFixedRate =
@@ -295,10 +332,12 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
   const displayHourlyRate =
     onboardingRate != null && onboarding?.onboarding_rate_type !== "fixed"
       ? onboardingRate
-      : contract?.hourly_rate ?? null;
+      : (contract?.hourly_rate ?? null);
   const displayOvertimeRate =
-    displayHourlyRate != null ? displayHourlyRate * 1.5 : contract?.overtime_rate ?? null;
-  
+    displayHourlyRate != null
+      ? displayHourlyRate * 1.5
+      : (contract?.overtime_rate ?? null);
+
   // Personal Information State (local form state)
   const [fullName, setFullName] = React.useState("");
   const [addressLine1, setAddressLine1] = React.useState("");
@@ -323,17 +362,17 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
 
   // Initialize form from profile data when it loads (only once)
   React.useEffect(() => {
-    console.log('[Profile] useEffect triggered', { 
-      hasProfile: !!profile, 
+    console.log("[Profile] useEffect triggered", {
+      hasProfile: !!profile,
       isInitialized,
       bankName: profile?.bank_name,
       accountNumber: profile?.bank_account_number,
-      fullProfile: profile
+      fullProfile: profile,
     });
-    
+
     if (profile && !isInitialized) {
-      console.log('[Profile] Initializing form with profile data:', profile);
-      
+      console.log("[Profile] Initializing form with profile data:", profile);
+
       // Personal
       setFullName(profile.full_name || "");
       setAddressLine1(profile.address_line1 || "");
@@ -343,9 +382,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
       setPostalCode(profile.postal_code || "");
       setEmail(profile.email || "");
       setPhone(profile.phone || "");
-      
+
       // Banking
-      console.log('[Profile] Setting banking fields:', {
+      console.log("[Profile] Setting banking fields:", {
         bank_name: profile.bank_name,
         bank_address: profile.bank_address,
         bank_account_number: profile.bank_account_number,
@@ -357,9 +396,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
       setAccountType(profile.account_type || "Checking");
       setCurrency(profile.currency || "USD");
       setAccountNumber(profile.bank_account_number || "");
-      
+
       setIsInitialized(true);
-      console.log('[Profile] Form initialized');
+      console.log("[Profile] Form initialized");
     }
   }, [profile, isInitialized]);
 
@@ -368,7 +407,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
     if (!dateStr) return "Not set";
     try {
       // Append T00:00:00 for simple YYYY-MM-DD strings to ensure local timezone parsing
-      const parsedDate = dateStr.includes("T") ? new Date(dateStr) : new Date(`${dateStr}T00:00:00`);
+      const parsedDate = dateStr.includes("T")
+        ? new Date(dateStr)
+        : new Date(`${dateStr}T00:00:00`);
       return format(parsedDate, "MMM d, yyyy");
     } catch {
       return dateStr;
@@ -417,7 +458,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
       }
       setActiveTab("banking");
     } else {
-      toast.error("Failed to save personal information", { description: result.error });
+      toast.error("Failed to save personal information", {
+        description: result.error,
+      });
     }
   };
 
@@ -455,7 +498,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
       }
       // Stay on banking tab - don't navigate away
     } else {
-      toast.error("Failed to save banking details", { description: result.error });
+      toast.error("Failed to save banking details", {
+        description: result.error,
+      });
     }
   };
 
@@ -576,7 +621,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
               <div className="space-y-5">
                 {/* Full Name */}
                 <div>
-                  <Label htmlFor="fullName" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                  <Label
+                    htmlFor="fullName"
+                    className="text-sm font-medium text-gray-900 mb-1.5 block"
+                  >
                     Full Name <span className="text-red-600">*</span>
                   </Label>
                   <Input
@@ -589,7 +637,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
 
                 {/* Address Line 1 */}
                 <div>
-                  <Label htmlFor="addressLine1" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                  <Label
+                    htmlFor="addressLine1"
+                    className="text-sm font-medium text-gray-900 mb-1.5 block"
+                  >
                     Address Line 1
                   </Label>
                   <Input
@@ -603,7 +654,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
 
                 {/* Address Line 2 */}
                 <div>
-                  <Label htmlFor="addressLine2" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                  <Label
+                    htmlFor="addressLine2"
+                    className="text-sm font-medium text-gray-900 mb-1.5 block"
+                  >
                     Address Line 2
                   </Label>
                   <Input
@@ -618,7 +672,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 {/* State/Parish & Country */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="stateParish" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="stateParish"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       State / Parish
                     </Label>
                     <Input
@@ -629,7 +686,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                     />
                   </div>
                   <div>
-                    <Label htmlFor="country" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="country"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       Country
                     </Label>
                     <Input
@@ -643,7 +703,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
 
                 {/* Postal Code */}
                 <div>
-                  <Label htmlFor="postalCode" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                  <Label
+                    htmlFor="postalCode"
+                    className="text-sm font-medium text-gray-900 mb-1.5 block"
+                  >
                     Zip / Postal Code
                   </Label>
                   <Input
@@ -657,7 +720,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 {/* Email & Phone */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="email" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="email"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       Email Address <span className="text-red-600">*</span>
                     </Label>
                     <Input
@@ -669,7 +735,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                     />
                   </div>
                   <div>
-                    <Label htmlFor="phone" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="phone"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       Phone Number
                     </Label>
                     <Input
@@ -776,7 +845,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
               <div className="space-y-5">
                 {/* Name of Bank */}
                 <div>
-                  <Label htmlFor="bankName" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                  <Label
+                    htmlFor="bankName"
+                    className="text-sm font-medium text-gray-900 mb-1.5 block"
+                  >
                     Name of Bank <span className="text-red-600">*</span>
                   </Label>
                   <Input
@@ -789,7 +861,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
 
                 {/* Bank Address */}
                 <div>
-                  <Label htmlFor="bankAddress" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                  <Label
+                    htmlFor="bankAddress"
+                    className="text-sm font-medium text-gray-900 mb-1.5 block"
+                  >
                     Bank Address
                   </Label>
                   <Textarea
@@ -804,7 +879,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 {/* SWIFT Code & ABA/Wire Routing */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="swiftCode" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="swiftCode"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       SWIFT Code
                     </Label>
                     <Input
@@ -815,7 +893,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                     />
                   </div>
                   <div>
-                    <Label htmlFor="routingNumber" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="routingNumber"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       ABA / Wire Routing
                     </Label>
                     <Input
@@ -830,11 +911,17 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 {/* Account Type & Currency */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="accountType" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="accountType"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       Account Type
                     </Label>
                     <Select value={accountType} onValueChange={setAccountType}>
-                      <SelectTrigger id="accountType" className="h-11 bg-white border-gray-300 rounded-lg">
+                      <SelectTrigger
+                        id="accountType"
+                        className="h-11 bg-white border-gray-300 rounded-lg"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -844,11 +931,17 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="currency" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="currency"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       Currency
                     </Label>
                     <Select value={currency} onValueChange={setCurrency}>
-                      <SelectTrigger id="currency" className="h-11 bg-white border-gray-300 rounded-lg">
+                      <SelectTrigger
+                        id="currency"
+                        className="h-11 bg-white border-gray-300 rounded-lg"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -864,7 +957,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
 
                 {/* Account Number */}
                 <div>
-                  <Label htmlFor="accountNumber" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                  <Label
+                    htmlFor="accountNumber"
+                    className="text-sm font-medium text-gray-900 mb-1.5 block"
+                  >
                     Account Number <span className="text-red-600">*</span>
                   </Label>
                   <Input
@@ -909,10 +1005,11 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
             {/* Info Banner */}
             <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-4">
               <p className="text-sm text-blue-900">
-                <span className="font-semibold">Work Order:</span> Upload your signed work order
-                for our records, then enter your contract details and your last invoice number.
-                Review the values below before saving — new invoices will continue from the number
-                you provide.
+                <span className="font-semibold">Work Order:</span> Upload your
+                signed work order for our records, then enter your contract
+                details and your last invoice number. Review the values below
+                before saving — new invoices will continue from the number you
+                provide.
               </p>
             </div>
 
@@ -924,7 +1021,7 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
 
               {onboarding?.work_order_path ? (
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <div 
+                  <div
                     className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer group"
                     onClick={handleViewWorkOrder}
                   >
@@ -935,7 +1032,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                       </p>
                       {onboarding.work_order_uploaded_at && (
                         <p className="text-xs text-gray-500">
-                          Uploaded {formatContractDate(onboarding.work_order_uploaded_at)}
+                          Uploaded{" "}
+                          {formatContractDate(
+                            onboarding.work_order_uploaded_at,
+                          )}
                         </p>
                       )}
                     </div>
@@ -963,7 +1063,8 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
                   <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
                   <p className="text-sm text-gray-600">
-                    Upload your signed work order (PDF, Word, or image — max 10MB)
+                    Upload your signed work order (PDF, Word, or image — max
+                    10MB)
                   </p>
                 </div>
               )}
@@ -1000,7 +1101,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                   ) : (
                     <>
                       <Upload className="w-4 h-4 mr-2" />
-                      {onboarding?.work_order_path ? "Replace Work Order" : "Upload Work Order"}
+                      {onboarding?.work_order_path
+                        ? "Replace Work Order"
+                        : "Upload Work Order"}
                     </>
                   )}
                 </Button>
@@ -1027,7 +1130,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
               <div className="space-y-5">
                 {/* Role */}
                 <div>
-                  <Label htmlFor="woRole" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                  <Label
+                    htmlFor="woRole"
+                    className="text-sm font-medium text-gray-900 mb-1.5 block"
+                  >
                     Role
                   </Label>
                   <Input
@@ -1043,7 +1149,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 {/* Rate type + amount */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="woRateType" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="woRateType"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       Rate Type
                     </Label>
                     <Select
@@ -1061,7 +1170,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="woRate" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="woRate"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       {woRateType === "fixed" ? "Fixed Rate" : "Hourly Rate"}
                     </Label>
                     <Input
@@ -1081,7 +1193,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 {/* Start & End dates */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="woStart" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="woStart"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       Contract Start Date
                     </Label>
                     <Input
@@ -1094,7 +1209,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                     />
                   </div>
                   <div>
-                    <Label htmlFor="woEnd" className="text-sm font-medium text-gray-900 mb-1.5 block">
+                    <Label
+                      htmlFor="woEnd"
+                      className="text-sm font-medium text-gray-900 mb-1.5 block"
+                    >
                       Contract Expiry Date
                     </Label>
                     <Input
@@ -1116,13 +1234,18 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 Invoice Numbering
               </h2>
               <p className="text-sm text-gray-600 mb-4">
-                Enter your last invoice number if you have one. New invoices will continue from it.
-                Leave this blank if you're a new contractor — numbering will start automatically.
+                Enter your last invoice number if you have one. New invoices
+                will continue from it. Leave this blank if you're a new
+                contractor — numbering will start automatically.
               </p>
 
               <div>
-                <Label htmlFor="lastInvoiceNumber" className="text-sm font-medium text-gray-900 mb-1.5 block">
-                  Last Invoice Number <span className="text-gray-400 font-normal">(optional)</span>
+                <Label
+                  htmlFor="lastInvoiceNumber"
+                  className="text-sm font-medium text-gray-900 mb-1.5 block"
+                >
+                  Last Invoice Number{" "}
+                  <span className="text-gray-400 font-normal">(optional)</span>
                 </Label>
                 <Input
                   id="lastInvoiceNumber"
@@ -1136,8 +1259,12 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
               {nextInvoiceNumber && (
                 <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 p-3">
                   <Hash className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Next invoice number will be</span>
-                  <span className="text-sm font-semibold text-gray-900">{nextInvoiceNumber}</span>
+                  <span className="text-sm text-gray-600">
+                    Next invoice number will be
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {nextInvoiceNumber}
+                  </span>
                 </div>
               )}
             </div>
@@ -1176,7 +1303,10 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
             {/* Info Banner */}
             <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-4">
               <p className="text-sm text-blue-900">
-                <span className="font-semibold">Note:</span> Rate and contract dates reflect what you entered in the Work Order tab. Project, contract type, and reporting manager are managed by your administrator.
+                <span className="font-semibold">Note:</span> Rate and contract
+                dates reflect what you entered in the Work Order tab. Project,
+                contract type, and reporting manager are managed by your
+                administrator.
               </p>
             </div>
 
@@ -1185,7 +1315,9 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 {/* Role */}
                 <div>
                   <div className="text-sm text-gray-600 mb-2">Role</div>
-                  <div className="text-gray-900">{displayRole || "Not set"}</div>
+                  <div className="text-gray-900">
+                    {displayRole || "Not set"}
+                  </div>
                 </div>
 
                 {/* Start Date & End Date */}
@@ -1201,7 +1333,11 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                     <div className="text-sm text-gray-600 mb-2">End Date</div>
                     <div className="flex items-center gap-2 text-gray-900">
                       <Calendar className="w-4 h-4 text-gray-500" />
-                      <span>{displayEndDate ? formatContractDate(displayEndDate) : "Ongoing"}</span>
+                      <span>
+                        {displayEndDate
+                          ? formatContractDate(displayEndDate)
+                          : "Ongoing"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1212,20 +1348,28 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                     <div className="text-sm text-gray-600 mb-2">Fixed Rate</div>
                     <div className="flex items-center gap-2 text-gray-900">
                       <DollarSign className="w-4 h-4 text-gray-500" />
-                      <span>{onboardingRate != null ? `$${onboardingRate.toFixed(2)}/monthly` : "Not set"}</span>
+                      <span>
+                        {onboardingRate != null
+                          ? `$${onboardingRate.toFixed(2)}/monthly`
+                          : "Not set"}
+                      </span>
                     </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <div className="text-sm text-gray-600 mb-2">Hourly Rate</div>
+                      <div className="text-sm text-gray-600 mb-2">
+                        Hourly Rate
+                      </div>
                       <div className="flex items-center gap-2 text-gray-900">
                         <DollarSign className="w-4 h-4 text-gray-500" />
                         <span>{formatRate(displayHourlyRate)}</span>
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-600 mb-2">Overtime Rate</div>
+                      <div className="text-sm text-gray-600 mb-2">
+                        Overtime Rate
+                      </div>
                       <div className="flex items-center gap-2 text-gray-900">
                         <Clock className="w-4 h-4 text-gray-500" />
                         <span>{formatRate(displayOvertimeRate)}</span>
@@ -1237,14 +1381,18 @@ export function ContractorProfile({ onCancel, initialTab }: ContractorProfilePro
                 {/* Project Name */}
                 <div>
                   <div className="text-sm text-gray-600 mb-2">Project</div>
-                  <div className="text-gray-900">{contract?.project_name || "Not assigned"}</div>
+                  <div className="text-gray-900">
+                    {contract?.project_name || "Not assigned"}
+                  </div>
                 </div>
 
                 {/* Contract Type — driven by the onboarding rate type (source of
                     truth) so it matches the rate shown above, falling back to the
                     admin-managed contract. */}
                 <div>
-                  <div className="text-sm text-gray-600 mb-2">Contract Type</div>
+                  <div className="text-sm text-gray-600 mb-2">
+                    Contract Type
+                  </div>
                   <div className="text-gray-900 capitalize">
                     {onboardingRate != null
                       ? isFixedRate
