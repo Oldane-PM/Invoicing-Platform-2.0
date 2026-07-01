@@ -46,6 +46,24 @@ export interface UseVendorOnboardingResult {
       rateType: "hourly" | "fixed" | null;
       startDate: string | null;
       endDate: string | null;
+      isValid?: boolean;
+      reasons?: string[];
+      validationStatus?: string;
+      validationDetails?: any;
+    };
+  }>;
+  extractPreviousInvoice: (storagePath: string) => Promise<{
+    ok: boolean;
+    error?: string;
+    data?: {
+      bankName: string | null;
+      bankAddress: string | null;
+      swiftCode: string | null;
+      routingNumber: string | null;
+      accountType: 'Checking' | 'Savings' | null;
+      currency: string | null;
+      accountNumber: string | null;
+      invoiceNumber: string | null;
     };
   }>;
   reload: () => void;
@@ -163,6 +181,47 @@ export function useVendorOnboarding(): UseVendorOnboardingResult {
     }
   };
 
+  const extractPreviousInvoice = async (storagePath: string) => {
+    setIsExtracting(true);
+    try {
+      let token = null;
+      try {
+        const client = getSupabaseClient();
+        const sessionResponse = await client.auth.getSession();
+        token = sessionResponse?.data?.session?.access_token;
+      } catch (e) {
+        console.warn("Could not get Supabase session token:", e);
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/work-order/extract-invoice`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ storagePath }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          error: "Failed to extract details",
+        }));
+        throw new Error(errorData.error || "Failed to extract details from invoice");
+      }
+
+      const responseData = await response.json();
+      return { ok: true, data: responseData.data };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : "Failed to extract invoice details",
+      };
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
   return {
     data: data ?? null,
     isLoading,
@@ -174,6 +233,7 @@ export function useVendorOnboarding(): UseVendorOnboardingResult {
     uploadWorkOrderFile,
     getWorkOrderUrl,
     extractWorkOrder,
+    extractPreviousInvoice,
     reload: () => {
       void refetch();
     },
