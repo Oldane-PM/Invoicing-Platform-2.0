@@ -29,9 +29,10 @@ const WORK_ORDER_MAX_BYTES = 10 * 1024 * 1024;
 
 interface ContractorProfileProps {
   onCancel: () => void;
+  initialTab?: string;
 }
 
-export function ContractorProfile({ onCancel }: ContractorProfileProps) {
+export function ContractorProfile({ onCancel, initialTab }: ContractorProfileProps) {
   const { profile, contract, isLoading, isSaving, error, saveProfile } = useContractorProfile();
 
   // Onboarding (work order + contract details + invoice sequence)
@@ -46,7 +47,13 @@ export function ContractorProfile({ onCancel }: ContractorProfileProps) {
     extractWorkOrder,
   } = useVendorOnboarding();
 
-  const [activeTab, setActiveTab] = React.useState("personal");
+  const [activeTab, setActiveTab] = React.useState(initialTab || "personal");
+
+  React.useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Onboarding form state (manually entered / reviewed before submission)
   const [woRole, setWoRole] = React.useState("");
