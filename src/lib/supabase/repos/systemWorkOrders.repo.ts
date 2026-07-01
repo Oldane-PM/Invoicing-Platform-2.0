@@ -29,6 +29,7 @@ export interface SystemWorkOrder {
   // Joined fields
   contractor_name?: string;
   contractor_email?: string;
+  contractor_address?: string;
 }
 
 // Ensure schema is fully available
@@ -76,21 +77,36 @@ export async function getAdminWorkOrders(supabaseClient?: SupabaseClient): Promi
 
   const userIds = Array.from(new Set((data || []).map(row => row.contractor_user_id)));
   let profiles: any[] = [];
+  let contractorProfiles: any[] = [];
   if (userIds.length > 0) {
     const { data: profilesData } = await supabase
       .from("profiles")
       .select("id, full_name, email")
       .in("id", userIds);
     profiles = profilesData || [];
+
+    const { data: cpData } = await supabase
+      .from("contractor_profiles")
+      .select("user_id, address_line1, address_line2, state_parish")
+      .in("user_id", userIds);
+    contractorProfiles = cpData || [];
   }
 
   const profileMap = new Map(profiles.map(p => [p.id, p]));
+  const cpMap = new Map(contractorProfiles.map(p => [p.user_id, p]));
 
-  return (data || []).map((row: any) => ({
-    ...row,
-    contractor_name: profileMap.get(row.contractor_user_id)?.full_name,
-    contractor_email: profileMap.get(row.contractor_user_id)?.email
-  }));
+  return (data || []).map((row: any) => {
+    const p = profileMap.get(row.contractor_user_id);
+    const cp = cpMap.get(row.contractor_user_id);
+    const addressParts = [cp?.address_line1, cp?.address_line2, cp?.state_parish].filter(Boolean);
+    
+    return {
+      ...row,
+      contractor_name: p?.full_name,
+      contractor_email: p?.email,
+      contractor_address: addressParts.length > 0 ? addressParts.join(", ") : undefined
+    };
+  });
 }
 
 export async function getContractorWorkOrders(
@@ -110,7 +126,27 @@ export async function getContractorWorkOrders(
     throw new Error(error.message);
   }
 
-  return data;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", contractorUserId)
+    .single();
+
+  const { data: cp } = await supabase
+    .from("contractor_profiles")
+    .select("address_line1, address_line2, state_parish")
+    .eq("user_id", contractorUserId)
+    .maybeSingle();
+
+  const addressParts = [cp?.address_line1, cp?.address_line2, cp?.state_parish].filter(Boolean);
+  const address = addressParts.length > 0 ? addressParts.join(", ") : undefined;
+
+  return (data || []).map(row => ({
+    ...row,
+    contractor_name: profile?.full_name,
+    contractor_email: profile?.email,
+    contractor_address: address
+  }));
 }
 
 export async function getWorkOrderById(
@@ -137,10 +173,19 @@ export async function getWorkOrderById(
     .eq("id", data.contractor_user_id)
     .single();
 
+  const { data: cp } = await supabase
+    .from("contractor_profiles")
+    .select("address_line1, address_line2, state_parish")
+    .eq("user_id", data.contractor_user_id)
+    .maybeSingle();
+
+  const addressParts = [cp?.address_line1, cp?.address_line2, cp?.state_parish].filter(Boolean);
+
   return {
     ...data,
     contractor_name: profile?.full_name,
-    contractor_email: profile?.email
+    contractor_email: profile?.email,
+    contractor_address: addressParts.length > 0 ? addressParts.join(", ") : undefined
   };
 }
 

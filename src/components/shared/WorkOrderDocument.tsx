@@ -42,7 +42,7 @@ export function WorkOrderDocument({ workOrder }: WorkOrderDocumentProps) {
   };
 
   return (
-    <div className="bg-white p-12 max-w-[850px] mx-auto print:p-0 print:max-w-none text-black shadow-sm rounded-lg print:shadow-none" style={{ fontFamily: "Arial, sans-serif" }}>
+    <div className="bg-white p-12 max-w-[850px] mx-auto print:p-0 print:max-w-none text-black" style={{ fontFamily: "Arial, sans-serif" }}>
       {/* Header */}
       <div className="flex justify-between items-start mb-12">
         <div className="flex items-center gap-3">
@@ -124,8 +124,13 @@ export function WorkOrderDocument({ workOrder }: WorkOrderDocumentProps) {
         <div className="flex-1 max-w-[320px]">
           <div className="font-bold text-[15px] mb-1">{workOrder.contractor_name || "Contractor"}</div>
           <div className="text-[14px] leading-snug mb-[40px] min-h-[42px]">
-            1201 chepstow road Waterford<br />
-            St. Catherine
+            {workOrder.contractor_address ? (
+              workOrder.contractor_address.split(', ').map((part, i) => (
+                <span key={i}>{part}<br /></span>
+              ))
+            ) : (
+              <><br /><br /></>
+            )}
           </div>
 
           <div className="flex mb-[18px]">
