@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Button } from "../../components/ui/button";
 
-import { Loader2, Download, CheckCircle2, AlertTriangle, Upload, FileText, Eye, X } from "lucide-react";
+import { Loader2, Download, CheckCircle2, AlertTriangle, Upload, FileText, Eye, X, ChevronDown, Edit, Trash2, RefreshCw } from "lucide-react";
 import { supabase } from "../../lib/supabase/client";
 import { toast } from "sonner";
 
@@ -13,7 +13,54 @@ export function TaxFormsTab() {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
+  const [w8MenuOpen, setW8MenuOpen] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleRenameW8Ben = async () => {
+    const currentName = formData?.form_data?.filename || "w8ben.pdf";
+    const newName = prompt("Rename tax form document:", currentName);
+    if (newName === null || newName.trim() === "") return;
+
+    try {
+      const response = await supabase
+        ?.from('w8ben_forms')
+        .update({
+          form_data: {
+            ...formData.form_data,
+            filename: newName
+          }
+        })
+        .eq('id', formData.id);
+
+      if (response?.error) throw response.error;
+      toast.success("Document renamed successfully!");
+      fetchForm();
+    } catch (err) {
+      toast.error("Failed to rename W-8BEN document.");
+    }
+  };
+
+  const handleDeleteW8Ben = async () => {
+    if (!confirm("Are you sure you want to remove your W-8BEN tax form?")) return;
+
+    try {
+      const response = await supabase
+        ?.from('w8ben_forms')
+        .update({
+          pdf_url: null,
+          status: 'returned',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', formData.id);
+
+      if (response?.error) throw response.error;
+      toast.success("W-8BEN document removed successfully.");
+      setFormData(null);
+      fetchForm();
+    } catch (err) {
+      toast.error("Failed to remove W-8BEN document.");
+    }
+  };
 
   const fetchForm = async () => {
     try {
@@ -196,18 +243,93 @@ export function TaxFormsTab() {
         )}
 
         {isSubmitted && formData.signed_pdf_url && (
-          <div className="mt-6 pt-6 border-t border-gray-100 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
-              Submitted on {new Date(formData.created_at).toLocaleDateString()}
+          <div className="mt-6 pt-6 border-t border-gray-100 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {formData?.form_data?.filename || "w8ben.pdf"}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Submitted on {new Date(formData.created_at).toLocaleDateString()}
+                </p>
+              </div>
             </div>
-            <Button
-              variant="outline"
-              className="flex items-center gap-2"
-              onClick={() => window.open(formData.signed_pdf_url, '_blank')}
-            >
-              <Download className="w-4 h-4" />
-              Download PDF
-            </Button>
+
+            <div className="relative">
+              <Button
+                variant="ghost"
+                onClick={() => setW8MenuOpen(!w8MenuOpen)}
+                className="h-9 w-9 p-0 text-gray-500 hover:bg-gray-100 shrink-0 cursor-pointer rounded-lg"
+              >
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${w8MenuOpen ? 'rotate-180' : ''}`} />
+              </Button>
+
+              {w8MenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setW8MenuOpen(false)} />
+                  <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-40 animate-fadeIn font-normal">
+                    <button
+                      onClick={() => {
+                        setW8MenuOpen(false);
+                        window.open(formData.signed_pdf_url, '_blank');
+                      }}
+                      className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer border-0 bg-transparent"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-gray-400" />
+                      View Document
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setW8MenuOpen(false);
+                        window.open(formData.signed_pdf_url, '_blank');
+                      }}
+                      className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer border-0 bg-transparent"
+                    >
+                      <Download className="w-3.5 h-3.5 text-gray-400" />
+                      Download Document
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setW8MenuOpen(false);
+                        handleRenameW8Ben();
+                      }}
+                      className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer border-0 bg-transparent"
+                    >
+                      <Edit className="w-3.5 h-3.5 text-gray-400" />
+                      Edit Metadata (Rename)
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setW8MenuOpen(false);
+                        // Trigger file upload re-selection
+                        fileInputRef.current?.click();
+                      }}
+                      className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer border-0 bg-transparent"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
+                      Replace PDF File
+                    </button>
+
+                    <div className="border-t border-gray-100 my-1" />
+
+                    <button
+                      onClick={() => {
+                        setW8MenuOpen(false);
+                        handleDeleteW8Ben();
+                      }}
+                      className="w-full text-left px-3.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer border-0 bg-transparent"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      Delete Tax Form
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

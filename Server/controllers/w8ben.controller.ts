@@ -309,7 +309,7 @@ export async function uploadW8BenForm(req: Request, res: Response, next: NextFun
     }
 
     // Perform validation on the uploaded tax form document
-    const validationResult = await validateW8BenFromFile(file.buffer, file.mimetype, file.originalname);
+    const validationResult = await validateW8BenFromFile(file.buffer, file.mimetype, file.originalname, contractorId);
     if (!validationResult.isValid) {
       res.status(400).json({
         error: 'W-8BEN document validation failed.',

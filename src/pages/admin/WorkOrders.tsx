@@ -17,6 +17,7 @@ import { CreateWorkOrder } from "./CreateWorkOrder";
 import { ReviewWorkOrder } from "./ReviewWorkOrder";
 import { Checkbox } from "../../components/ui/checkbox";
 import { BulkRenewDialog } from "./BulkRenewDialog";
+import { ValidationConfigTab } from "./ValidationConfigTab";
 
 export function AdminWorkOrders() {
   const { data: workOrders, isLoading } = useAdminWorkOrders();
@@ -81,6 +82,8 @@ export function AdminWorkOrders() {
     }
   };
 
+  const [activeTab, setActiveTab] = React.useState<'list' | 'validation'>('list');
+
   if (isCreating) {
     return <CreateWorkOrder onCancel={() => setIsCreating(false)} />;
   }
@@ -102,124 +105,150 @@ export function AdminWorkOrders() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 min-h-[40px]">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Work Orders</h2>
-          <p className="text-sm text-gray-600">Manage work orders and requests</p>
+          <p className="text-sm text-gray-600">Manage work orders, validation rules, and templates</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          {selectedForRenewal.length > 0 && (
-            <Button 
-              onClick={() => setIsBulkRenewing(true)}
-              variant="outline"
-              className="border-purple-200 text-purple-700 hover:bg-purple-50"
+          <div className="flex bg-gray-100 p-1 rounded-lg mr-2">
+            <button
+              onClick={() => setActiveTab('list')}
+              className={`px-4 py-2 text-xs font-semibold rounded-[8px] transition-all ${
+                activeTab === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
-              <CopyPlus className="w-4 h-4 mr-2" />
-              Bulk Renew ({selectedForRenewal.length})
-            </Button>
+              Work Orders List
+            </button>
+            <button
+              onClick={() => setActiveTab('validation')}
+              className={`px-4 py-2 text-xs font-semibold rounded-[8px] transition-all ${
+                activeTab === 'validation' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Validation Configuration
+            </button>
+          </div>
+          {activeTab === 'list' && (
+            <>
+              {selectedForRenewal.length > 0 && (
+                <Button 
+                  onClick={() => setIsBulkRenewing(true)}
+                  variant="outline"
+                  className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                >
+                  <CopyPlus className="w-4 h-4 mr-2" />
+                  Bulk Renew ({selectedForRenewal.length})
+                </Button>
+              )}
+              <Button 
+                onClick={() => setIsCreating(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Generate Work Order
+              </Button>
+            </>
           )}
-          <Button 
-            onClick={() => setIsCreating(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Generate Work Order
-          </Button>
         </div>
       </div>
       
-      <Card className="border border-gray-200 rounded-[14px] bg-white overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-gray-200 bg-gray-50">
-                <TableHead className="w-12 px-6">
-                  <Checkbox 
-                    checked={allSelected ? true : isIndeterminate ? "indeterminate" : false}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all"
-                  />
-                </TableHead>
-                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium px-6">
-                  Period
-                </TableHead>
-                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  Contractor
-                </TableHead>
-                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  Role
-                </TableHead>
-                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  Pay Rate
-                </TableHead>
-                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
-                  Status
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-400">
-                      <Loader2 className="w-8 h-8 mb-3 animate-spin" />
-                      <div className="text-gray-600 font-medium">Loading work orders...</div>
-                    </div>
-                  </TableCell>
+      {activeTab === 'list' ? (
+        <Card className="border border-gray-200 rounded-[14px] bg-white overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-gray-200 bg-gray-50">
+                  <TableHead className="w-12 px-6">
+                    <Checkbox 
+                      checked={allSelected ? true : isIndeterminate ? "indeterminate" : false}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium px-6">
+                    Period
+                  </TableHead>
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                    Contractor
+                  </TableHead>
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                    Role
+                  </TableHead>
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                    Pay Rate
+                  </TableHead>
+                  <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
+                    Status
+                  </TableHead>
                 </TableRow>
-              ) : !workOrders || workOrders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-400">
-                      <FileSignature className="w-16 h-16 mb-3 text-gray-300" strokeWidth={1.5} />
-                      <div className="text-gray-600 font-medium">No work orders found</div>
-                      <div className="text-sm text-gray-500 mt-1">Click "Generate Work Order" to create one.</div>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                workOrders.map((wo: any) => (
-                  <TableRow
-                    key={wo.id}
-                    className="h-16 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
-                    onClick={() => handleRowClick(wo.id)}
-                  >
-                    <TableCell className="px-6" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox 
-                        checked={selectedForRenewal.includes(wo.id)}
-                        onCheckedChange={(checked) => handleSelectOne(wo.id, !!checked)}
-                        aria-label={`Select work order ${wo.id}`}
-                      />
-                    </TableCell>
-                    <TableCell className="px-6 text-sm text-gray-600">
-                      {format(new Date(wo.start_date.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")} - {format(new Date(wo.end_date.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium text-gray-900">{wo.contractor_name || "Unknown"}</div>
-                      <div className="text-sm text-gray-500">{wo.contractor_email}</div>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-700">{wo.role}</TableCell>
-                    <TableCell className="text-sm font-medium text-gray-900">
-                      ${wo.pay_amount.toLocaleString()} / {wo.pay_type === 'Hourly' ? 'hr' : 'mo'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`${getStatusColor(wo.status)} border rounded-full px-3 py-1 font-medium text-xs`}>
-                        {getStatusLabel(wo.status)}
-                      </Badge>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-64 text-center">
+                      <div className="flex flex-col items-center justify-center text-gray-400">
+                        <Loader2 className="w-8 h-8 mb-3 animate-spin" />
+                        <div className="text-gray-600 font-medium">Loading work orders...</div>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
-
-      <BulkRenewDialog 
-        open={isBulkRenewing} 
-        onClose={() => {
-          setIsBulkRenewing(false);
-          setSelectedForRenewal([]);
-        }} 
-        selectedWorkOrders={selectedWorkOrdersObjects} 
-      />
-    </div>
+                ) : !workOrders || workOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-64 text-center">
+                      <div className="flex flex-col items-center justify-center text-gray-400">
+                        <FileSignature className="w-16 h-16 mb-3 text-gray-300" strokeWidth={1.5} />
+                        <div className="text-gray-600 font-medium">No work orders found</div>
+                        <div className="text-sm text-gray-500 mt-1">Click "Generate Work Order" to create one.</div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  workOrders.map((wo: any) => (
+                    <TableRow
+                      key={wo.id}
+                      className="h-16 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                      onClick={() => handleRowClick(wo.id)}
+                    >
+                      <TableCell className="px-6" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox 
+                          checked={selectedForRenewal.includes(wo.id)}
+                          onCheckedChange={(checked) => handleSelectOne(wo.id, !!checked)}
+                          aria-label={`Select work order ${wo.id}`}
+                        />
+                      </TableCell>
+                      <TableCell className="px-6 text-sm text-gray-600">
+                        {format(new Date(wo.start_date.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")} - {format(new Date(wo.end_date.toString().substring(0, 10) + "T12:00:00Z"), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium text-gray-900">{wo.contractor_name || "Unknown"}</div>
+                        <div className="text-sm text-gray-500">{wo.contractor_email}</div>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-700">{wo.role}</TableCell>
+                      <TableCell className="text-sm font-medium text-gray-900">
+                        ${wo.pay_amount.toLocaleString()} / {wo.pay_type === 'Hourly' ? 'hr' : 'mo'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${getStatusColor(wo.status)} border rounded-full px-3 py-1 font-medium text-xs`}>
+                          {getStatusLabel(wo.status)}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      ) : (
+        <ValidationConfigTab />
+      )}
+ 
+       <BulkRenewDialog 
+         open={isBulkRenewing} 
+         onClose={() => {
+           setIsBulkRenewing(false);
+           setSelectedForRenewal([]);
+         }} 
+         selectedWorkOrders={selectedWorkOrdersObjects} 
+       />
+     </div>
   );
 }

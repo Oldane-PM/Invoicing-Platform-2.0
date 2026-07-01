@@ -1,4 +1,5 @@
 import mammoth from 'mammoth';
+import { getSupabaseAdmin } from '../clients/supabase.server';
 
 export interface ExtractedWorkOrderDetails {
   role: string | null;
@@ -44,6 +45,7 @@ export interface WorkOrderValidationResult {
   validationStatus: 'valid' | 'invalid' | 'needs_manual_review';
   reasons: string[];
   validationDetails: ValidationDetails;
+  personalInfo?: any;
 }
 
 /**
@@ -96,39 +98,91 @@ export async function extractDetailsFromFile(
     extractedText = fileBuffer.toString('utf8');
   }
 
-  // 2. Prepare payload for OpenRouter
+  // 2. Fetch configurations from Database (with static fallbacks)
+  let activeRules = [
+    { rule_name: 'Intellibus Branding & Layout', rule_description: 'Verify presence of Intellibus header logos, document headers, and section structure', rule_type: 'layout', weight: 50 },
+    { rule_name: 'Part III Sign-off & Certification', rule_description: 'Checks if the document contains sign-off certification blocks and representative name fields', rule_type: 'signature', weight: 20 },
+    { rule_name: 'Contractor Signature Presence', rule_description: 'Detects whether the contractor or resource signature is present in the signature block', rule_type: 'signature', weight: 30 }
+  ];
+
+  let extractionFields = [
+    { field_name: 'Role Name', field_format: 'string', mapping_key: 'role', is_required: true, field_description: 'Contractor role title assigned in the contract' },
+    { field_name: 'Billing Rate', field_format: 'number', mapping_key: 'rate', is_required: true, field_description: 'Hourly or flat rate of compensation' },
+    { field_name: 'Rate Type', field_format: 'string', mapping_key: 'rateType', is_required: true, field_description: 'Whether compensation is hourly, weekly, monthly, etc.' },
+    { field_name: 'Start Date', field_format: 'date', mapping_key: 'startDate', is_required: true, field_description: 'Start date of the work order' },
+    { field_name: 'End Date', field_format: 'date', mapping_key: 'endDate', is_required: true, field_description: 'Expiry or end date of the work order' }
+  ];
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: dbRules, error: rErr } = await supabase
+      .from('admin_verification_rules')
+      .select('*')
+      .eq('document_type', 'work_order')
+      .eq('is_active', true);
+    if (!rErr && dbRules && dbRules.length > 0) {
+      activeRules = dbRules;
+    }
+
+    const { data: dbFields, error: fErr } = await supabase
+      .from('admin_extraction_fields')
+      .select('*')
+      .eq('document_type', 'work_order');
+    if (!fErr && dbFields && dbFields.length > 0) {
+      extractionFields = dbFields;
+    }
+  } catch (dbErr) {
+    console.warn('[workOrderExtractor] Failed to load rules from DB, falling back to static config:', dbErr);
+  }
+
+  // Generate helper to get camelcase key for the prompt schema
+  const getRuleJsonKey = (rule: any) => {
+    return 'has_' + rule.rule_name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_+|_+$)/g, '');
+  };
+
+  // 3. Prepare payload for OpenRouter
   const systemPrompt = `You are a precise data extraction and document validation agent. Analyze the provided work order document and perform the following tasks:
 
 1. Extract contract fields:
-   - role: The job title or position (e.g., "Software Engineer", "Consultant", "QA Engineer").
-   - rate: The contract billing rate as a numeric value. If it says "$500/month", the rate is 500. Use null if not specified.
-   - rateType: How the rate is charged. Must be exactly "hourly" or "fixed". If it mentions "per hour" or "hourly", use "hourly". If "monthly" or "fixed", use "fixed".
-   - startDate: The contract start date in ISO format (YYYY-MM-DD). Use null if not found.
-   - endDate: The contract end or expiry date in ISO format (YYYY-MM-DD). Use null if not found.
+${extractionFields.map(f => `   - ${f.mapping_key}: ${f.field_description || f.field_name} (Format: ${f.field_format}, Required: ${f.is_required}).`).join('\n')}
 
-2. Perform layout & validity checks (specifically checking if it matches the standard Intellibus Work Order template characteristics):
-   - hasExpectedLayout: true if the document branding/text contains "Intellibus" and "Work Order" or "EXHIBIT A".
-   - extractedWorkOrderId: any Work Order number or ID extracted (e.g. "1").
-   - hasSignOffArea: true if the document has signature lines or fields at the end.
-   - hasContractorSignature: true if contractor signature details are present (e.g. contains signer name/date, typings like "V.McDove").
-   - hasFinanceSignature: true if finance/authorized signature details are present (e.g. "Shailaja S" or "Head of HR & Finance").
-   - validationCode: any Transaction ID, validation code, or secure identifier (e.g., look for "Transaction ID: [code]").
+2. Perform layout & validity checks based on these verification rules:
+${activeRules.map(r => `   - ${getRuleJsonKey(r)}: boolean. ${r.rule_description || r.rule_name} (Type: ${r.rule_type}).`).join('\n')}
+
+3. Extra metadata extraction:
+   - extractedWorkOrderId: any Work Order number or ID extracted (e.g. "1"). Use null if not found.
+   - validationCode: any Transaction ID, validation code, or secure identifier. Use null if not found.
+   - layoutNotes: A short explanation (1-2 sentences) of layout findings.
+   - signatureNotes: A short description of the signature findings.
+
+4. Extract contractor's personal details if present in the document:
+   - fullName: Full name of the contractor / resource (string, null if not found)
+   - email: Email address of the contractor (string, null if not found)
+   - phone: Phone number of the contractor (string, null if not found)
+   - addressLine1: Street address (string, null if not found)
+   - addressLine2: Apartment, suite, unit (string, null if not found)
+   - stateParish: State, parish, province, or region (string, null if not found)
+   - country: Country (string, null if not found)
+   - postalCode: Zip code or postal code (string, null if not found)
 
 Return ONLY a JSON object with this structure:
 {
-  "role": string | null,
-  "rate": number | null,
-  "rateType": "hourly" | "fixed" | null,
-  "startDate": "YYYY-MM-DD" | null,
-  "endDate": "YYYY-MM-DD" | null,
-  "hasExpectedLayout": boolean,
+  ${extractionFields.map(f => `"${f.mapping_key}": any`).join(',\n  ')},
+  ${activeRules.map(r => `"${getRuleJsonKey(r)}": boolean`).join(',\n  ')},
   "extractedWorkOrderId": string | null,
-  "hasSignOffArea": boolean,
-  "hasContractorSignature": boolean,
-  "hasFinanceSignature": boolean,
   "validationCode": string | null,
   "layoutNotes": string,
-  "signatureNotes": string
+  "signatureNotes": string,
+  "personalInfo": {
+    "fullName": string | null,
+    "email": string | null,
+    "phone": string | null,
+    "addressLine1": string | null,
+    "addressLine2": string | null,
+    "stateParish": string | null,
+    "country": string | null,
+    "postalCode": string | null
+  }
 }
 Do not write any markdown code block backticks, explanations, or extra text. Return only the raw JSON.`;
 
@@ -175,7 +229,7 @@ Do not write any markdown code block backticks, explanations, or extra text. Ret
     ];
   }
 
-  // 3. Make OpenRouter API request
+  // 4. Make OpenRouter API request
   let parsed: any;
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -220,54 +274,96 @@ Do not write any markdown code block backticks, explanations, or extra text. Ret
     throw err instanceof Error ? err : new Error('Unexpected error occurred during extraction.');
   }
 
-  // 4. Validate findings & format checks
+  // 5. Validate findings & format checks
   const reasons: string[] = [];
 
   if (!isPdf) {
     reasons.push("Document is not in PDF format. Legitimate work orders must be uploaded as PDF files.");
   }
 
-  // 5. Calculate Confidence Score based on document format
+  // 6. Calculate Confidence Score based on dynamic rules & weights
   let confidenceScore = 0;
-  if (parsed.hasExpectedLayout) {
-    confidenceScore += 50;
-  } else {
-    reasons.push("Document branding and section layout do not match the expected Intellibus Work Order template.");
+  let totalWeight = 0;
+
+  for (const rule of activeRules) {
+    const jsonKey = getRuleJsonKey(rule);
+    const passed = !!parsed[jsonKey];
+    totalWeight += rule.weight;
+    if (passed) {
+      confidenceScore += rule.weight;
+    } else {
+      reasons.push(`${rule.rule_name} check failed: ${rule.rule_description || 'Check not satisfied'}.`);
+    }
   }
 
-  if (parsed.hasSignOffArea) {
-    confidenceScore += 20;
+  if (totalWeight > 0) {
+    confidenceScore = Math.round((confidenceScore / totalWeight) * 100);
   } else {
-    reasons.push("The document is missing the required sign-off area.");
+    confidenceScore = 100;
   }
 
-  if (parsed.hasContractorSignature) {
-    confidenceScore += 15;
-  } else {
-    reasons.push("Contractor signature is missing or was not detected.");
-  }
-
-  if (parsed.hasFinanceSignature) {
-    confidenceScore += 15;
-  } else {
-    reasons.push("Finance officer authorization signature is missing or was not detected.");
-  }
-
-  confidenceScore = Math.max(0, Math.min(100, confidenceScore));
-
-  // Determine overall validity & status purely based on format/signatures
+  // Determine overall validity & status
   let validationStatus: 'valid' | 'invalid' | 'needs_manual_review' = 'needs_manual_review';
   if (!isPdf) {
     validationStatus = 'invalid';
-  } else if (!parsed.hasExpectedLayout) {
-    validationStatus = 'invalid';
-  } else if (confidenceScore >= 80) { // e.g. layout (50) + sign-off (20) + contractor signature (15) = 85 (Valid)
+  } else if (confidenceScore >= 80) {
     validationStatus = 'valid';
   } else if (confidenceScore < 50) {
     validationStatus = 'invalid';
   }
 
   const isValid = validationStatus === 'valid';
+
+  // 7. Write logs to audit tables in background
+  try {
+    const supabase = getSupabaseAdmin();
+    await supabase.from('document_validation_findings').insert({
+      contractor_user_id: _userId || 'unknown',
+      document_type: 'work_order',
+      pdf_url: null,
+      findings_json: parsed,
+      confidence_score: confidenceScore,
+      validation_status: validationStatus,
+      reasons: reasons
+    });
+
+    const extractedPayload: any = {};
+    extractionFields.forEach(f => {
+      extractedPayload[f.mapping_key] = parsed[f.mapping_key] || null;
+    });
+
+    await supabase.from('document_extracted_data').insert({
+      contractor_user_id: _userId || 'unknown',
+      document_type: 'work_order',
+      pdf_url: null,
+      extracted_json: extractedPayload
+    });
+
+    // Auto-populate contractor profile with extracted personal details
+    if (_userId && _userId !== 'unknown' && parsed.personalInfo) {
+      const pInfo = parsed.personalInfo;
+      const patch: any = {};
+      if (pInfo.fullName) patch.full_name = pInfo.fullName;
+      if (pInfo.email) patch.email = pInfo.email;
+      if (pInfo.phone) patch.phone = pInfo.phone;
+      if (pInfo.addressLine1) patch.address_line1 = pInfo.addressLine1;
+      if (pInfo.addressLine2) patch.address_line2 = pInfo.addressLine2;
+      if (pInfo.stateParish) patch.state_parish = pInfo.stateParish;
+      if (pInfo.country) patch.country = pInfo.country;
+      if (pInfo.postalCode) patch.postal_code = pInfo.postalCode;
+
+      if (Object.keys(patch).length > 0) {
+        console.log(`[workOrderExtractor] Auto-populating profile from work order for contractor: ${_userId}`, patch);
+        await supabase.from('contractor_profiles').upsert({
+          user_id: _userId,
+          ...patch,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+      }
+    }
+  } catch (logErr) {
+    console.warn('[workOrderExtractor] Failed to save dynamic audit log records:', logErr);
+  }
 
   return {
     // Flat fields (Backward compatibility for UI forms)
@@ -276,6 +372,7 @@ Do not write any markdown code block backticks, explanations, or extra text. Ret
     rateType: ['hourly', 'fixed'].includes(parsed.rateType) ? parsed.rateType : null,
     startDate: parsed.startDate || null,
     endDate: parsed.endDate || null,
+    personalInfo: parsed.personalInfo || null,
 
     // Validation details
     isValid,
@@ -284,11 +381,11 @@ Do not write any markdown code block backticks, explanations, or extra text. Ret
     reasons,
     validationDetails: {
       isPdf,
-      hasExpectedLayout: !!parsed.hasExpectedLayout,
+      hasExpectedLayout: !!parsed[getRuleJsonKey(activeRules[0] || {})],
       extractedWorkOrderId: parsed.extractedWorkOrderId || null,
-      hasSignOffArea: !!parsed.hasSignOffArea,
-      hasContractorSignature: !!parsed.hasContractorSignature,
-      hasFinanceSignature: !!parsed.hasFinanceSignature,
+      hasSignOffArea: !!parsed[getRuleJsonKey(activeRules[1] || {})],
+      hasContractorSignature: !!parsed[getRuleJsonKey(activeRules[2] || {})],
+      hasFinanceSignature: !!parsed[getRuleJsonKey(activeRules[2] || {})],
       validationCode: parsed.validationCode || null,
       idExistsInDb: null,
       layoutNotes: parsed.layoutNotes || '',
