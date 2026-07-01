@@ -21,6 +21,8 @@ export function ContractorOnboarding() {
     data: onboarding,
     uploadWorkOrderFile,
     saveOnboarding,
+    extractWorkOrder,
+    extractPreviousInvoice,
   } = useVendorOnboarding();
 
   const [w8BenFile, setW8BenFile] = React.useState<File | null>(null);
@@ -32,7 +34,7 @@ export function ContractorOnboarding() {
     if (!user) return;
     
     if (onboardingType === "new") {
-      if (!workOrderFile || !w8BenFile || !invoiceFile) {
+      if (!workOrderFile || !w8BenFile) {
         toast.error("Please upload all required documents.");
         return;
       }
@@ -56,28 +58,7 @@ export function ContractorOnboarding() {
       let invPath = null;
       let invFilename = null;
 
-      if (workOrderFile) {
-        const result = await uploadWorkOrderFile(workOrderFile);
-        if (!result.ok) throw new Error(result.error || "Failed to upload Work Order");
-        woPath = result.data?.work_order_path || null;
-        woFilename = result.data?.work_order_filename || null;
-        woUploadedAt = result.data?.work_order_uploaded_at || null;
-      }
-
-      if (w8BenFile) {
-        const w8Result = await uploadW8Ben(user.id, w8BenFile);
-        w8Path = w8Result.path;
-        w8Filename = w8Result.filename;
-      }
-
-      if (invoiceFile) {
-        const invResult = await uploadInitialInvoice(user.id, invoiceFile);
-        invPath = invResult.path;
-        invFilename = invResult.filename;
-      }
-
-      // 2. Save onboarding data
-      const patch = {
+      const patch: any = {
         work_order_path: woPath,
         work_order_filename: woFilename,
         work_order_uploaded_at: woUploadedAt,
@@ -88,6 +69,86 @@ export function ContractorOnboarding() {
         onboarding_completed_at: new Date().toISOString(),
       };
 
+      if (workOrderFile) {
+        const result = await uploadWorkOrderFile(workOrderFile);
+        if (!result.ok) throw new Error(result.error || "Failed to upload Work Order");
+        woPath = result.data?.work_order_path || null;
+        woFilename = result.data?.work_order_filename || null;
+        woUploadedAt = result.data?.work_order_uploaded_at || null;
+        patch.work_order_path = woPath;
+        patch.work_order_filename = woFilename;
+        patch.work_order_uploaded_at = woUploadedAt;
+
+        // Extract Work Order details
+        if (woPath) {
+          const extractResult = await extractWorkOrder(woPath);
+          if (extractResult.ok && extractResult.data) {
+            const ext = extractResult.data;
+            if (ext.role) patch.onboarding_role = ext.role;
+            if (ext.rate != null) patch.onboarding_rate = Number(ext.rate);
+            if (ext.rateType === "fixed" || ext.rateType === "hourly") {
+              patch.onboarding_rate_type = ext.rateType;
+            }
+            if (ext.startDate) patch.contract_start_date = ext.startDate;
+            if (ext.endDate) patch.contract_end_date = ext.endDate;
+          }
+        }
+      }
+
+      if (w8BenFile) {
+        const w8Result = await uploadW8Ben(user.id, w8BenFile);
+        w8Path = w8Result.path;
+        w8Filename = w8Result.filename;
+        patch.w8_ben_path = w8Path;
+        patch.w8_ben_filename = w8Filename;
+
+        // Call the backend API so it shows as 'Submitted' in the Tax Forms tab
+        try {
+          const sessionResponse = await getSupabaseClient().auth.getSession();
+          const token = sessionResponse?.data?.session?.access_token;
+          const baseUrl = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
+          
+          const formData = new FormData();
+          formData.append('w8ben', w8BenFile);
+          
+          await fetch(`${baseUrl}/api/w8ben/upload`, {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+        } catch (e) {
+          console.error("Failed to call w8ben upload API:", e);
+        }
+      }
+
+      if (invoiceFile) {
+        const invResult = await uploadInitialInvoice(user.id, invoiceFile);
+        invPath = invResult.path;
+        invFilename = invResult.filename;
+        patch.initial_invoice_path = invPath;
+        patch.initial_invoice_filename = invFilename;
+
+        // Extract Invoice details
+        if (invPath && onboardingType === "migrating") {
+          const extractResult = await extractPreviousInvoice(invPath);
+          if (extractResult.ok && extractResult.data) {
+            const ext = extractResult.data;
+            if (ext.invoiceNumber) patch.last_invoice_number = ext.invoiceNumber;
+            if (ext.bankName) patch.bank_name = ext.bankName;
+            if (ext.bankAddress) patch.bank_address = ext.bankAddress;
+            if (ext.swiftCode) patch.swift_code = ext.swiftCode;
+            if (ext.routingNumber) patch.routing_number = ext.routingNumber;
+            if (ext.accountType) patch.account_type = ext.accountType;
+            if (ext.currency) patch.currency = ext.currency;
+            if (ext.accountNumber) patch.bank_account_number = ext.accountNumber;
+          }
+        }
+      }
+
+      // 2. Save onboarding data
       const result = await saveOnboarding(patch);
       if (!result.ok) throw new Error(result.error);
       
@@ -98,7 +159,20 @@ export function ContractorOnboarding() {
         w8_ben_filename: w8Filename,
         initial_invoice_path: invPath,
         initial_invoice_filename: invFilename,
-        onboarding_completed_at: patch.onboarding_completed_at
+        onboarding_completed_at: patch.onboarding_completed_at,
+        onboarding_role: patch.onboarding_role,
+        onboarding_rate: patch.onboarding_rate,
+        onboarding_rate_type: patch.onboarding_rate_type,
+        contract_start_date: patch.contract_start_date,
+        contract_end_date: patch.contract_end_date,
+        last_invoice_number: patch.last_invoice_number,
+        bank_name: patch.bank_name,
+        bank_address: patch.bank_address,
+        bank_account_number: patch.bank_account_number,
+        swift_code: patch.swift_code,
+        routing_number: patch.routing_number,
+        account_type: patch.account_type,
+        currency: patch.currency
       }).eq("user_id", user.id);
 
       toast.success("Onboarding completed successfully!");
@@ -134,7 +208,7 @@ export function ContractorOnboarding() {
               onClick={() => setOnboardingType("migrating")}
             >
               <CheckCircle2 className="w-5 h-5 mr-3 text-gray-400" />
-              I am migrating from the old system
+              I am an existing user
             </Button>
           </div>
         </div>
@@ -209,13 +283,7 @@ export function ContractorOnboarding() {
                 onFileSelect={setW8BenFile}
                 accept=".pdf,.jpg,.jpeg,.png"
               />
-              <DocumentUploadRow
-                title="3. First Invoice (Template/Draft)"
-                description="Upload a template or draft of your first invoice"
-                file={invoiceFile}
-                onFileSelect={setInvoiceFile}
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-              />
+
             </div>
           )}
 
