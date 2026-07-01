@@ -13,8 +13,7 @@ import {
   LayoutDashboard,
   Users,
   Shield,
-  Calendar,
-  Briefcase,
+
   LogOut,
   User as UserIcon,
   ClipboardList,
@@ -30,8 +29,7 @@ import { SubmitHoursPage } from "./pages/contractor/SubmitHours";
 import { ContractorWorkOrders } from "./pages/contractor/WorkOrders";
 import { EmployeeDirectory } from "./pages/admin/EmployeeDirectory";
 import { UserAccessManagement } from "./pages/admin/UserAccessManagement";
-import { AdminCalendar } from "./pages/admin/Calendar";
-import { AdminProjects } from "./pages/admin/Projects";
+
 import { AdminWorkOrders } from "./pages/admin/WorkOrders";
 import { UnassignedDashboard } from "./pages/unassigned/Dashboard";
 import { NotificationBell } from "./components/shared/NotificationBell";
@@ -61,8 +59,6 @@ type Screen =
   | "dashboard"
   | "directory"
   | "access"
-  | "calendar"
-  | "projects"
   | "work_orders";
 type ManagerScreen = "dashboard" | "team";
 type ContractorScreen =
@@ -221,17 +217,6 @@ function App() {
         return {
           title: "User Access",
           subtitle: "Control user roles and permissions",
-        };
-      case "calendar":
-        return {
-          title: "Calendar",
-          subtitle:
-            "Manage holidays and special time off that affect employee submissions",
-        };
-      case "projects":
-        return {
-          title: "Projects",
-          subtitle: "Manage projects and track resources",
         };
       case "work_orders":
         return {
@@ -670,28 +655,6 @@ function App() {
               </span>
             </button>
             <button
-              onClick={() => setCurrentScreen("calendar")}
-              className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
-                currentScreen === "calendar"
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              <span className="font-medium text-sm md:text-base">Calendar</span>
-            </button>
-            <button
-              onClick={() => setCurrentScreen("projects")}
-              className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
-                currentScreen === "projects"
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              }`}
-            >
-              <Briefcase className="w-4 h-4" />
-              <span className="font-medium text-sm md:text-base">Projects</span>
-            </button>
-            <button
               onClick={() => setCurrentScreen("work_orders")}
               className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
                 currentScreen === "work_orders"
@@ -715,8 +678,6 @@ function App() {
           <EmployeeDirectory onEmployeeClick={handleEmployeeClick} />
         )}
         {currentScreen === "access" && <UserAccessManagement />}
-        {currentScreen === "calendar" && <AdminCalendar />}
-        {currentScreen === "projects" && <AdminProjects />}
         {currentScreen === "work_orders" && <AdminWorkOrders />}
       </main>
 
