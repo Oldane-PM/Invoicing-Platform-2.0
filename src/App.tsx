@@ -13,7 +13,6 @@ import {
   LayoutDashboard,
   Users,
   Shield,
-
   LogOut,
   User as UserIcon,
   ClipboardList,
@@ -40,7 +39,6 @@ import { useAuth } from "./lib/hooks/useAuth";
 import { getUserProfile } from "./lib/supabase/repos/auth.repo";
 import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 
-
 // Map a profile role (any casing) to the app's UserRole.
 function roleToUserRole(role: string | null | undefined): UserRole {
   switch ((role || "").toUpperCase()) {
@@ -55,11 +53,7 @@ function roleToUserRole(role: string | null | undefined): UserRole {
   }
 }
 
-type Screen =
-  | "dashboard"
-  | "directory"
-  | "access"
-  | "work_orders";
+type Screen = "dashboard" | "directory" | "access" | "work_orders";
 type ManagerScreen = "dashboard" | "team";
 type ContractorScreen =
   | "dashboard"
@@ -109,11 +103,15 @@ function App() {
   };
 
   // Use profile full name if available, otherwise fall back to demo/role names
-  const displayName = profile?.fullName || (
-    currentUser === "Admin" ? "Finance Officer" :
-    currentUser === "Manager" ? "Manager User" :
-    currentUser === "Contractor" ? "Contractor User" : "User"
-  );
+  const displayName =
+    profile?.fullName ||
+    (currentUser === "Admin"
+      ? "Finance Officer"
+      : currentUser === "Manager"
+        ? "Manager User"
+        : currentUser === "Contractor"
+          ? "Contractor User"
+          : "User");
 
   const userInitials = getInitials(displayName);
 
@@ -268,15 +266,15 @@ function App() {
         <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
           <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
-                Welcome, {displayName}
-              </h1>
-              <p className="text-xs md:text-sm text-gray-600">
-                Admin Portal — Review and approve submissions
-              </p>
-            </div>
-            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
+                  Welcome, {displayName}
+                </h1>
+                <p className="text-xs md:text-sm text-gray-600">
+                  Admin Portal — Review and approve submissions
+                </p>
+              </div>
+              <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
                 <NotificationBell onClick={() => setNotificationsOpen(true)} />
                 <ThemeToggle />
                 <Button
@@ -368,8 +366,14 @@ function App() {
                     ? new Date(member.contractEnd).toISOString()
                     : undefined,
                   rate_type: member.contractType as "Hourly" | "Fixed",
-                  hourly_rate: member.contractType === "Hourly" ? member.hourlyRate : undefined,
-                  fixed_rate: member.contractType === "Fixed" ? member.hourlyRate : undefined,
+                  hourly_rate:
+                    member.contractType === "Hourly"
+                      ? member.hourlyRate
+                      : undefined,
+                  fixed_rate:
+                    member.contractType === "Fixed"
+                      ? member.hourlyRate
+                      : undefined,
                   contract_type: member.contractType,
                   reporting_manager_id: user?.id || undefined,
                   reporting_manager_name: displayName,
@@ -427,78 +431,78 @@ function App() {
 
               {/* Right Section */}
               <div className="flex items-center gap-2 md:gap-3 flex-shrink-0 flex-wrap">
-              {/* Contractor Work Orders Button */}
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  setContractorScreen(
+                {/* Contractor Work Orders Button */}
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    setContractorScreen(
+                      contractorScreen === "work_orders"
+                        ? "dashboard"
+                        : "work_orders",
+                    )
+                  }
+                  className={`h-8 md:h-9 px-2 md:px-4 rounded-lg transition-colors ${
                     contractorScreen === "work_orders"
-                      ? "dashboard"
-                      : "work_orders",
-                  )
-                }
-                className={`h-8 md:h-9 px-2 md:px-4 rounded-lg transition-colors ${
-                  contractorScreen === "work_orders"
-                    ? "bg-purple-50 text-purple-700 hover:bg-purple-100"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <ClipboardList className="w-4 h-4 md:w-5 md:h-5 md:mr-2" />
-                <span className="hidden md:inline">Work Orders</span>
-              </Button>
+                      ? "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <ClipboardList className="w-4 h-4 md:w-5 md:h-5 md:mr-2" />
+                  <span className="hidden md:inline">Work Orders</span>
+                </Button>
 
-              {/* Contractor Profile Button */}
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  setContractorScreen(
-                    contractorScreen === "profile" ? "dashboard" : "profile",
-                  )
-                }
-                className={`h-8 md:h-9 px-2 md:px-4 rounded-lg transition-colors ${
-                  contractorScreen === "profile"
-                    ? "bg-purple-50 text-purple-700 hover:bg-purple-100"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <UserIcon className="w-4 h-4 md:w-5 md:h-5 md:mr-2" />
-                <span className="hidden md:inline">Contractor Profile</span>
-              </Button>
+                {/* Contractor Profile Button */}
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    setContractorScreen(
+                      contractorScreen === "profile" ? "dashboard" : "profile",
+                    )
+                  }
+                  className={`h-8 md:h-9 px-2 md:px-4 rounded-lg transition-colors ${
+                    contractorScreen === "profile"
+                      ? "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <UserIcon className="w-4 h-4 md:w-5 md:h-5 md:mr-2" />
+                  <span className="hidden md:inline">Contractor Profile</span>
+                </Button>
 
-              {/* Notifications */}
-              <NotificationBell onClick={() => setNotificationsOpen(true)} />
+                {/* Notifications */}
+                <NotificationBell onClick={() => setNotificationsOpen(true)} />
 
-              {/* Theme Toggle */}
-              <ThemeToggle />
+                {/* Theme Toggle */}
+                <ThemeToggle />
 
-              {/* Avatar Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
-                  >
-                    <Avatar className="w-8 h-8 md:w-10 md:h-10 bg-purple-100">
-                      <AvatarFallback className="bg-purple-100 text-purple-700 font-semibold text-xs md:text-sm">
-                        {userInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem
-                    onClick={() => setContractorScreen("profile")}
-                  >
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                {/* Avatar Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
+                    >
+                      <Avatar className="w-8 h-8 md:w-10 md:h-10 bg-purple-100">
+                        <AvatarFallback className="bg-purple-100 text-purple-700 font-semibold text-xs md:text-sm">
+                          {userInitials}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem
+                      onClick={() => setContractorScreen("profile")}
+                    >
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
         </header>
@@ -536,7 +540,9 @@ function App() {
             />
           )}
           {contractorScreen === "work_orders" && (
-            <ContractorWorkOrders onBack={() => setContractorScreen("dashboard")} />
+            <ContractorWorkOrders
+              onBack={() => setContractorScreen("dashboard")}
+            />
           )}
         </main>
 

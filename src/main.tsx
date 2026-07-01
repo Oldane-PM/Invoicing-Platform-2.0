@@ -20,14 +20,14 @@ createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
     <ThemeProvider
       attribute="class"
-      defaultTheme="dark"
+      defaultTheme="light"
       enableSystem={false}
       disableTransitionOnChange
-      storageKey="invoice-theme"
+      storageKey="invoice-theme-v2"
     >
       <QueryClientProvider client={queryClient}>
         <App />
       </QueryClientProvider>
     </ThemeProvider>
-  </ErrorBoundary>
+  </ErrorBoundary>,
 );
