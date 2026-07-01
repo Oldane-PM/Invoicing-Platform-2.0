@@ -14,7 +14,8 @@ export type NotificationEventType =
   | 'manager_rejected'
   | 'paid'
   | 'work_order_sent'
-  | 'w8ben_uploaded';
+  | 'w8ben_uploaded'
+  | 'invoice_reminder';
 
 export interface Notification {
   id: string;

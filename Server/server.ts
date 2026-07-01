@@ -8,6 +8,7 @@ import oauthCallbackRoutes from "./routes/oauth-callback.routes";
 import userRoutes from "./routes/user.routes";
 import w8benRoutes from "./routes/w8ben.routes";
 import workOrderRoutes from "./routes/workOrder.routes";
+import { startInvoiceReminderScheduler } from "./services/invoiceReminderService";
 
 const app = express();
 const port = Number(process.env.PORT ?? 5001);
@@ -97,6 +98,7 @@ try {
   app.listen(port, () => {
     console.log(` Server listening on http://localhost:${port}`);
     console.log(` Auth endpoint: http://localhost:${port}/api/auth`);
+    startInvoiceReminderScheduler();
   });
 } catch (error) {
   console.error("Failed to start server:", error);
