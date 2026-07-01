@@ -90,6 +90,8 @@ function App() {
     React.useState<ManagerScreen>("dashboard");
   const [contractorScreen, setContractorScreen] =
     React.useState<ContractorScreen>("dashboard");
+  const [contractorProfileTab, setContractorProfileTab] =
+    React.useState<string>("personal");
   const [editingSubmission, setEditingSubmission] =
     React.useState<ContractorSubmission | null>(null);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
@@ -465,11 +467,12 @@ function App() {
               {/* Contractor Profile Button */}
               <Button
                 variant="ghost"
-                onClick={() =>
+                onClick={() => {
+                  setContractorProfileTab("personal");
                   setContractorScreen(
                     contractorScreen === "profile" ? "dashboard" : "profile",
-                  )
-                }
+                  );
+                }}
                 className={`h-8 md:h-9 px-2 md:px-4 rounded-lg transition-colors ${
                   contractorScreen === "profile"
                     ? "bg-purple-50 text-purple-700 hover:bg-purple-100"
@@ -503,7 +506,10 @@ function App() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem
-                    onClick={() => setContractorScreen("profile")}
+                    onClick={() => {
+                      setContractorProfileTab("personal");
+                      setContractorScreen("profile");
+                    }}
                   >
                     Profile
                   </DropdownMenuItem>
@@ -530,11 +536,16 @@ function App() {
                 setEditingSubmission(submission);
                 setContractorScreen("submit-hours");
               }}
+              onNavigateToProfile={(tab) => {
+                setContractorProfileTab(tab || "personal");
+                setContractorScreen("profile");
+              }}
             />
           )}
           {contractorScreen === "profile" && (
             <ContractorProfile
               onCancel={() => setContractorScreen("dashboard")}
+              initialTab={contractorProfileTab}
             />
           )}
           {contractorScreen === "submit-hours" && (
