@@ -20,7 +20,7 @@ const SIGNED_URL_EXPIRY_SECONDS = 600; // 10 minutes
 
 // Columns that belong to onboarding (subset of contractor_profiles).
 const ONBOARDING_COLUMNS =
-  "user_id, onboarding_role, onboarding_rate, onboarding_rate_type, contract_start_date, contract_end_date, last_invoice_number, work_order_path, work_order_filename, work_order_uploaded_at, onboarding_completed_at";
+  "user_id, onboarding_role, onboarding_rate, onboarding_rate_type, contract_start_date, contract_end_date, last_invoice_number, work_order_path, work_order_filename, work_order_uploaded_at, w8_ben_path, w8_ben_filename, initial_invoice_path, initial_invoice_filename, onboarding_completed_at";
 
 /** Fetch onboarding fields for a contractor. Returns empty record if none yet. */
 export async function getVendorOnboarding(userId: string): Promise<VendorOnboardingData> {
@@ -50,6 +50,10 @@ export async function getVendorOnboarding(userId: string): Promise<VendorOnboard
     work_order_path: data.work_order_path ?? null,
     work_order_filename: data.work_order_filename ?? null,
     work_order_uploaded_at: data.work_order_uploaded_at ?? null,
+    w8_ben_path: data.w8_ben_path ?? null,
+    w8_ben_filename: data.w8_ben_filename ?? null,
+    initial_invoice_path: data.initial_invoice_path ?? null,
+    initial_invoice_filename: data.initial_invoice_filename ?? null,
     onboarding_completed_at: data.onboarding_completed_at ?? null,
   };
 }
@@ -185,4 +189,52 @@ export async function getWorkOrderRef(
   } catch (err) {
     throw err;
   }
+}
+
+/** Upload a W8-BEN to the work-orders bucket. */
+export async function uploadW8Ben(
+  userId: string,
+  file: File
+): Promise<WorkOrderUploadResult> {
+  const supabase = getSupabaseClient();
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${userId}/w8ben-${Date.now()}-${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(WORK_ORDERS_BUCKET)
+    .upload(path, file, {
+      contentType: file.type || "application/octet-stream",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    console.error("[vendorOnboarding.repo] W8-BEN upload failed:", uploadError);
+    throw new Error(`Failed to upload W8-BEN: ${uploadError.message}`);
+  }
+
+  return { path, filename: file.name, uploadedAt: new Date().toISOString() };
+}
+
+/** Upload an Initial Invoice to the work-orders bucket. */
+export async function uploadInitialInvoice(
+  userId: string,
+  file: File
+): Promise<WorkOrderUploadResult> {
+  const supabase = getSupabaseClient();
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${userId}/initial-invoice-${Date.now()}-${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(WORK_ORDERS_BUCKET)
+    .upload(path, file, {
+      contentType: file.type || "application/octet-stream",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    console.error("[vendorOnboarding.repo] Initial Invoice upload failed:", uploadError);
+    throw new Error(`Failed to upload Initial Invoice: ${uploadError.message}`);
+  }
+
+  return { path, filename: file.name, uploadedAt: new Date().toISOString() };
 }

@@ -36,6 +36,8 @@ import { NotificationDrawer } from "./components/shared/NotificationDrawer";
 import { ThemeToggle } from "./components/shared/ThemeToggle";
 import { ContractorDetailDrawer } from "./components/drawers/ContractorDetailDrawer";
 import { useAuth } from "./lib/hooks/useAuth";
+import { useVendorOnboarding } from "./lib/hooks/contractor/useVendorOnboarding";
+import { ContractorOnboarding } from "./pages/contractor/ContractorOnboarding";
 import { getUserProfile } from "./lib/supabase/repos/auth.repo";
 import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 
@@ -89,6 +91,9 @@ function App() {
   const [selectedEmployee, setSelectedEmployee] =
     React.useState<EmployeeDirectoryRow | null>(null);
   const [employees, setEmployees] = React.useState<EmployeeDirectoryRow[]>([]);
+
+  // We fetch onboarding at the top level so we can use it to block contractor access
+  const { data: onboardingData, isLoading: onboardingLoading } = useVendorOnboarding();
 
   // Filter options - these could come from Supabase in the future
   // const projects: string[] = []; // Unused - kept for future use
@@ -416,6 +421,26 @@ function App() {
 
   // Contractor Portal - Simple View
   if (currentUser === "Contractor") {
+    if (onboardingLoading) {
+      return (
+        <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-gray-600">Loading your profile...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!onboardingData?.onboarding_completed_at) {
+      return (
+        <div className="min-h-screen bg-[#F9FAFB]">
+          <Toaster position="top-right" />
+          <ContractorOnboarding />
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#F9FAFB]">
         <Toaster position="top-right" />
