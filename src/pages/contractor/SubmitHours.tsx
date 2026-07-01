@@ -8,7 +8,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../../components/ui/popover";
-import { Checkbox } from "../../components/ui/checkbox";
 
 import { toast } from "sonner";
 import {
@@ -16,10 +15,8 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
-  ChevronsUpDown,
   ArrowLeft,
   Loader2,
-  X,
   AlertCircle,
 } from "lucide-react";
 import { Alert, AlertDescription } from "../../components/ui/alert";
@@ -40,7 +37,6 @@ import { replaceInvoiceAfterSubmissionEditApi } from "../../lib/api/invoiceClien
 import { useSubmittedPeriods } from "../../lib/hooks/contractor/useSubmittedPeriods";
 import { useContractorProfile } from "../../lib/hooks/contractor/useContractorProfile";
 import { useVendorOnboarding } from "../../lib/hooks/contractor/useVendorOnboarding";
-import { useContractorProjects } from "../../lib/hooks/contractor/useContractorProjects";
 import { useNonWorkingDays } from "../../lib/hooks/adminCalendar";
 import type { SubmissionDraft, ContractorSubmission } from "../../lib/types";
 
@@ -89,50 +85,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   const [overtimeHours, setOvertimeHours] = React.useState("");
   const [overtimeDescription, setOvertimeDescription] = React.useState("");
   const [paymentLink, setPaymentLink] = React.useState("");
-  const [selectedProjectIds, setSelectedProjectIds] = React.useState<string[]>([]);
-  const [projectPickerOpen, setProjectPickerOpen] = React.useState(false);
   const isPrePopulatingRef = React.useRef(false);
-
-  // Get projects assigned to this contractor
-  const { projects, isLoading: loadingProjects } = useContractorProjects();
-
-  /** Include any of the submission’s saved projects that are not in the current assignment list (so the picker can show labels). */
-  const projectsForDropdown = React.useMemo(() => {
-    const list = [...projects];
-    if (isEditMode) {
-      const savedIds = editingSubmission?.projectIds?.length
-        ? editingSubmission.projectIds
-        : editingSubmission?.projectId
-          ? [editingSubmission.projectId]
-          : [];
-      const savedNames = editingSubmission?.projectNames ?? [];
-      savedIds.forEach((pid, i) => {
-        if (pid && !list.some((p) => p.id === pid)) {
-          list.unshift({
-            id: pid,
-            name: savedNames[i] || editingSubmission?.projectName || "Project",
-            client: "—",
-          });
-        }
-      });
-    }
-    return list;
-  }, [projects, isEditMode, editingSubmission?.projectId, editingSubmission?.projectName, editingSubmission?.projectIds, editingSubmission?.projectNames]);
-
-  const hasProjectsForDropdown = projectsForDropdown.length > 0;
-
-  const selectedProjects = React.useMemo(
-    () => projectsForDropdown.filter((p) => selectedProjectIds.includes(p.id)),
-    [projectsForDropdown, selectedProjectIds]
-  );
-
-  const toggleProject = (projectId: string) => {
-    setSelectedProjectIds((prev) =>
-      prev.includes(projectId)
-        ? prev.filter((id) => id !== projectId)
-        : [...prev, projectId]
-    );
-  };
 
   const queryClient = useQueryClient();
 
@@ -222,7 +175,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
   // Clear projects when leaving edit mode (e.g. parent clears editingSubmission)
   React.useEffect(() => {
     if (!editingSubmission) {
-      setSelectedProjectIds([]);
+      // no-op: projects removed
     }
   }, [editingSubmission]);
 
@@ -251,14 +204,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
         setPaymentLink(editingSubmission.paymentLink || "");
         setIsHoursManuallyEdited(true); // Prevent auto-calculation from overwriting
 
-        const editProjectIds = editingSubmission.projectIds?.length
-          ? editingSubmission.projectIds
-          : editingSubmission.projectId
-            ? [editingSubmission.projectId]
-            : [];
-        if (editProjectIds.length > 0) {
-          setSelectedProjectIds(editProjectIds);
-        }
+        // Projects removed - no longer populated
 
         // Load excluded dates if they exist
         console.log('[SubmitHours] editingSubmission.excludedDates:', editingSubmission.excludedDates);
@@ -286,14 +232,7 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
 
   // If submission details arrive with projects after first paint (cache refresh / async), keep the picker in sync
   React.useEffect(() => {
-    if (!isEditMode) return;
-    const pids = editingSubmission?.projectIds?.length
-      ? editingSubmission.projectIds
-      : editingSubmission?.projectId
-        ? [editingSubmission.projectId]
-        : [];
-    if (pids.length === 0) return;
-    setSelectedProjectIds((prev) => (prev.length > 0 ? prev : pids));
+    // Projects removed - no-op
   }, [isEditMode, editingSubmission?.id, editingSubmission?.projectId, editingSubmission?.projectIds]);
 
   // Clear overtime description when overtime hours is cleared or set to 0
@@ -421,14 +360,6 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       format(d, "yyyy-MM-dd")
     );
 
-    // Resolve selected projects in the order they appear in the list, so the
-    // primary project (project_id) and the joined label stay deterministic.
-    const orderedProjects = projectsForDropdown.filter((p) =>
-      selectedProjectIds.includes(p.id)
-    );
-    const projectIds = orderedProjects.map((p) => p.id);
-    const projectNames = orderedProjects.map((p) => p.name);
-
     const draft: SubmissionDraft = {
       workPeriod,
       excludedDates: excludedDatesStrings,
@@ -437,11 +368,10 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
       overtimeHours: parseInt(overtimeHours) || 0,
       overtimeDescription: overtimeDescription.trim() || null,
       paymentLink: paymentLink.trim() || null,
-      // Comma-joined label keeps existing single-column displays/invoices showing every project
-      projectName: projectNames.join(", ") || "General Work",
-      projectId: projectIds[0], // primary project (FK)
-      projectIds,
-      projectNames,
+      projectName: "General Work",
+      projectId: undefined,
+      projectIds: [],
+      projectNames: [],
     };
 
 
@@ -513,7 +443,6 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     setOvertimeHours("");
     setOvertimeDescription("");
     setPaymentLink("");
-    setSelectedProjectIds([]);
     onCancel();
   };
 
