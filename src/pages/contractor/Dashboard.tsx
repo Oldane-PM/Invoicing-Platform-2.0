@@ -1,6 +1,8 @@
 import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
+import { Card } from "../../components/ui/card";
+import { MetricCard } from "../../components/shared/MetricCard";
 import { ContractorSubmissionDrawer } from "../../components/drawers/ContractorSubmissionDrawer";
 import { InvoiceButton } from "../../components/shared/InvoiceButton";
 import {
@@ -13,9 +15,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
-import { Plus, Clock, Loader2, RefreshCw, Edit, Trash2 } from "lucide-react";
+import { Plus, Clock, Loader2, RefreshCw, Edit, Trash2, DollarSign, FileText, AlertTriangle } from "lucide-react";
 import { format, parse } from "date-fns";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "../../lib/supabase/client";
+import { useAuth } from "../../lib/hooks/useAuth";
+import { useVendorOnboarding } from "../../lib/hooks/contractor/useVendorOnboarding";
 import { useSubmissions } from "../../lib/hooks/contractor/useSubmissions";
 import { useDeleteSubmission } from "../../lib/hooks/contractor/useDeleteSubmission";
 import { getWorkPeriodKey, groupSubmissionsByWorkPeriod } from "../../lib/utils";
@@ -68,14 +74,192 @@ const statusStyles: Record<DisplayStatus, string> = {
 interface ContractorDashboardProps {
   onNavigateToSubmit?: () => void;
   onEditSubmission?: (submission: ContractorSubmission) => void;
+  onNavigateToProfile?: (tab?: string) => void;
 }
 
 export function ContractorDashboard({
   onNavigateToSubmit,
   onEditSubmission,
+  onNavigateToProfile,
 }: ContractorDashboardProps) {
   // Use the Supabase-backed submissions hook
   const { submissions, loading, error, refetch } = useSubmissions();
+
+  const { user } = useAuth();
+  const userId = user?.id;
+
+  // Onboarding data
+  const { data: onboarding } = useVendorOnboarding();
+
+  // W-8BEN Form data status
+  const { data: w8benData } = useQuery({
+    queryKey: ["w8benStatus", userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      const sessionResponse = await supabase?.auth.getSession();
+      const token = sessionResponse?.data?.session?.access_token;
+      
+      const baseUrl = (import.meta.env.VITE_AUTH_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/+$/, "");
+      const res = await fetch(`${baseUrl}/api/w8ben/${userId}`, {
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.success ? json.data : null;
+      }
+      return null;
+    },
+    enabled: !!userId,
+  });
+
+  // Required Actions Checklist
+  const actionsChecklist = React.useMemo(() => {
+    const list = [];
+
+    // 1. W8-BEN Form check
+    const hasW8BEN = w8benData && w8benData.status === 'submitted';
+    const isW8BENReturned = w8benData && w8benData.status === 'returned';
+
+    if (!hasW8BEN) {
+      list.push({
+        id: "w8ben",
+        type: isW8BENReturned ? "error" : "action",
+        title: isW8BENReturned 
+          ? "Tax Form W-8BEN Action Required: Form was returned for review"
+          : "Tax Form W-8BEN Required: Please submit your foreign tax status certificate",
+        description: isW8BENReturned
+          ? `Reason: ${w8benData.form_data?._return_reason || "Please review and submit a corrected form."}`
+          : "We require a signed W-8BEN form on file before payments can be processed.",
+        buttonText: isW8BENReturned ? "Update W-8BEN" : "Submit W-8BEN",
+        tab: "tax",
+      });
+    }
+
+    // 2. Work Order check & Expiration check
+    const hasWorkOrder = !!onboarding?.work_order_path;
+    const contractEndDateStr = onboarding?.contract_end_date;
+
+    if (!hasWorkOrder) {
+      list.push({
+        id: "work_order",
+        type: "action",
+        title: "Work Order Required: Please upload your signed work order",
+        description: "A signed work order must be uploaded to complete your profile onboarding.",
+        buttonText: "Upload Work Order",
+        tab: "onboarding",
+      });
+    } else if (contractEndDateStr) {
+      const endDate = new Date(contractEndDateStr);
+      if (!isNaN(endDate.getTime())) {
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const endStart = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+        const diffTime = endStart.getTime() - todayStart.getTime();
+        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (daysRemaining <= 7) {
+          const formattedDate = format(endDate, "MMM d, yyyy");
+          list.push({
+            id: "work_order_expiring",
+            type: daysRemaining < 0 ? "error" : "warning",
+            title: daysRemaining < 0
+              ? `Work Order Expired: Your contract expired on ${formattedDate}`
+              : `Work Order Expiring: Your contract will expire in ${daysRemaining === 0 ? 'today' : daysRemaining === 1 ? '1 day' : daysRemaining + ' days'} (${formattedDate})`,
+            description: "Please upload a new signed work order to prevent any interruptions to invoicing or work periods.",
+            buttonText: "Upload New Work Order",
+            tab: "onboarding",
+          });
+        }
+      }
+    }
+
+    return list;
+  }, [w8benData, onboarding]);
+
+  // Calculate metrics dynamically on client side
+  const metrics = React.useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    let totalInvoiced = 0;
+    let totalReceived = 0;
+    let totalOutstanding = 0;
+    let totalOverdue = 0;
+    let collectedThisYear = 0;
+
+    const statusCounts = {
+      Paid: { count: 0, amount: 0 },
+      Approved: { count: 0, amount: 0 },
+      Pending: { count: 0, amount: 0 },
+      ActionRequired: { count: 0, amount: 0 },
+    };
+
+    submissions.forEach((submission) => {
+      const amount = submission.totalAmount || 0;
+      totalInvoiced += amount;
+
+      const subDate = new Date(submission.submissionDate);
+      const isPaid = submission.status === "PAID";
+      
+      // An invoice is outstanding if it is pending review, clarification, or approved (awaiting payment)
+      const isOutstanding = 
+        submission.status === "PENDING_MANAGER" || 
+        submission.status === "CLARIFICATION_REQUESTED" || 
+        submission.status === "AWAITING_ADMIN_PAYMENT";
+
+      // An invoice is overdue if it is outstanding and the submission date is older than 30 days
+      let isOverdue = false;
+      if (isOutstanding && !isNaN(subDate.getTime())) {
+        const dueDate = new Date(subDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+        isOverdue = now > dueDate;
+      }
+
+      if (isPaid) {
+        totalReceived += amount;
+        statusCounts.Paid.count += 1;
+        statusCounts.Paid.amount += amount;
+
+        // Check if submission date is in current calendar year
+        if (!isNaN(subDate.getTime()) && subDate.getFullYear() === currentYear) {
+          collectedThisYear += amount;
+        }
+      } else {
+        if (isOutstanding) {
+          totalOutstanding += amount;
+          if (isOverdue) {
+            totalOverdue += amount;
+          }
+        }
+
+        if (submission.status === "AWAITING_ADMIN_PAYMENT") {
+          statusCounts.Approved.count += 1;
+          statusCounts.Approved.amount += amount;
+        } else if (
+          submission.status === "PENDING_MANAGER" ||
+          submission.status === "CLARIFICATION_REQUESTED"
+        ) {
+          statusCounts.Pending.count += 1;
+          statusCounts.Pending.amount += amount;
+        } else if (submission.status === "REJECTED_CONTRACTOR") {
+          statusCounts.ActionRequired.count += 1;
+          statusCounts.ActionRequired.amount += amount;
+        }
+      }
+    });
+
+    return {
+      totalInvoiced,
+      totalReceived,
+      totalOutstanding,
+      totalOverdue,
+      collectedThisYear,
+      statusCounts,
+    };
+  }, [submissions]);
+
   const { deleteSubmission, loading: isDeleting } = useDeleteSubmission();
 
   // Delete confirmation state
@@ -161,6 +345,126 @@ export function ContractorDashboard({
           <p className="text-sm text-gray-600 mt-3 sm:mt-2 text-center sm:text-left">
             Submit your work hours for the selected period
           </p>
+        </div>
+
+        {/* Required Actions Checklist */}
+        {actionsChecklist.length > 0 && (
+          <div className="max-w-[1040px] mx-auto px-6 mb-6">
+            <div className="bg-white border border-red-200 dark:border-red-900 rounded-xl overflow-hidden shadow-sm">
+              <div className="bg-red-50/75 dark:bg-red-950/20 px-5 py-3 border-b border-red-100 dark:border-red-950 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-500" />
+                <h3 className="font-semibold text-red-900 dark:text-red-400 text-sm">Required Actions</h3>
+              </div>
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                {actionsChecklist.map((item) => (
+                  <div key={item.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${item.type === 'error' ? 'bg-red-500' : item.type === 'warning' ? 'bg-amber-500' : 'bg-blue-500'}`} />
+                        <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{item.title}</h4>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 pl-4">{item.description}</p>
+                    </div>
+                    <Button
+                      onClick={() => onNavigateToProfile?.(item.tab)}
+                      className="shrink-0 h-9 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-4 font-medium transition-colors"
+                    >
+                      {item.buttonText}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dashboard Stats Section */}
+        <div className="max-w-[1040px] mx-auto px-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+            {/* Card 1: At a Glance */}
+            <Card className="p-6 border border-gray-200 dark:border-gray-800 rounded-[14px] bg-white dark:bg-card flex flex-col justify-between shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all">
+              <div className="flex items-start justify-between mb-3">
+                <div className="text-sm text-gray-600 dark:text-gray-400">At a Glance</div>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                  <Clock className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="space-y-2 mt-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-500 dark:text-gray-400">Outstanding:</span>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100">
+                    {metrics.totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-500 dark:text-gray-400">Overdue:</span>
+                  <span className="font-semibold text-red-600 dark:text-red-400">
+                    {metrics.totalOverdue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-500 dark:text-gray-400">Collected this Year:</span>
+                  <span className="font-semibold text-green-600 dark:text-green-400">
+                    {metrics.collectedThisYear.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                  </span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Card 2: Total Amount Invoiced */}
+            <MetricCard
+              title="Total Invoiced"
+              value={`${metrics.totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`}
+              subtitle="All submitted invoices"
+              icon={FileText}
+              accentColor="purple"
+            />
+
+            {/* Card 3: Total Amount Received */}
+            <MetricCard
+              title="Total Received (Paid)"
+              value={`${metrics.totalReceived.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`}
+              subtitle="Successfully collected"
+              icon={DollarSign}
+              accentColor="green"
+            />
+
+            {/* Card 4: Invoice Status Breakdown */}
+            <Card className="p-6 border border-gray-200 dark:border-gray-800 rounded-[14px] bg-white dark:bg-card flex flex-col justify-between shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all">
+              <div className="flex items-start justify-between mb-3">
+                <div className="text-sm text-gray-600 dark:text-gray-400">Invoice Statuses</div>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
+                  <FileText className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2">
+                <div className="flex flex-col text-xs leading-tight">
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Paid</span>
+                  <span className="font-semibold text-purple-700 dark:text-purple-400 text-sm">
+                    {metrics.statusCounts.Paid.count} ({metrics.statusCounts.Paid.amount.toLocaleString('en-US', { maximumFractionDigits: 0 })} USD)
+                  </span>
+                </div>
+                <div className="flex flex-col text-xs leading-tight">
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Approved</span>
+                  <span className="font-semibold text-green-700 dark:text-green-400 text-sm">
+                    {metrics.statusCounts.Approved.count} ({metrics.statusCounts.Approved.amount.toLocaleString('en-US', { maximumFractionDigits: 0 })} USD)
+                  </span>
+                </div>
+                <div className="flex flex-col text-xs leading-tight">
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Pending</span>
+                  <span className="font-semibold text-amber-700 dark:text-amber-400 text-sm">
+                    {metrics.statusCounts.Pending.count} ({metrics.statusCounts.Pending.amount.toLocaleString('en-US', { maximumFractionDigits: 0 })} USD)
+                  </span>
+                </div>
+                <div className="flex flex-col text-xs leading-tight">
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Action Req.</span>
+                  <span className="font-semibold text-red-600 dark:text-red-400 text-sm">
+                    {metrics.statusCounts.ActionRequired.count} ({metrics.statusCounts.ActionRequired.amount.toLocaleString('en-US', { maximumFractionDigits: 0 })} USD)
+                  </span>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
 
         {/* Recent Submissions Section */}
