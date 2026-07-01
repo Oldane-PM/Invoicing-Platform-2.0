@@ -17,6 +17,7 @@ import {
   TabsTrigger,
 } from "../../components/ui/tabs";
 import { toast } from "sonner";
+import { supabase } from "../../lib/supabase/client";
 import {
   Calendar,
   DollarSign,
@@ -28,6 +29,10 @@ import {
   ExternalLink,
   Hash,
   Trash2,
+  ChevronDown,
+  Edit,
+  DownloadCloud,
+  RefreshCw,
 } from "lucide-react";
 import { useContractorProfile } from "../../lib/hooks/contractor/useContractorProfile";
 import { useVendorOnboarding } from "../../lib/hooks/contractor/useVendorOnboarding";
@@ -48,7 +53,7 @@ export function ContractorProfile({
   onCancel,
   initialTab,
 }: ContractorProfileProps) {
-  const { profile, contract, isLoading, isSaving, error, saveProfile } =
+  const { profile, contract, isLoading, isSaving, error, saveProfile, reload: reloadProfile } =
     useContractorProfile();
 
   // Onboarding (work order + contract details + invoice sequence)
@@ -62,6 +67,7 @@ export function ContractorProfile({
     getWorkOrderUrl,
     extractWorkOrder,
     extractPreviousInvoice,
+    reload,
   } = useVendorOnboarding();
 
   const [activeTab, setActiveTab] = React.useState(initialTab || "personal");
@@ -85,8 +91,42 @@ export function ContractorProfile({
     React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [invoiceUploadError, setInvoiceUploadError] = React.useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [woMenuOpen, setWoMenuOpen] = React.useState(false);
+
+  const handleDownloadWorkOrder = async () => {
+    try {
+      if (!onboarding?.work_order_path) return;
+      const { data, error } = await supabase?.storage
+        .from('invoices')
+        .createSignedUrl(onboarding.work_order_path, 3600) || {};
+      if (error || !data) throw error || new Error("Failed to get signed URL");
+      window.open(data.signedUrl, '_blank');
+    } catch (err) {
+      toast.error("Failed to generate download link.");
+    }
+  };
+
+  const handleEditWorkOrderMetadata = async () => {
+    if (!profile) return;
+    const currentName = onboarding?.work_order_filename || "Work order";
+    const newName = prompt("Rename work order file:", currentName);
+    if (newName === null || newName.trim() === "") return;
+
+    try {
+      const response = await supabase
+        ?.from('vendor_onboarding')
+        .update({ work_order_filename: newName })
+        .eq('contractor_id', profile.user_id);
+      if (response?.error) throw response.error;
+      toast.success("Filename updated successfully!");
+      reload();
+    } catch (err) {
+      toast.error("Failed to rename document.");
+    }
+  };
   const invoiceFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Initialize onboarding form from stored data once it loads
   React.useEffect(() => {
@@ -157,8 +197,25 @@ export function ContractorProfile({
               if (ext.rateType === "fixed" || ext.rateType === "hourly") {
                 setWoRateType(ext.rateType);
               }
-              if (ext.startDate) setWoStart(ext.startDate);
+               if (ext.startDate) setWoStart(ext.startDate);
               if (ext.endDate) setWoEnd(ext.endDate);
+              
+              if (ext.personalInfo) {
+                const p = ext.personalInfo;
+                if (p.fullName) setFullName(p.fullName);
+                if (p.addressLine1) setAddressLine1(p.addressLine1);
+                if (p.addressLine2) setAddressLine2(p.addressLine2);
+                if (p.stateParish) setStateParish(p.stateParish);
+                if (p.country) setCountry(p.country);
+                if (p.postalCode) setPostalCode(p.postalCode);
+                if (p.email) setEmail(p.email);
+                if (p.phone) setPhone(p.phone);
+              }
+              
+              // Trigger reload of cached contractor profile personal info from DB
+              setIsInitialized(false);
+              reloadProfile();
+              
               return extractResult.data;
             } else {
               throw new Error(
@@ -1040,23 +1097,78 @@ export function ContractorProfile({
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="relative">
                     <Button
                       variant="ghost"
-                      onClick={handleViewWorkOrder}
-                      className="h-9 px-3 text-blue-600 hover:bg-blue-50 shrink-0 cursor-pointer"
+                      onClick={() => setWoMenuOpen(!woMenuOpen)}
+                      className="h-9 w-9 p-0 text-gray-500 hover:bg-gray-100 shrink-0 cursor-pointer rounded-lg"
                     >
-                      <ExternalLink className="w-4 h-4 mr-1.5" />
-                      View
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${woMenuOpen ? 'rotate-180' : ''}`} />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={handleRemoveWorkOrder}
-                      className="h-9 px-3 text-red-600 hover:bg-red-50 shrink-0 cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4 mr-1.5" />
-                      Remove
-                    </Button>
+
+                    {woMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-30" onClick={() => setWoMenuOpen(false)} />
+                        <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-40 animate-fadeIn">
+                          <button
+                            onClick={() => {
+                              setWoMenuOpen(false);
+                              handleViewWorkOrder();
+                            }}
+                            className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+                            View Document
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              setWoMenuOpen(false);
+                              handleDownloadWorkOrder();
+                            }}
+                            className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                          >
+                            <DownloadCloud className="w-3.5 h-3.5 text-gray-400" />
+                            Download Document
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setWoMenuOpen(false);
+                              handleEditWorkOrderMetadata();
+                            }}
+                            className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                          >
+                            <Edit className="w-3.5 h-3.5 text-gray-400" />
+                            Edit Metadata (Rename)
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setWoMenuOpen(false);
+                              fileInputRef.current?.click();
+                            }}
+                            className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
+                            Replace PDF File
+                          </button>
+
+                          <div className="border-t border-gray-100 my-1" />
+
+                          <button
+                            onClick={() => {
+                              setWoMenuOpen(false);
+                              handleRemoveWorkOrder();
+                            }}
+                            className="w-full text-left px-3.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            Delete Work Order
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               ) : (

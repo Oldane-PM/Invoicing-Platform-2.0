@@ -50,6 +50,7 @@ export interface UseVendorOnboardingResult {
       reasons?: string[];
       validationStatus?: string;
       validationDetails?: any;
+      personalInfo?: any;
     };
   }>;
   extractPreviousInvoice: (storagePath: string) => Promise<{

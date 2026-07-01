@@ -9,6 +9,7 @@ import userRoutes from "./routes/user.routes";
 import w8benRoutes from "./routes/w8ben.routes";
 import workOrderRoutes from "./routes/workOrder.routes";
 import { startInvoiceReminderScheduler } from "./services/invoiceReminderService";
+import adminConfigRoutes from "./routes/adminConfig.routes";
 
 const app = express();
 const port = Number(process.env.PORT ?? 5001);
@@ -67,6 +68,9 @@ app.use("/api/w8ben", w8benRoutes);
 
 // Work order extraction routes
 app.use("/api/work-order", workOrderRoutes);
+
+// Admin configuration routes
+app.use("/api/admin/config", adminConfigRoutes);
 
 // OAuth callback routes (mounted separately to avoid conflict with Better Auth)
 app.use("/api/callback", oauthCallbackRoutes);

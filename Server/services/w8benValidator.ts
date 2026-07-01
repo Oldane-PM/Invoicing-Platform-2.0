@@ -1,4 +1,5 @@
 import mammoth from 'mammoth';
+import { getSupabaseAdmin } from '../clients/supabase.server';
 
 export interface W8BenValidationResult {
   isValid: boolean;
@@ -18,7 +19,8 @@ export interface W8BenValidationResult {
 export async function validateW8BenFromFile(
   fileBuffer: Buffer,
   mimeType: string,
-  fileName: string
+  fileName: string,
+  _userId?: string | null
 ): Promise<W8BenValidationResult> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -37,6 +39,46 @@ export async function validateW8BenFromFile(
     }
   }
 
+  // Fetch configs from DB with static fallbacks
+  let activeRules = [
+    { rule_name: 'IRS W-8BEN Layout & Header', rule_description: 'Verifies that structure matching the standard IRS Form W-8BEN is present', rule_type: 'layout', weight: 50 },
+    { rule_name: 'Certification Block Presence', rule_description: 'Checks for Part III certification text blocks and sign-off guidelines', rule_type: 'signature', weight: 20 },
+    { rule_name: 'Contractor Signature Check', rule_description: 'Detects the physical or digital signature of the beneficial owner in Part III', rule_type: 'signature', weight: 30 }
+  ];
+
+  let extractionFields = [
+    { field_name: 'Beneficial Owner Name', field_description: 'First and last name of the beneficial owner', field_format: 'string', mapping_key: 'name', is_required: true },
+    { field_name: 'Citizenship Country', field_description: 'Country of citizenship', field_format: 'string', mapping_key: 'citizenship', is_required: true },
+    { field_name: 'Permanent Residence Address', field_description: 'Physical street address of residence', field_format: 'string', mapping_key: 'residenceAddress', is_required: true },
+    { field_name: 'Typed Signature Name', field_description: 'Typed name of the signatory beneficial owner', field_format: 'string', mapping_key: 'signatureName', is_required: true }
+  ];
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: dbRules, error: rErr } = await supabase
+      .from('admin_verification_rules')
+      .select('*')
+      .eq('document_type', 'w8ben')
+      .eq('is_active', true);
+    if (!rErr && dbRules && dbRules.length > 0) {
+      activeRules = dbRules;
+    }
+
+    const { data: dbFields, error: fErr } = await supabase
+      .from('admin_extraction_fields')
+      .select('*')
+      .eq('document_type', 'w8ben');
+    if (!fErr && dbFields && dbFields.length > 0) {
+      extractionFields = dbFields;
+    }
+  } catch (dbErr) {
+    console.warn('[w8benValidator] Failed to load rules from DB, falling back to static config:', dbErr);
+  }
+
+  const getRuleJsonKey = (rule: any) => {
+    return 'has_' + rule.rule_name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_+|_+$)/g, '');
+  };
+
   let contents: any[] = [];
   
   if (isPdf) {
@@ -46,28 +88,22 @@ export async function validateW8BenFromFile(
       text: `Analyze the provided tax form document (passed as a base64 PDF in user content) and check if it is a valid, completed IRS Form W-8BEN (Certificate of Foreign Status of Beneficial Owner for United States Tax Withholding and Reporting).
 
 Check for these visual layout and content characteristics:
-1. Expected W-8BEN Layout:
-   - Does it contain headers like "Form W-8BEN", "Department of the Treasury Internal Revenue Service", or "Certificate of Foreign Status of Beneficial Owner"?
-   - Does it have Part I (Identification of Beneficial Owner), Part II (Claim of Tax Treaty Benefits), Part III (Certification)?
-2. Sign-off / Certification Area:
-   - Does Part III contain the required IRS certification paragraphs and a sign-off area?
-3. Contractor Signature:
-   - Is there a handwritten signature, digital signature (e.g. DocuSign, Adobe Sign), or signature stamp in the "Sign Here" section of Part III?
-   - Is there a signature date next to the signature?
+${activeRules.map(r => `- ${getRuleJsonKey(r)}: boolean. ${r.rule_description || r.rule_name} (Type: ${r.rule_type}).`).join('\n')}
+
+Also extract these key fields:
+${extractionFields.map(f => `- ${f.mapping_key}: ${f.field_description || f.field_name} (Format: ${f.field_format}).`).join('\n')}
 
 Evaluate these details and return a JSON object with the following fields:
-- hasExpectedLayout: true if the layout structure, titles, and sections match the standard IRS Form W-8BEN, false otherwise.
-- hasSignOffArea: true if the certification and sign-off area in Part III is present, false otherwise.
-- hasContractorSignature: true if a signature (handwritten, stamp, or digital certificate) is visible/present in the signature area of Part III, false otherwise.
+${activeRules.map(r => `"${getRuleJsonKey(r)}": boolean`).join(',\n')},
+${extractionFields.map(f => `"${f.mapping_key}": any`).join(',\n')},
 - layoutNotes: A short explanation (1-2 sentences) of layout and text matching findings.
 - signatureNotes: A short description of the signature findings in Part III.
 
 Return the result STRICTLY as a JSON object inside a fenced markdown block:
 \`\`\`json
 {
-  "hasExpectedLayout": true | false,
-  "hasSignOffArea": true | false,
-  "hasContractorSignature": true | false,
+  ${activeRules.map(r => `"${getRuleJsonKey(r)}": boolean`).join(',\n  ')},
+  ${extractionFields.map(f => `"${f.mapping_key}": any`).join(',\n  ')},
   "layoutNotes": "...",
   "signatureNotes": "..."
 }
@@ -89,23 +125,22 @@ ${extractedText || 'No text extracted. Please inspect name: ' + fileName}
 ---
 Check if this document matches the content of a valid IRS Form W-8BEN (Certificate of Foreign Status of Beneficial Owner for United States Tax Withholding and Reporting).
 Extract/check these details:
-1. Expected W-8BEN Layout: Check if titles like "Form W-8BEN", "Beneficial Owner", and "Certification" are present.
-2. Sign-off / Certification Area: Check if Part III (Certification) text is present.
-3. Contractor Signature: Check if there's a signature, signature text, or placeholder in Part III.
+${activeRules.map(r => `- ${getRuleJsonKey(r)}: boolean. ${r.rule_description || r.rule_name} (Type: ${r.rule_type}).`).join('\n')}
+
+Also extract these key fields:
+${extractionFields.map(f => `- ${f.mapping_key}: ${f.field_description || f.field_name} (Format: ${f.field_format}).`).join('\n')}
 
 Evaluate these details and return a JSON object with the following fields:
-- hasExpectedLayout: true if it matches a standard W-8BEN content structure, false otherwise.
-- hasSignOffArea: true if the Part III certification block is present, false otherwise.
-- hasContractorSignature: true if signature details are present, false otherwise.
+${activeRules.map(r => `"${getRuleJsonKey(r)}": boolean`).join(',\n')},
+${extractionFields.map(f => `"${f.mapping_key}": any`).join(',\n')},
 - layoutNotes: A short explanation of findings.
 - signatureNotes: A short description of signature findings.
 
 Return the result STRICTLY as a JSON object inside a fenced markdown block:
 \`\`\`json
 {
-  "hasExpectedLayout": true | false,
-  "hasSignOffArea": true | false,
-  "hasContractorSignature": true | false,
+  ${activeRules.map(r => `"${getRuleJsonKey(r)}": boolean`).join(',\n  ')},
+  ${extractionFields.map(f => `"${f.mapping_key}": any`).join(',\n  ')},
   "layoutNotes": "...",
   "signatureNotes": "..."
 }
@@ -163,38 +198,63 @@ Return only the JSON block without extra explanations.`
     reasons.push("Document is not in PDF format. W-8BEN tax forms must be uploaded as PDF files.");
   }
 
-  // 5. Calculate Confidence Score based on document format
+  // 5. Calculate Confidence Score based on dynamic rules & weights
   let confidenceScore = 0;
-  if (parsed.hasExpectedLayout) {
-    confidenceScore += 50;
-  } else {
-    reasons.push("Document structure and section headers do not match a standard IRS Form W-8BEN.");
+  let totalWeight = 0;
+
+  for (const rule of activeRules) {
+    const jsonKey = getRuleJsonKey(rule);
+    const passed = !!parsed[jsonKey];
+    totalWeight += rule.weight;
+    if (passed) {
+      confidenceScore += rule.weight;
+    } else {
+      reasons.push(`${rule.rule_name} check failed: ${rule.rule_description || 'Check not satisfied'}.`);
+    }
   }
 
-  if (parsed.hasSignOffArea) {
-    confidenceScore += 20;
+  if (totalWeight > 0) {
+    confidenceScore = Math.round((confidenceScore / totalWeight) * 100);
   } else {
-    reasons.push("The document is missing the required Part III Certification section.");
+    confidenceScore = 100;
   }
 
-  if (parsed.hasContractorSignature) {
-    confidenceScore += 30;
-  } else {
-    reasons.push("Beneficial Owner (Contractor) signature is missing or was not detected in Part III.");
-  }
-
-  confidenceScore = Math.max(0, Math.min(100, confidenceScore));
-
-  // Determine overall validity & status purely based on format/signatures
+  // Determine overall validity & status
   let validationStatus: 'valid' | 'invalid' | 'needs_manual_review' = 'needs_manual_review';
   if (!isPdf) {
     validationStatus = 'invalid';
-  } else if (!parsed.hasExpectedLayout) {
-    validationStatus = 'invalid';
-  } else if (confidenceScore >= 80) { // layout (50) + sign-off (20) + signature (30) = 100
+  } else if (confidenceScore >= 80) {
     validationStatus = 'valid';
   } else if (confidenceScore < 50) {
     validationStatus = 'invalid';
+  }
+
+  // 6. Write logs to audit tables in background
+  try {
+    const supabase = getSupabaseAdmin();
+    await supabase.from('document_validation_findings').insert({
+      contractor_user_id: _userId || 'unknown',
+      document_type: 'w8ben',
+      pdf_url: null,
+      findings_json: parsed,
+      confidence_score: confidenceScore,
+      validation_status: validationStatus,
+      reasons: reasons
+    });
+
+    const extractedPayload: any = {};
+    extractionFields.forEach(f => {
+      extractedPayload[f.mapping_key] = parsed[f.mapping_key] || null;
+    });
+
+    await supabase.from('document_extracted_data').insert({
+      contractor_user_id: _userId || 'unknown',
+      document_type: 'w8ben',
+      pdf_url: null,
+      extracted_json: extractedPayload
+    });
+  } catch (logErr) {
+    console.warn('[w8benValidator] Failed to save dynamic audit log records:', logErr);
   }
 
   return {
@@ -204,9 +264,9 @@ Return only the JSON block without extra explanations.`
     reasons,
     validationDetails: {
       isPdf,
-      hasExpectedLayout: !!parsed.hasExpectedLayout,
-      hasSignOffArea: !!parsed.hasSignOffArea,
-      hasContractorSignature: !!parsed.hasContractorSignature,
+      hasExpectedLayout: !!parsed[getRuleJsonKey(activeRules[0] || {})],
+      hasSignOffArea: !!parsed[getRuleJsonKey(activeRules[1] || {})],
+      hasContractorSignature: !!parsed[getRuleJsonKey(activeRules[2] || {})],
       layoutNotes: parsed.layoutNotes || '',
       signatureNotes: parsed.signatureNotes || ''
     }
