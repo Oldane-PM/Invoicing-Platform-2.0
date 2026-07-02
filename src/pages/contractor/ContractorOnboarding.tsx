@@ -17,6 +17,7 @@ import {
   Info,
   Lock,
   Shield,
+  CreditCard,
 } from "lucide-react";
 import { useVendorOnboarding } from "../../lib/hooks/contractor/useVendorOnboarding";
 
@@ -237,7 +238,7 @@ export function ContractorOnboarding() {
       }
 
       setUploadedPatch(patch);
-      setStep("review");
+      setStep(onboardingType === "new" ? "payment" : "review");
       toast.success("Documents uploaded and verified successfully!");
     } catch (err: any) {
       toast.error(err.message || "An error occurred during onboarding.");
@@ -419,8 +420,9 @@ export function ContractorOnboarding() {
     currentStep: "welcome" | "upload" | "review" | "payment";
   }) => {
     const isWelcomeDone = currentStep !== "welcome";
-    const isUploadDone = currentStep === "review" || currentStep === "payment";
-    const isReviewDone = currentStep === "payment";
+    const isUploadDone = currentStep === "payment" || currentStep === "review";
+    const isPaymentDone = currentStep === "review";
+    const isReviewDone = false;
     const isReviewActive = currentStep === "review";
     const isUploadActive = currentStep === "upload";
     const isWelcomeActive = currentStep === "welcome";
@@ -490,46 +492,23 @@ export function ContractorOnboarding() {
           className={`flex-1 h-0.5 -mt-6 transition-colors ${isUploadDone ? "bg-green-500" : "bg-gray-200"}`}
         />
 
-        <div className="flex flex-col items-center">
-          <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors ${
-              isReviewDone
-                ? "bg-green-500 border-green-500 text-white"
-                : isReviewActive
-                  ? "bg-blue-600 border-blue-600 text-white animate-pulse"
-                  : "bg-white border-gray-300 text-gray-400"
-            }`}
-          >
-            {isReviewDone ? (
-              <CheckCircle2 className="w-4 h-4 text-white" />
-            ) : (
-              "3"
-            )}
-          </div>
-          <span
-            className={`text-xs mt-1.5 font-medium ${isReviewActive ? "text-blue-600 font-semibold" : "text-gray-500"}`}
-          >
-            Review & Confirm
-          </span>
-          <span className={`text-[10px] text-gray-400 mt-0.5`}>
-            {isReviewDone ? "Completed" : isReviewActive ? "In Progress" : "Upcoming"}
-          </span>
-        </div>
-
-        {onboardingType === "new" && (
+        {onboardingType === "new" ? (
           <>
-            <div
-              className={`flex-1 h-0.5 -mt-6 transition-colors ${isReviewDone ? "bg-green-500" : "bg-gray-200"}`}
-            />
             <div className="flex flex-col items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors ${
-                  isPaymentActive
-                    ? "bg-blue-600 border-blue-600 text-white"
-                    : "bg-white border-gray-300 text-gray-400"
+                  isPaymentDone
+                    ? "bg-green-500 border-green-500 text-white"
+                    : isPaymentActive
+                      ? "bg-blue-600 border-blue-600 text-white animate-pulse"
+                      : "bg-white border-gray-300 text-gray-400"
                 }`}
               >
-                4
+                {isPaymentDone ? (
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                ) : (
+                  "3"
+                )}
               </div>
               <span
                 className={`text-xs mt-1.5 font-medium ${isPaymentActive ? "text-blue-600 font-semibold" : "text-gray-500"}`}
@@ -537,10 +516,66 @@ export function ContractorOnboarding() {
                 Banking
               </span>
               <span className={`text-[10px] text-gray-400 mt-0.5`}>
-                {isPaymentActive ? "In Progress" : "Upcoming"}
+                {isPaymentDone ? "Completed" : isPaymentActive ? "In Progress" : "Upcoming"}
+              </span>
+            </div>
+
+            <div
+              className={`flex-1 h-0.5 -mt-6 transition-colors ${isPaymentDone ? "bg-green-500" : "bg-gray-200"}`}
+            />
+
+            <div className="flex flex-col items-center">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors ${
+                  isReviewDone
+                    ? "bg-green-500 border-green-500 text-white"
+                    : isReviewActive
+                      ? "bg-blue-600 border-blue-600 text-white animate-pulse"
+                      : "bg-white border-gray-300 text-gray-400"
+                }`}
+              >
+                {isReviewDone ? (
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                ) : (
+                  "4"
+                )}
+              </div>
+              <span
+                className={`text-xs mt-1.5 font-medium ${isReviewActive ? "text-blue-600 font-semibold" : "text-gray-500"}`}
+              >
+                Review & Confirm
+              </span>
+              <span className={`text-[10px] text-gray-400 mt-0.5`}>
+                {isReviewDone ? "Completed" : isReviewActive ? "In Progress" : "Upcoming"}
               </span>
             </div>
           </>
+        ) : (
+          <div className="flex flex-col items-center">
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors ${
+                isReviewDone
+                  ? "bg-green-500 border-green-500 text-white"
+                  : isReviewActive
+                    ? "bg-blue-600 border-blue-600 text-white animate-pulse"
+                    : "bg-white border-gray-300 text-gray-400"
+              }`}
+            >
+              {isReviewDone ? (
+                <CheckCircle2 className="w-4 h-4 text-white" />
+              ) : (
+                "3"
+              )}
+            </div>
+            <span
+              className={`text-xs mt-1.5 font-medium ${isReviewActive ? "text-blue-600 font-semibold" : "text-gray-500"}`}
+            >
+              Review & Confirm
+            </span>
+            <span className={`text-[10px] text-gray-400 mt-0.5`}>
+              {isReviewDone ? "Completed" : isReviewActive ? "In Progress" : "Upcoming"}
+            </span>
+          </div>
         )}
       </div>
     );
@@ -922,8 +957,58 @@ export function ContractorOnboarding() {
                   </div>
                 </div>
 
+                {/* Banking Details Summary Card */}
+                {onboardingType === "new" && (
+                  <div className="border border-gray-200 rounded-xl p-6 bg-white shadow-sm mt-6">
+                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+                      <div className="flex items-center gap-2 font-bold text-gray-900 text-lg">
+                        <CreditCard className="w-5 h-5 text-blue-600" />
+                        Banking Details
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setStep("payment")}
+                        className="text-blue-600 border-blue-200 hover:bg-blue-50/50 flex items-center gap-1.5"
+                      >
+                        Edit
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-2 gap-y-6 gap-x-4">
+                      <div className="col-span-2">
+                        <span className="text-xs font-semibold text-gray-400 block">Name of Bank</span>
+                        <span className="text-[15px] font-bold text-gray-900">{bankName || "—"}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-xs font-semibold text-gray-400 block">Bank Address</span>
+                        <span className="text-[15px] font-bold text-gray-900">{bankAddress || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-gray-400 block">SWIFT Code</span>
+                        <span className="text-[15px] font-bold text-gray-900">{swiftCode || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-gray-400 block">ABA / Wire Routing</span>
+                        <span className="text-[15px] font-bold text-gray-900">{routingNumber || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-gray-400 block">Account Type</span>
+                        <span className="text-[15px] font-bold text-gray-900">{accountType || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-gray-400 block">Currency</span>
+                        <span className="text-[15px] font-bold text-gray-900">{currency || "—"}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-xs font-semibold text-gray-400 block">Account Number</span>
+                        <span className="text-[15px] font-bold text-gray-900">{accountNumber || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Uploaded Documents List */}
-                <div className="border border-gray-200 rounded-xl p-6 bg-white shadow-sm">
+                <div className="border border-gray-200 rounded-xl p-6 bg-white shadow-sm mt-6">
                   <div className="font-bold text-gray-900 text-lg mb-6 pb-4 border-b border-gray-100 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-gray-500" />
                     Uploaded Documents
@@ -1010,7 +1095,7 @@ export function ContractorOnboarding() {
               <div className="pt-8 mt-8 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-between items-center gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => setStep("upload")}
+                  onClick={() => setStep(onboardingType === "new" ? "payment" : "upload")}
                   disabled={isSubmitting}
                   className="h-11 px-6 sm:w-auto w-full border-gray-300 flex items-center gap-1.5"
                 >
@@ -1021,20 +1106,14 @@ export function ContractorOnboarding() {
                   Encrypted & secure
                 </div>
                 <Button
-                  onClick={() => {
-                    if (onboardingType === "new") {
-                      setStep("payment");
-                    } else {
-                      handleConfirmAndFinish();
-                    }
-                  }}
+                  onClick={handleConfirmAndFinish}
                   disabled={isSubmitting}
                   className="h-11 px-8 sm:w-auto w-full bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : null}
-                  {onboardingType === "new" ? "Continue to Payment Details" : isSubmitting ? "Saving..." : "Confirm & Finish"}
+                  {isSubmitting ? "Saving..." : "Confirm & Finish"}
                   {!isSubmitting && <ChevronRight className="w-4 h-4" />}
                 </Button>
               </div>
@@ -1105,7 +1184,7 @@ export function ContractorOnboarding() {
                 <div className="pt-8 mt-8 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-between items-center gap-3">
                   <Button
                     variant="outline"
-                    onClick={() => setStep("review")}
+                    onClick={() => setStep("upload")}
                     disabled={isSubmitting}
                     className="h-11 px-6 sm:w-auto w-full border-gray-300 flex items-center gap-1.5"
                   >
@@ -1116,15 +1195,12 @@ export function ContractorOnboarding() {
                     Encrypted & secure
                   </div>
                   <Button
-                    onClick={handleConfirmAndFinish}
+                    onClick={() => setStep("review")}
                     disabled={isSubmitting}
                     className="h-11 px-8 sm:w-auto w-full bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm flex items-center justify-center gap-2"
                   >
-                    {isSubmitting ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : null}
-                    {isSubmitting ? "Finishing Setup..." : "Confirm & Finish"}
-                    {!isSubmitting && <ChevronRight className="w-4 h-4" />}
+                    Continue to Review
+                    <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
