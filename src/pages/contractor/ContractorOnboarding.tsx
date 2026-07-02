@@ -29,11 +29,13 @@ import {
 } from "../../lib/data/vendorOnboarding/vendorOnboarding.repo";
 import { useAuth } from "../../lib/hooks/useAuth";
 import { getSupabaseClient } from "../../lib/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 type OnboardingType = "new" | "migrating" | null;
 
 export function ContractorOnboarding() {
   const { user, profile } = useAuth();
+  const queryClient = useQueryClient();
   const [onboardingType, setOnboardingType] =
     React.useState<OnboardingType>(null);
 
@@ -68,7 +70,6 @@ export function ContractorOnboarding() {
   const [contractorName, setContractorName] = React.useState("");
   const [workOrderNumber, setWorkOrderNumber] = React.useState("");
   const [role, setRole] = React.useState("");
-  const [department, setDepartment] = React.useState("Information Technology");
   const [rate, setRate] = React.useState<number | "">("");
   const [rateType, setRateType] = React.useState<"hourly" | "fixed">("hourly");
   const [startDate, setStartDate] = React.useState("");
@@ -76,17 +77,14 @@ export function ContractorOnboarding() {
 
   // W-8BEN form extracted values
   const [taxName, setTaxName] = React.useState("");
-  const [taxStatus, setTaxStatus] = React.useState("Non-U.S. Individual");
-  const [taxResidence, setTaxResidence] = React.useState("Jamaica");
-  const [taxAddress, setTaxAddress] = React.useState(
-    "123 Main Street, Kingston 10, Kingston, Jamaica",
-  );
-  const [taxIdNum, setTaxIdNum] = React.useState("123-456-789");
-  const [exemptions, setExemptions] = React.useState("No");
+  const [taxStatus] = React.useState("Non-U.S. Individual");
+  const [taxResidence] = React.useState("Jamaica");
+  const [taxAddress] = React.useState("123 Main Street, Kingston 10, Kingston, Jamaica");
+  const [taxIdNum] = React.useState("123-456-789");
+  const [exemptions] = React.useState("No");
 
   // Editing state for review cards
   const [editContract, setEditContract] = React.useState(false);
-  const [editW8, setEditW8] = React.useState(false);
 
   // Storing the file upload details to submit in the final confirm step
   const [uploadedPatch, setUploadedPatch] = React.useState<any>(null);
@@ -170,6 +168,9 @@ export function ContractorOnboarding() {
             if (ext.endDate) {
               patch.contract_end_date = ext.endDate;
               setEndDate(ext.endDate);
+            }
+            if (ext.validationDetails?.extractedWorkOrderId) {
+              setWorkOrderNumber(ext.validationDetails.extractedWorkOrderId);
             }
           }
         }
@@ -310,7 +311,10 @@ export function ContractorOnboarding() {
         .eq("user_id", user?.id);
 
       toast.success("Profile onboarding completed successfully!");
-      window.location.reload();
+      
+      // Invalidate queries so parent App.tsx automatically and smoothly redirects to dashboard
+      queryClient.invalidateQueries({ queryKey: ["vendorOnboarding"] });
+      queryClient.invalidateQueries({ queryKey: ["contractorProfile", user?.id] });
     } catch (err: any) {
       toast.error(err.message || "An error occurred during final save.");
     } finally {
@@ -865,31 +869,8 @@ export function ContractorOnboarding() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs font-semibold text-gray-500">
-                          Department
-                        </Label>
-                        <Input
-                          value={department}
-                          onChange={(e) => setDepartment(e.target.value)}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-semibold text-gray-500">
-                          Contract Rate
-                        </Label>
-                        <Input
-                          type="number"
-                          value={rate}
-                          onChange={(e) =>
-                            setRate(
-                              e.target.value === ""
-                                ? ""
-                                : Number(e.target.value),
-                            )
-                          }
-                          className="mt-1"
-                        />
+                        <Label className="text-xs font-semibold text-gray-500">Contract Rate</Label>
+                        <Input type="number" value={rate} onChange={(e) => setRate(e.target.value === "" ? "" : Number(e.target.value))} className="mt-1" />
                       </div>
                       <div>
                         <Label className="text-xs font-semibold text-gray-500">
@@ -932,55 +913,27 @@ export function ContractorOnboarding() {
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-2 gap-y-6 gap-x-4">
                       <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Contractor Name
-                        </span>
+                        <span className="text-xs font-semibold text-gray-400 block">Contractor Name</span>
+                        <span className="text-[15px] font-bold text-gray-900">{contractorName || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-gray-400 block">Work Order / PO Number</span>
+                        <span className="text-[15px] font-bold text-gray-900">{workOrderNumber || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-gray-400 block">Role / Position</span>
+                        <span className="text-[15px] font-bold text-gray-900">{role || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-gray-400 block">Contract Rate</span>
                         <span className="text-[15px] font-bold text-gray-900">
-                          {contractorName || "—"}
+                          {rate ? `USD ${Number(rate).toFixed(2)} / ${rateType === "hourly" ? "hour" : "month"}` : "—"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Work Order / PO Number
-                        </span>
+                        <span className="text-xs font-semibold text-gray-400 block">Contract Duration</span>
                         <span className="text-[15px] font-bold text-gray-900">
-                          {workOrderNumber || "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Role / Position
-                        </span>
-                        <span className="text-[15px] font-bold text-gray-900">
-                          {role || "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Department
-                        </span>
-                        <span className="text-[15px] font-bold text-gray-900">
-                          {department || "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Contract Rate
-                        </span>
-                        <span className="text-[15px] font-bold text-gray-900">
-                          {rate
-                            ? `USD ${Number(rate).toFixed(2)} / ${rateType === "hourly" ? "hour" : "month"}`
-                            : "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Contract Duration
-                        </span>
-                        <span className="text-[15px] font-bold text-gray-900">
-                          {startDate
-                            ? `${startDate} to ${endDate || "Present"}`
-                            : "—"}
+                          {startDate ? `${startDate} to ${endDate || "Present"}` : "—"}
                         </span>
                       </div>
                     </div>
@@ -993,141 +946,14 @@ export function ContractorOnboarding() {
                 </div>
 
                 {/* W-8BEN Summary Card */}
-                <div className="border border-gray-200 rounded-xl p-6 bg-white shadow-sm">
-                  <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
-                    <div className="flex items-center gap-2 font-bold text-gray-900 text-lg">
-                      <FileText className="w-5 h-5 text-green-600" />
-                      W-8BEN Summary
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditW8(!editW8)}
-                      className="text-blue-600 border-blue-200 hover:bg-blue-50/50 flex items-center gap-1.5"
-                    >
-                      {editW8 ? "Save View" : "Edit"}
-                    </Button>
+                <div className="border border-gray-200 rounded-xl p-6 bg-white shadow-sm flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-gray-900 text-lg">
+                    <FileText className="w-5 h-5 text-green-600" />
+                    W-8BEN Summary
                   </div>
-
-                  {editW8 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-xs font-semibold text-gray-500">
-                          Full Name
-                        </Label>
-                        <Input
-                          value={taxName}
-                          onChange={(e) => setTaxName(e.target.value)}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-semibold text-gray-500">
-                          U.S. Taxpayer Status
-                        </Label>
-                        <Input
-                          value={taxStatus}
-                          onChange={(e) => setTaxStatus(e.target.value)}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-semibold text-gray-500">
-                          Country of Tax Residence
-                        </Label>
-                        <Input
-                          value={taxResidence}
-                          onChange={(e) => setTaxResidence(e.target.value)}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-semibold text-gray-500">
-                          Permanent Address
-                        </Label>
-                        <Input
-                          value={taxAddress}
-                          onChange={(e) => setTaxAddress(e.target.value)}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-semibold text-gray-500">
-                          Tax Identification Number (TIN)
-                        </Label>
-                        <Input
-                          value={taxIdNum}
-                          onChange={(e) => setTaxIdNum(e.target.value)}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-semibold text-gray-500">
-                          Exemptions Claimed
-                        </Label>
-                        <Input
-                          value={exemptions}
-                          onChange={(e) => setExemptions(e.target.value)}
-                          className="mt-1"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-2 gap-y-6 gap-x-4">
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Full Name
-                        </span>
-                        <span className="text-[15px] font-bold text-gray-900">
-                          {taxName || "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          U.S. Taxpayer Status
-                        </span>
-                        <span className="text-[15px] font-bold text-gray-900">
-                          {taxStatus || "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Country of Tax Residence
-                        </span>
-                        <span className="text-[15px] font-bold text-gray-900">
-                          {taxResidence || "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Permanent Address
-                        </span>
-                        <span className="text-[15px] font-bold text-gray-900">
-                          {taxAddress || "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Tax Identification Number (TIN)
-                        </span>
-                        <span className="text-[15px] font-bold text-gray-900">
-                          {taxIdNum || "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 block">
-                          Exemptions Claimed
-                        </span>
-                        <span className="text-[15px] font-bold text-gray-900">
-                          {exemptions || "—"}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-6 pt-4 border-t border-gray-100 flex items-center gap-2 text-xs text-green-700 bg-green-50/50 px-3 py-2.5 rounded-lg">
+                  <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 px-3 py-1.5 rounded-lg font-semibold border border-green-200">
                     <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                    <span>Details were extracted from your W-8BEN form.</span>
+                    <span>Submitted</span>
                   </div>
                 </div>
 

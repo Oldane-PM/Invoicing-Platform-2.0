@@ -287,6 +287,15 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
     }
   }, [isFixedRate, workingDaysCount, autoCalculatedHours, isHoursManuallyEdited]);
 
+  // Set default hours for fixed-rate contractors to 160, and clear overtime states
+  React.useEffect(() => {
+    if (isFixedRate && !isEditMode) {
+      setHoursSubmitted("160");
+      setOvertimeHours("");
+      setOvertimeDescription("");
+    }
+  }, [isFixedRate, isEditMode]);
+
   const handleMonthSelect = (monthIndex: number) => {
     setSelectedMonth(monthIndex);
     setExcludedDates([]); // Reset exclusions when month changes
@@ -362,11 +371,11 @@ export function SubmitHoursPage({ onCancel, onSuccess, editingSubmission }: Subm
 
     const draft: SubmissionDraft = {
       workPeriod,
-      excludedDates: excludedDatesStrings,
-      hoursSubmitted: parseInt(hoursSubmitted) || 0,
+      excludedDates: isFixedRate ? [] : excludedDatesStrings,
+      hoursSubmitted: isFixedRate ? 160 : (parseInt(hoursSubmitted) || 0),
       description: description.trim(),
-      overtimeHours: parseInt(overtimeHours) || 0,
-      overtimeDescription: overtimeDescription.trim() || null,
+      overtimeHours: isFixedRate ? 0 : (parseInt(overtimeHours) || 0),
+      overtimeDescription: isFixedRate ? null : (overtimeDescription.trim() || null),
       paymentLink: paymentLink.trim() || null,
       projectName: "General Work",
       projectId: undefined,

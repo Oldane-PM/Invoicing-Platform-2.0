@@ -550,10 +550,6 @@ function App() {
                 setEditingSubmission(submission);
                 setContractorScreen("submit-hours");
               }}
-              onNavigateToProfile={(tab) => {
-                setContractorProfileTab(tab || "personal");
-                setContractorScreen("profile");
-              }}
             />
           )}
           {contractorScreen === "profile" && (
