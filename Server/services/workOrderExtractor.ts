@@ -365,11 +365,21 @@ Do not write any markdown code block backticks, explanations, or extra text. Ret
     console.warn('[workOrderExtractor] Failed to save dynamic audit log records:', logErr);
   }
 
+  let normalizedRateType: 'hourly' | 'fixed' | null = null;
+  if (parsed.rateType) {
+    const raw = String(parsed.rateType).toLowerCase();
+    if (raw.includes('hour') || raw.includes('hr')) {
+      normalizedRateType = 'hourly';
+    } else if (raw.includes('fixed') || raw.includes('month') || raw.includes('flat') || raw.includes('salary')) {
+      normalizedRateType = 'fixed';
+    }
+  }
+
   return {
     // Flat fields (Backward compatibility for UI forms)
     role: parsed.role || null,
     rate: typeof parsed.rate === 'number' ? parsed.rate : null,
-    rateType: ['hourly', 'fixed'].includes(parsed.rateType) ? parsed.rateType : null,
+    rateType: normalizedRateType,
     startDate: parsed.startDate || null,
     endDate: parsed.endDate || null,
     personalInfo: parsed.personalInfo || null,
