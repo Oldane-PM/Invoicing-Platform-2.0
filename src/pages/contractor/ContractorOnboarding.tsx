@@ -327,16 +327,17 @@ export function ContractorOnboarding() {
       <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
         {/* Top Navbar */}
         <header className="w-full bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2.5 font-bold text-xl">
+          <div className="flex items-center gap-2.5 font-bold text-xl shrink-0">
             <img src="/intellibus-logo.png" alt="Intellibus Logo" className="h-8 object-contain" />
-            <span className="text-gray-900 ml-1">Invoice</span>{" "}
-            <span className="text-blue-600 font-medium">Portal</span>
+            <span className="text-gray-900 ml-1 whitespace-nowrap">
+              Invoice <span className="text-blue-600 font-medium">Portal</span>
+            </span>
           </div>
         </header>
 
         {/* Main Content */}
         <main className="flex-1 flex items-center justify-center p-4">
-          <div className="max-w-[850px] w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-10 md:p-12 text-center mt-6 mb-8">
+          <div className="max-w-[850px] w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-10 md:p-12 text-center mt-6 mb-8">
             <div className="flex justify-center mb-5"></div>
             <h1 className="text-[28px] font-bold text-gray-900 mb-4 tracking-tight">
               Welcome to the Invoice Platform!
@@ -353,7 +354,7 @@ export function ContractorOnboarding() {
             <div className="grid md:grid-cols-2 gap-6 mb-12 text-left">
               {/* New Contractor Card */}
               <div
-                className="border-[1.5px] border-blue-200 rounded-2xl p-8 flex flex-col items-center text-center hover:border-blue-400 transition-all bg-white shadow-sm hover:shadow-md cursor-pointer group"
+                className="border-[1.5px] border-blue-200 rounded-2xl p-6 sm:p-8 flex flex-col items-center text-center hover:border-blue-400 transition-all bg-white shadow-sm hover:shadow-md cursor-pointer group"
                 onClick={() => {
                   setOnboardingType("new");
                   setStep("upload");
@@ -372,7 +373,7 @@ export function ContractorOnboarding() {
                   I have never submitted an invoice or received a payment
                   through this platform.
                 </p>
-                <Button className="w-full bg-[#1A61D5] hover:bg-[#154db0] text-white h-12 rounded-lg mt-auto text-[15px] font-medium">
+                <Button className="w-full bg-[#1A61D5] hover:bg-[#154db0] text-white h-auto py-3.5 sm:h-12 rounded-lg mt-auto text-sm sm:text-[15px] font-medium whitespace-normal flex items-center justify-center gap-1.5 shrink-0">
                   Start New Contractor Setup{" "}
                   <ChevronRight className="w-4 h-4 ml-1.5" />
                 </Button>
@@ -380,7 +381,7 @@ export function ContractorOnboarding() {
 
               {/* Existing Contractor Card */}
               <div
-                className="border-[1.5px] border-[#c3e6cb] rounded-2xl p-8 flex flex-col items-center text-center hover:border-[#a3d6b0] transition-all bg-[#fcfdfc] shadow-sm hover:shadow-md cursor-pointer group"
+                className="border-[1.5px] border-[#c3e6cb] rounded-2xl p-6 sm:p-8 flex flex-col items-center text-center hover:border-[#a3d6b0] transition-all bg-[#fcfdfc] shadow-sm hover:shadow-md cursor-pointer group"
                 onClick={() => {
                   setOnboardingType("migrating");
                   setStep("upload");
@@ -402,7 +403,7 @@ export function ContractorOnboarding() {
                   I have submitted invoices before and have already received
                   payment.
                 </p>
-                <Button className="w-full bg-[#357a38] hover:bg-[#2c662e] text-white h-12 rounded-lg mt-auto text-[15px] font-medium">
+                <Button className="w-full bg-[#357a38] hover:bg-[#2c662e] text-white h-auto py-3.5 sm:h-12 rounded-lg mt-auto text-sm sm:text-[15px] font-medium whitespace-normal flex items-center justify-center gap-1.5 shrink-0">
                   Continue as Existing Contractor{" "}
                   <ChevronRight className="w-4 h-4 ml-1.5" />
                 </Button>
@@ -685,10 +686,11 @@ export function ContractorOnboarding() {
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
       {/* Top Navbar */}
       <header className="w-full bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-2.5 font-bold text-xl">
+        <div className="flex items-center gap-2.5 font-bold text-xl shrink-0">
           <img src="/intellibus-logo.png" alt="Intellibus Logo" className="h-8 object-contain" />
-          <span className="text-gray-900 ml-1">Invoice</span>{" "}
-          <span className="text-blue-600 font-medium">Portal</span>
+          <span className="text-gray-900 ml-1 whitespace-nowrap">
+            Invoice <span className="text-blue-600 font-medium">Portal</span>
+          </span>
         </div>
         <button className="text-blue-600 flex items-center gap-2 text-[15px] font-medium hover:text-blue-700 transition-colors">
           <HelpCircle className="w-4 h-4" /> Need help?
@@ -697,7 +699,7 @@ export function ContractorOnboarding() {
 
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center p-4">
-        <div className="max-w-[850px] w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8 md:p-12 text-center mt-6 mb-8">
+        <div className="max-w-[850px] w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 md:p-12 text-center mt-6 mb-8">
           <StepProgressBar currentStep={step} />
 
           {step === "upload" && (
