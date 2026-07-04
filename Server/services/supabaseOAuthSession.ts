@@ -1,7 +1,7 @@
 import type { IncomingHttpHeaders } from "http";
 import { fromNodeHeaders } from "better-auth/node";
-import { auth } from "../../src/lib/auth";
-import { getSupabaseAdmin } from "../clients/supabase.server";
+import { auth } from "../../src/lib/auth.js";
+import { getSupabaseAdmin } from "../clients/supabase.server.js";
 
 type AuthHeaders = IncomingHttpHeaders | Headers;
 

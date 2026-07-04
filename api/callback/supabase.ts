@@ -1,4 +1,4 @@
-import { createSupabaseOAuthSession } from "../../Server/services/supabaseOAuthSession";
+import { createSupabaseOAuthSession } from "../../Server/services/supabaseOAuthSession.js";
 
 const methodNotAllowed = () =>
   Response.json(
