@@ -24,12 +24,28 @@ const withHttps = (host) => {
 
 const normalizeAppOrigin = (value) => trimTrailingSlash(value).replace(/\/api\/auth$/i, "");
 
+const isLocalhostURL = (value) => {
+    try {
+        const hostname = new URL(withHttps(value) || value).hostname;
+        return hostname === "localhost" || hostname === "127.0.0.1";
+    } catch {
+        return false;
+    }
+};
+
+const getVercelOrigin = () => withHttps(process.env.FRONTEND_URL) ||
+    withHttps(process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
+    withHttps(process.env.VERCEL_URL);
+
 const getBetterAuthBaseURL = () => {
-    if (process.env.BETTER_AUTH_URL) {
+    const vercelOrigin = getVercelOrigin();
+    const isVercelRuntime = process.env.VERCEL === "1" || !!process.env.VERCEL_URL;
+
+    if (process.env.BETTER_AUTH_URL &&
+        !(isVercelRuntime && isLocalhostURL(process.env.BETTER_AUTH_URL))) {
         return normalizeAppOrigin(process.env.BETTER_AUTH_URL);
     }
 
-    const vercelOrigin = withHttps(process.env.VERCEL_URL);
     if (vercelOrigin) {
         return normalizeAppOrigin(vercelOrigin);
     }

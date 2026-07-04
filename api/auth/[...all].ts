@@ -1,7 +1,8 @@
-import { auth } from "../../src/lib/auth";
+import { handleBetterAuthRequest } from "../../Server/services/betterAuthServerless";
 
-export default {
-  fetch(request: Request) {
-    return auth.handler(request);
-  },
-};
+export const GET = handleBetterAuthRequest;
+export const POST = handleBetterAuthRequest;
+export const PUT = handleBetterAuthRequest;
+export const PATCH = handleBetterAuthRequest;
+export const DELETE = handleBetterAuthRequest;
+export const OPTIONS = handleBetterAuthRequest;

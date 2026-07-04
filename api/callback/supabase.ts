@@ -1,22 +1,24 @@
 import { createSupabaseOAuthSession } from "../../Server/services/supabaseOAuthSession";
 
-export default {
-  async fetch(request: Request) {
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204 });
-    }
+const methodNotAllowed = () =>
+  Response.json(
+    { success: false, error: "Method not allowed" },
+    {
+      status: 405,
+      headers: { Allow: "POST, OPTIONS" },
+    },
+  );
 
-    if (request.method !== "POST") {
-      return Response.json(
-        { success: false, error: "Method not allowed" },
-        {
-          status: 405,
-          headers: { Allow: "POST, OPTIONS" },
-        },
-      );
-    }
+export function OPTIONS() {
+  return new Response(null, { status: 204 });
+}
 
-    const result = await createSupabaseOAuthSession(request.headers);
-    return Response.json(result.body, { status: result.status });
-  },
-};
+export const GET = methodNotAllowed;
+export const PUT = methodNotAllowed;
+export const PATCH = methodNotAllowed;
+export const DELETE = methodNotAllowed;
+
+export async function POST(request: Request) {
+  const result = await createSupabaseOAuthSession(request.headers);
+  return Response.json(result.body, { status: result.status });
+}
