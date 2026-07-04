@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Loader2 } from "lucide-react";
-import { useSession } from "../../lib/auth-client";
+import { authBaseURL, useSession } from "../../lib/auth-client";
 import { getSupabaseClient } from "../../lib/supabase/client";
 import { markUserActivated } from "../../lib/data/userAccess";
 
@@ -60,8 +60,7 @@ export function OAuthCallback({ onAuthComplete }: OAuthCallbackProps) {
         console.log("[OAuth Callback] Better Auth session found:", session.user.email);
 
         // Call backend to create Supabase session
-        const apiBase = (import.meta.env.VITE_AUTH_BASE_URL || "http://localhost:5001").replace(/\/+$/, "");
-        const response = await fetch(`${apiBase}/api/callback/supabase`, {
+        const response = await fetch(`${authBaseURL}/api/callback/supabase`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

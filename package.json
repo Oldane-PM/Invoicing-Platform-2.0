@@ -119,6 +119,10 @@
       "optional": true
     }
   },
+  "overrides": {
+    "framer-motion": "12.40.0",
+    "motion-dom": "12.40.0"
+  },
   "pnpm": {
     "overrides": {
       "vite": "6.3.5"
