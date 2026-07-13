@@ -307,10 +307,10 @@ export async function createSupabaseOAuthSession(
       if (!existingContractor) {
         const contractStart = isContractorFromInvitation
           ? invitation.contract_start_date
-          : new Date().toISOString().split("T")[0];
+          : null;
         const contractEnd = isContractorFromInvitation
           ? invitation.contract_end_date
-          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+          : null;
 
         console.log("[OAuth Callback] Creating contractor record for:", email, isAutoAssignedContractor ? "(auto-assigned Intellibus)" : "(from invitation)");
 

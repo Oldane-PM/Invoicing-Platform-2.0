@@ -18,6 +18,7 @@ import {
   Lock,
   Shield,
   CreditCard,
+  LogOut,
 } from "lucide-react";
 import { useVendorOnboarding } from "../../lib/hooks/contractor/useVendorOnboarding";
 
@@ -34,7 +35,7 @@ import { useQueryClient } from "@tanstack/react-query";
 type OnboardingType = "new" | "migrating" | null;
 
 export function ContractorOnboarding() {
-  const { user, profile } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const queryClient = useQueryClient();
   const [onboardingType, setOnboardingType] =
     React.useState<OnboardingType>(null);
@@ -333,6 +334,15 @@ export function ContractorOnboarding() {
               Invoice <span className="text-blue-600 font-medium">Portal</span>
             </span>
           </div>
+          <button 
+            onClick={async () => {
+              await signOut();
+              window.location.href = '/';
+            }}
+            className="text-gray-500 hover:text-gray-700 flex items-center gap-2 text-[15px] font-medium transition-colors"
+          >
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
         </header>
 
         {/* Main Content */}
@@ -692,9 +702,20 @@ export function ContractorOnboarding() {
             Invoice <span className="text-blue-600 font-medium">Portal</span>
           </span>
         </div>
-        <button className="text-blue-600 flex items-center gap-2 text-[15px] font-medium hover:text-blue-700 transition-colors">
-          <HelpCircle className="w-4 h-4" /> Need help?
-        </button>
+        <div className="flex items-center gap-4">
+          <button className="text-blue-600 flex items-center gap-2 text-[15px] font-medium hover:text-blue-700 transition-colors">
+            <HelpCircle className="w-4 h-4" /> Need help?
+          </button>
+          <button 
+            onClick={async () => {
+              await signOut();
+              window.location.href = '/';
+            }}
+            className="text-gray-500 hover:text-gray-700 flex items-center gap-2 text-[15px] font-medium transition-colors"
+          >
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
+        </div>
       </header>
 
       {/* Main Content */}
