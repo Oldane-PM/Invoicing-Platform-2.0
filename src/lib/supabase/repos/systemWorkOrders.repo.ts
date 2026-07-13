@@ -240,5 +240,29 @@ export async function signWorkOrderFinance(
     console.error("Error signing work order as finance:", error);
     throw new Error(error.message);
   }
+
+  if (data) {
+    // Determine contract type based on pay_type
+    const contractType = data.pay_type?.toLowerCase().includes("fixed") ? "fixed" : "hourly";
+    
+    // Create the active contract record
+    const { error: contractError } = await supabase
+      .from("contracts")
+      .insert({
+        contractor_user_id: data.contractor_user_id,
+        project_name: data.role || "Work Order Project",
+        contract_type: contractType,
+        start_date: data.start_date,
+        end_date: data.end_date,
+        is_active: true,
+      });
+
+    if (contractError) {
+      console.error("Error creating contract record from work order:", contractError);
+      // We don't throw here to avoid failing the signature step if the contract insert fails,
+      // but in a production system we might want to handle this transactionally.
+    }
+  }
+
   return data;
 }

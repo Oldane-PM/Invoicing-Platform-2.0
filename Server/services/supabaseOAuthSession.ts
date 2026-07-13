@@ -320,8 +320,8 @@ export async function createSupabaseOAuthSession(
             contractor_id: authUserId,
             contract_start: contractStart,
             contract_end: contractEnd,
-            hourly_rate: 75.0,
-            overtime_rate: 112.5,
+            hourly_rate: null,
+            overtime_rate: null,
             is_active: true,
           });
 
@@ -338,45 +338,7 @@ export async function createSupabaseOAuthSession(
         console.log("[OAuth Callback] Contractor record already exists, skipping creation");
       }
 
-      const { data: existingContract } = await supabase
-        .from("contracts")
-        .select("id")
-        .eq("contractor_user_id", authUserId)
-        .eq("is_active", true)
-        .maybeSingle();
 
-      if (!existingContract) {
-        const contractStart = isContractorFromInvitation
-          ? invitation.contract_start_date
-          : new Date().toISOString().split("T")[0];
-        const contractEnd = isContractorFromInvitation
-          ? invitation.contract_end_date
-          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-
-        console.log("[OAuth Callback] Creating contracts record for:", email);
-        const { error: contractError2 } = await supabase
-          .from("contracts")
-          .insert({
-            contractor_user_id: authUserId,
-            project_name: "General Work",
-            contract_type: "hourly",
-            start_date: contractStart,
-            end_date: contractEnd,
-            is_active: true,
-          });
-
-        if (contractError2) {
-          if (contractError2.code === "23505") {
-            console.log("[OAuth Callback] Contract record already exists (race condition handled)");
-          } else {
-            console.error("[OAuth Callback] Error creating contract record:", contractError2);
-          }
-        } else {
-          console.log("[OAuth Callback] Contract record created");
-        }
-      } else {
-        console.log("[OAuth Callback] Contract record already exists, skipping");
-      }
     }
 
     if (invitation && !isInvitationAlreadyUsed) {

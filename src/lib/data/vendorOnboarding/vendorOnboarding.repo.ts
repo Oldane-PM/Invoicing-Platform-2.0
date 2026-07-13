@@ -102,6 +102,9 @@ export async function saveVendorOnboarding(
       if (isHourly && patch.onboarding_rate != null) {
         dbUpdates.hourly_rate = patch.onboarding_rate;
         dbUpdates.overtime_rate = patch.onboarding_rate * 1.5;
+      } else {
+        dbUpdates.hourly_rate = null;
+        dbUpdates.overtime_rate = null;
       }
       
       await supabase.from("contractors").upsert(dbUpdates, { onConflict: "contractor_id" });
@@ -113,7 +116,28 @@ export async function saveVendorOnboarding(
             contractUpdates.contract_type = "fixed";
             if (patch.onboarding_rate != null) contractUpdates.fixed_monthly_rate = patch.onboarding_rate;
         }
-        await supabase.from("contracts").update(contractUpdates).eq("contractor_user_id", userId).eq("is_active", true);
+        if (patch.contract_start_date !== undefined) contractUpdates.start_date = patch.contract_start_date;
+        if (patch.contract_end_date !== undefined) contractUpdates.end_date = patch.contract_end_date;
+
+        const { data: existingContract } = await supabase
+          .from("contracts")
+          .select("id")
+          .eq("contractor_user_id", userId)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (existingContract) {
+          await supabase.from("contracts").update(contractUpdates).eq("id", existingContract.id);
+        } else {
+          await supabase.from("contracts").insert({
+            contractor_user_id: userId,
+            is_active: true,
+            project_name: patch.onboarding_role || "General Work",
+            start_date: patch.contract_start_date || new Date().toISOString().split("T")[0],
+            end_date: patch.contract_end_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+            ...contractUpdates
+          });
+        }
       }
       console.log(`[vendorOnboarding.repo] Auto-synced work order data to official contract for user ${userId}`);
     }

@@ -26,9 +26,9 @@ import type {
 export async function getAdminMetrics(): Promise<AdminMetrics> {
   const supabase = getSupabaseClient();
 
-  // Get total contractors (active contracts)
+  // Get total contractors (active contractors)
   const { count: totalContractors } = await supabase
-    .from('contracts')
+    .from('contractors')
     .select('*', { count: 'exact', head: true })
     .eq('is_active', true);
 
