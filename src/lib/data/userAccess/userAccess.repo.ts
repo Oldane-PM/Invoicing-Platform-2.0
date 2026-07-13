@@ -153,11 +153,22 @@ export async function markUserActivated(userId: string): Promise<void> {
 export async function deleteUser(userId: string): Promise<void> {
   const apiBase = (import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:5001').replace(/\/+$/, '');
   
+  // Get the Supabase session token for authorization
+  const { getSupabaseClient } = await import('../../supabase/client');
+  const supabase = getSupabaseClient();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${apiBase}/api/users/${userId}`, {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     credentials: 'include',
   });
 
