@@ -100,6 +100,34 @@ async function requireManagerOrAdmin(req: Request, res: Response, next: Function
  */
 async function requireAdmin(req: Request, res: Response, next: Function) {
   try {
+    // 1. Check for Bearer token (Supabase auth)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabase = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (!error && user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, id")
+          .eq("id", user.id)
+          .single();
+        if (profile) {
+          const userRole = profile.role?.toUpperCase();
+          if (userRole === "ADMIN") {
+            (req as any).user = user;
+            (req as any).profileId = profile.id;
+            return next();
+          }
+        }
+      }
+    }
+
+    // 2. Fallback to Better Auth session
     const session = await auth.api.getSession({
       headers: req.headers as any,
     });
