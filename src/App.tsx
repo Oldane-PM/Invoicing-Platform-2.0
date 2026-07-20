@@ -61,7 +61,7 @@ function roleToUserRole(role: string | null | undefined): UserRole {
   }
 }
 
-type Screen = "dashboard" | "directory" | "work_orders";
+type Screen = "dashboard" | "directory" | "access" | "work_orders";
 type ManagerScreen = "dashboard" | "team";
 type ContractorScreen =
   | "dashboard"
