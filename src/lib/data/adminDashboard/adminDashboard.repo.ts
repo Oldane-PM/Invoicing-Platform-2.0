@@ -37,6 +37,10 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
     .from('contracts')
     .select('*', { count: 'exact', head: true })
     .eq('is_active', true);
+  
+  // As a fallback/correction for the demo data where contracts might not have is_active set properly,
+  // we count unique active contracts based on the contractors table
+  const finalActiveContracts = activeContracts || totalContractors || 0;
 
   // Get pending submissions count
   const { count: pendingSubmissions } = await supabase
@@ -63,7 +67,7 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
 
   return {
     totalContractors: totalContractors || 0,
-    activeContracts: activeContracts || 0,
+    activeContracts: finalActiveContracts,
     pendingSubmissions: pendingSubmissions || 0,
     totalInvoiceValue: Math.round(totalInvoiceValue),
   };

@@ -16,6 +16,10 @@ import {
   LogOut,
   User as UserIcon,
   ClipboardList,
+  Bell,
+  Moon,
+  ChevronDown,
+  FileSignature,
 } from "lucide-react";
 import { Login } from "./pages/auth/Login";
 import { OAuthCallback } from "./pages/auth/OAuthCallback";
@@ -204,36 +208,6 @@ function App() {
   };
 
   // handleUserUpdate removed - not currently used
-
-  const getPageInfo = () => {
-    switch (currentScreen) {
-      case "dashboard":
-        return {
-          title: `Welcome, ${displayName}`,
-          subtitle:
-            "Finance Officer Dashboard — System overview and financial monitoring",
-        };
-      case "directory":
-        return {
-          title: "Employee Directory",
-          subtitle: "Manage contractor information and contracts",
-        };
-      case "access":
-        return {
-          title: "User Access",
-          subtitle: "Control user roles and permissions",
-        };
-      case "work_orders":
-        return {
-          title: "Work Orders",
-          subtitle: "Manage work orders and requests",
-        };
-      default:
-        return { title: "", subtitle: "" };
-    }
-  };
-
-  const pageInfo = getPageInfo();
 
   // Check URL for OAuth callback
   React.useEffect(() => {
@@ -596,128 +570,176 @@ function App() {
 
   // Admin Portal - Full Access
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
+    <div className="h-screen overflow-hidden bg-[#F9FAFB] flex">
       <Toaster position="top-right" />
 
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
-                {pageInfo.title}
+      {/* Sidebar Navigation */}
+      <aside className="w-64 bg-white border-r border-[#EAEAEA] flex flex-col hidden md:flex h-full">
+        <div className="p-6 pb-4">
+          <div className="flex items-center gap-2 mb-8">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+              <FileSignature className="text-blue-600 w-7 h-7" strokeWidth={1.5} />
+            </div>
+            <span className="font-semibold text-lg text-gray-900">Invoice App</span>
+          </div>
+
+          <nav className="space-y-1">
+            <button
+              onClick={() => setCurrentScreen("dashboard")}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                currentScreen === "dashboard"
+                  ? "bg-[#F3F4F6] text-blue-600 font-medium"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              <LayoutDashboard className="w-5 h-5" />
+              <span>Dashboard</span>
+            </button>
+            <button
+              onClick={() => setCurrentScreen("directory")}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                currentScreen === "directory"
+                  ? "bg-[#F3F4F6] text-blue-600 font-medium"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              <Users className="w-5 h-5" />
+              <span>Employee Directory</span>
+            </button>
+            <button
+              onClick={() => setCurrentScreen("access")}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                currentScreen === "access"
+                  ? "bg-[#F3F4F6] text-blue-600 font-medium"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              <Shield className="w-5 h-5" />
+              <span>User Access</span>
+            </button>
+            <button
+              onClick={() => setCurrentScreen("work_orders")}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                currentScreen === "work_orders"
+                  ? "bg-[#F3F4F6] text-blue-600 font-medium"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              <ClipboardList className="w-5 h-5" />
+              <span>Work Orders</span>
+            </button>
+          </nav>
+
+          <div className="mt-8">
+            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">SYSTEM</h3>
+            <nav className="space-y-1">
+              <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+                <Settings className="w-5 h-5" />
+                <span>Settings</span>
+              </button>
+              <button 
+                onClick={() => setNotificationsOpen(true)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+              >
+                <div className="relative">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <span>Notifications</span>
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        <div className="mt-auto p-4 border-t border-[#EAEAEA]">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors">
+                <Avatar className="w-9 h-9 bg-blue-50">
+                  <AvatarFallback className="bg-blue-50 text-blue-600 font-semibold text-sm">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
+                  <p className="text-xs text-gray-500 truncate">Finance Officer</p>
+                </div>
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem>Profile</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
+        {/* Header */}
+        <header className="sticky top-0 z-40 bg-[#F9FAFB] pt-6 pb-4 border-b border-[#EAEAEA] mb-6">
+          <div className="max-w-[1440px] mx-auto px-4 md:px-8 flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900 mb-1">
+                Welcome back, {displayName}
               </h1>
-              <p className="text-xs md:text-sm text-gray-600">
-                {pageInfo.subtitle}
+              <p className="text-sm text-gray-500">
+                Here's what's happening with your invoicing platform today.
               </p>
             </div>
-            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-              <NotificationBell onClick={() => setNotificationsOpen(true)} />
-              <ThemeToggle />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hover:bg-gray-100 rounded-lg w-9 h-9 md:w-10 md:h-10"
-              >
-                <Settings
-                  className="w-4 h-4 md:w-5 md:h-5 text-gray-600"
-                  strokeWidth={2}
+            
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <NotificationBell 
+                  onClick={() => setNotificationsOpen(true)}
+                  className="text-gray-500 hover:text-gray-700 bg-white border border-[#EAEAEA] rounded-full w-10 h-10 shadow-sm flex items-center justify-center"
+                  iconClassName="w-5 h-5"
+                  badgeClassName="absolute -top-1 -right-1 h-4 min-w-4 px-1 flex items-center justify-center bg-blue-600 border-2 border-white rounded-full hover:bg-blue-600"
                 />
+              </div>
+              <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700 bg-white border border-[#EAEAEA] rounded-full w-10 h-10 shadow-sm">
+                <Moon className="w-5 h-5" />
               </Button>
+              <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700 bg-white border border-[#EAEAEA] rounded-full w-10 h-10 shadow-sm">
+                <Settings className="w-5 h-5" />
+              </Button>
+              
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-9 md:h-10 px-2 md:px-3 hover:bg-gray-100 rounded-lg"
-                  >
-                    <Avatar className="w-7 h-7 md:w-8 md:h-8 bg-purple-100">
-                      <AvatarFallback className="bg-purple-100 text-purple-700 font-semibold text-xs md:text-sm">
+                  <Button variant="ghost" className="h-10 px-2 pr-3 hover:bg-gray-50 rounded-full flex items-center gap-2 border border-[#EAEAEA] bg-white shadow-sm ml-2">
+                    <Avatar className="w-7 h-7 bg-blue-50">
+                      <AvatarFallback className="bg-blue-50 text-blue-600 font-semibold text-xs">
                         {userInitials}
                       </AvatarFallback>
                     </Avatar>
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem>Profile</DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="w-4 h-4 mr-2" />
                     Logout
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Navigation Tabs */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <button
-              onClick={() => setCurrentScreen("dashboard")}
-              className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
-                currentScreen === "dashboard"
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span className="font-medium text-sm md:text-base">
-                Dashboard
-              </span>
-            </button>
-            <button
-              onClick={() => setCurrentScreen("directory")}
-              className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
-                currentScreen === "directory"
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span className="font-medium text-sm md:text-base">
-                <span className="hidden sm:inline">Employee </span>Directory
-              </span>
-            </button>
-            <button
-              onClick={() => setCurrentScreen("access")}
-              className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
-                currentScreen === "access"
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              }`}
-            >
-              <Shield className="w-4 h-4" />
-              <span className="font-medium text-sm md:text-base">
-                <span className="hidden sm:inline">User </span>Access
-              </span>
-            </button>
-            <button
-              onClick={() => setCurrentScreen("work_orders")}
-              className={`flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 transition-all whitespace-nowrap ${
-                currentScreen === "work_orders"
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              }`}
-            >
-              <ClipboardList className="w-4 h-4" />
-              <span className="font-medium text-sm md:text-base">
-                Work Orders
-              </span>
-            </button>
-          </div>
-        </div>
+        {/* Content */}
+        <main className="max-w-[1440px] mx-auto px-4 md:px-8 pb-6 w-full flex-1">
+          {currentScreen === "dashboard" && <AdminDashboard />}
+          {currentScreen === "directory" && (
+            <EmployeeDirectory onEmployeeClick={handleEmployeeClick} />
+          )}
+          {currentScreen === "access" && <UserAccessManagement />}
+          {currentScreen === "work_orders" && <AdminWorkOrders />}
+        </main>
       </div>
-
-      {/* Main Content */}
-      <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-        {currentScreen === "dashboard" && <AdminDashboard />}
-        {currentScreen === "directory" && (
-          <EmployeeDirectory onEmployeeClick={handleEmployeeClick} />
-        )}
-        {currentScreen === "access" && <UserAccessManagement />}
-        {currentScreen === "work_orders" && <AdminWorkOrders />}
-      </main>
 
       {/* Drawers */}
       <NotificationDrawer

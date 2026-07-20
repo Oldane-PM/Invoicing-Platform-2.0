@@ -12,9 +12,12 @@ import { useUnreadNotificationCount } from '../../lib/hooks/notifications';
 
 interface NotificationBellProps {
   onClick: () => void;
+  className?: string;
+  iconClassName?: string;
+  badgeClassName?: string;
 }
 
-export function NotificationBell({ onClick }: NotificationBellProps) {
+export function NotificationBell({ onClick, className, iconClassName, badgeClassName }: NotificationBellProps) {
   const { data: unreadCount = 0, isLoading } = useUnreadNotificationCount();
 
   return (
@@ -22,14 +25,14 @@ export function NotificationBell({ onClick }: NotificationBellProps) {
       variant="ghost"
       size="icon"
       onClick={onClick}
-      className="relative h-9 w-9 rounded-lg hover:bg-gray-100"
+      className={`relative ${className || 'h-9 w-9 rounded-lg hover:bg-gray-100'}`}
       aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
     >
-      <Bell className="h-5 w-5 text-gray-600" />
+      <Bell className={iconClassName || 'h-5 w-5 text-gray-600'} />
       {!isLoading && unreadCount > 0 && (
         <Badge
           variant="destructive"
-          className="absolute -top-1 -right-1 h-5 min-w-5 px-1 flex items-center justify-center bg-red-500 hover:bg-red-500"
+          className={badgeClassName || "absolute -top-1 -right-1 h-5 min-w-5 px-1 flex items-center justify-center bg-red-500 hover:bg-red-500"}
         >
           <span className="text-[10px] font-semibold text-white">
             {unreadCount > 99 ? '99+' : unreadCount}
