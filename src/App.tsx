@@ -48,6 +48,8 @@ import type { EmployeeDirectoryRow, ContractorSubmission } from "./lib/types";
 // Map a profile role (any casing) to the app's UserRole.
 function roleToUserRole(role: string | null | undefined): UserRole {
   switch ((role || "").toUpperCase()) {
+    case "SUPERADMIN":
+      return "Superadmin";
     case "ADMIN":
       return "Admin";
     case "MANAGER":
@@ -59,14 +61,14 @@ function roleToUserRole(role: string | null | undefined): UserRole {
   }
 }
 
-type Screen = "dashboard" | "directory" | "access" | "work_orders";
+type Screen = "dashboard" | "directory" | "work_orders";
 type ManagerScreen = "dashboard" | "team";
 type ContractorScreen =
   | "dashboard"
   | "profile"
   | "submit-hours"
   | "work_orders";
-type UserRole = "Admin" | "Manager" | "Contractor" | "Unassigned" | null;
+type UserRole = "Superadmin" | "Admin" | "Manager" | "Contractor" | "Unassigned" | null;
 type AppView = "login" | "oauth-callback" | "app";
 
 function App() {
@@ -116,13 +118,15 @@ function App() {
   // Use profile full name if available, otherwise fall back to demo/role names
   const displayName =
     profile?.fullName ||
-    (currentUser === "Admin"
-      ? "Finance Officer"
-      : currentUser === "Manager"
-        ? "Manager User"
-        : currentUser === "Contractor"
-          ? "Contractor User"
-          : "User");
+    (currentUser === "Superadmin"
+      ? "Admin"
+      : currentUser === "Admin"
+        ? "Finance Officer"
+        : currentUser === "Manager"
+          ? "Manager User"
+          : currentUser === "Contractor"
+            ? "Contractor User"
+            : "User");
 
   const userInitials = getInitials(displayName);
 
@@ -159,7 +163,9 @@ function App() {
 
   // Handle OAuth callback completion
   const handleAuthComplete = (authRole: string) => {
-    if (authRole === "ADMIN") {
+    if (authRole === "SUPERADMIN") {
+      setCurrentUser("Superadmin");
+    } else if (authRole === "ADMIN") {
       setCurrentUser("Admin");
     } else if (authRole === "MANAGER") {
       setCurrentUser("Manager");
@@ -568,6 +574,75 @@ function App() {
     );
   }
 
+  // Admin (Superadmin) Portal - User Access Management ONLY
+  if (currentUser === "Superadmin") {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB]">
+        <Toaster position="top-right" />
+
+        {/* Sticky Header */}
+        <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+          <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
+                  Admin Portal
+                </h1>
+                <p className="text-xs md:text-sm text-gray-600">
+                  Manage user roles and system access permissions
+                </p>
+              </div>
+              <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+                <ThemeToggle />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="h-9 md:h-10 px-2 md:px-3 hover:bg-gray-100 rounded-lg"
+                    >
+                      <Avatar className="w-7 h-7 md:w-8 md:h-8 bg-purple-100">
+                        <AvatarFallback className="bg-purple-100 text-purple-700 font-semibold text-xs md:text-sm">
+                          {userInitials}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Navigation Tabs (Only showing User Access) */}
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
+            <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <button
+                className="flex items-center gap-2 px-3 md:px-4 py-3 border-b-2 border-purple-600 text-purple-600 transition-all whitespace-nowrap"
+              >
+                <Shield className="w-4 h-4" />
+                <span className="font-medium text-sm md:text-base">
+                  User Access
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <main className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+          <UserAccessManagement />
+        </main>
+      </div>
+    );
+  }
+
   // Admin Portal - Full Access
   return (
     <div className="h-screen overflow-hidden bg-[#F9FAFB] flex">
@@ -740,7 +815,6 @@ function App() {
           {currentScreen === "work_orders" && <AdminWorkOrders />}
         </main>
       </div>
-
       {/* Drawers */}
       <NotificationDrawer
         open={notificationsOpen}

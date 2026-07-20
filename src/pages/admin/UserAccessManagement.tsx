@@ -38,7 +38,13 @@ const ROLE_OPTIONS = [
   { value: "Contractor", label: "Contractor" },
   { value: "Manager", label: "Manager" },
   { value: "Admin", label: "Finance Officer" },
+  { value: "Superadmin", label: "Admin" },
 ];
+
+const getRoleLabel = (role: string) => {
+  const capRole = role.charAt(0).toUpperCase() + role.slice(1);
+  return ROLE_OPTIONS.find((opt) => opt.value === capRole)?.label ?? capRole;
+};
 
 interface PendingRoleChange {
   userId: string;
@@ -335,8 +341,12 @@ export function UserAccessManagement() {
                       </TableCell>
                       <TableCell>
                         {isInvitation ? (
-                          <span className="text-sm text-gray-400 italic">
-                            {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                           <span className="text-sm text-gray-400 italic">
+                             {getRoleLabel(user.role)}
+                           </span>
+                        ) : isCurrentUser ? (
+                          <span className="text-sm font-semibold text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 inline-block w-48 text-center">
+                            {getRoleLabel(user.role)} (You)
                           </span>
                         ) : (
                           <Combobox

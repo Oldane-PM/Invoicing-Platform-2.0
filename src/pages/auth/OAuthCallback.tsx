@@ -103,6 +103,7 @@ export function OAuthCallback({ onAuthComplete }: OAuthCallbackProps) {
 
         // Map role to uppercase for App.tsx
         const roleMap: Record<string, string> = {
+          'superadmin': 'SUPERADMIN',
           'admin': 'ADMIN',
           'manager': 'MANAGER',
           'contractor': 'CONTRACTOR',
