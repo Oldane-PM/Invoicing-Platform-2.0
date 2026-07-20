@@ -42,7 +42,7 @@ async function requireManagerOrAdmin(req: Request, res: Response, next: Function
           .single();
         if (profile) {
           const userRole = profile.role?.toUpperCase();
-          if (userRole === "ADMIN" || userRole === "MANAGER") {
+          if (userRole === "ADMIN" || userRole === "MANAGER" || userRole === "SUPERADMIN") {
             (req as any).user = user;
             (req as any).profileId = profile.id;
             return next();
@@ -82,7 +82,7 @@ async function requireManagerOrAdmin(req: Request, res: Response, next: Function
     }
 
     const userRole = profile.role?.toUpperCase();
-    if (userRole !== "ADMIN" && userRole !== "MANAGER") {
+    if (userRole !== "ADMIN" && userRole !== "MANAGER" && userRole !== "SUPERADMIN") {
       return res.status(403).json({ error: "Forbidden: Access denied" });
     }
 
@@ -118,7 +118,7 @@ async function requireAdmin(req: Request, res: Response, next: Function) {
           .single();
         if (profile) {
           const userRole = profile.role?.toUpperCase();
-          if (userRole === "ADMIN") {
+          if (userRole === "ADMIN" || userRole === "SUPERADMIN") {
             (req as any).user = user;
             (req as any).profileId = profile.id;
             return next();
@@ -168,7 +168,7 @@ async function requireAdmin(req: Request, res: Response, next: Function) {
 
     // Check role (case-insensitive)
     const userRole = profile.role?.toUpperCase();
-    if (userRole !== "ADMIN") {
+    if (userRole !== "ADMIN" && userRole !== "SUPERADMIN") {
       console.log(`[requireAdmin] Access denied. User role: ${userRole}`);
       return res.status(403).json({ error: "Forbidden: Admin access required" });
     }
@@ -350,7 +350,7 @@ router.patch("/:userId/role", requireAdmin, async (req: Request, res: Response) 
       return res.status(400).json({ error: "Role is required" });
     }
 
-    const validRoles = ['admin', 'manager', 'contractor', 'unassigned'];
+    const validRoles = ['admin', 'manager', 'contractor', 'unassigned', 'superadmin'];
     if (!validRoles.includes(role.toLowerCase())) {
       return res.status(400).json({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
     }
