@@ -15,7 +15,7 @@ import {
 } from "../../components/ui/table";
 import { SubmissionReviewDrawer } from "../../components/drawers/SubmissionReviewDrawer";
 import { toast } from "sonner";
-import { Search, FileX, Users, FileText, DollarSign, TrendingUp, Loader2, AlertCircle } from "lucide-react";
+import { Search, Users, FileText, DollarSign, TrendingUp, Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { Checkbox } from "../../components/ui/checkbox";
 import { useAuth } from "../../lib/hooks/useAuth";
@@ -246,7 +246,8 @@ export function AdminDashboard() {
               value={metrics?.totalContractors || 0}
               subtitle="Active contractors"
               icon={Users}
-              accentColor="purple"
+              accentColor="blue"
+              trend={{ isPositive: true, displayValue: "100%" }}
             />
             <MetricCard
               title="Pending Submissions"
@@ -254,6 +255,7 @@ export function AdminDashboard() {
               subtitle="Needs attention"
               icon={FileText}
               accentColor="yellow"
+              trend={{ isPositive: true, displayValue: "0%" }}
             />
             <MetricCard
               title="Total Invoice Value"
@@ -261,75 +263,93 @@ export function AdminDashboard() {
               subtitle="Awaiting payment"
               icon={DollarSign}
               accentColor="green"
+              trend={{ isPositive: true, displayValue: "0%" }}
             />
             <MetricCard
               title="Active Contracts"
               value={metrics?.activeContracts || 0}
               subtitle="Currently active"
               icon={TrendingUp}
-              accentColor="blue"
+              accentColor="purple"
+              trend={{ isPositive: true, displayValue: "100%" }}
             />
           </>
         )}
       </div>
 
       {/* Filters & Search */}
-      <Card className="p-4 border border-gray-200 rounded-[14px] bg-white">
-        <div className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <Input
-              placeholder="Search by name, project, manager…"
-              value={filters.search || ""}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="pl-11 h-11 bg-gray-50 border-gray-200 rounded-lg"
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <Combobox
-              value={filters.contractorType || ""}
-              onValueChange={(value) => setFilters({ ...filters, contractorType: value })}
-              options={[
-                { value: "Hourly", label: "Hourly" },
-                { value: "Fixed", label: "Fixed" },
-              ]}
-              placeholder="Contractor Type"
-            />
-            <Combobox
-              value={filters.status || ""}
-              onValueChange={(value) => setFilters({ ...filters, status: value })}
-              options={[
-                { value: "submitted", label: "Pending Manager Approval" },
-                { value: "approved", label: "Awaiting Finance Officer Payment" },
-                { value: "paid", label: "Paid" },
-                { value: "rejected", label: "Rejected" },
-                { value: "needs_clarification", label: "Needs Clarification" },
-              ]}
-              placeholder="Status"
-            />
-            <Combobox
-              value={filters.project || ""}
-              onValueChange={(value) => setFilters({ ...filters, project: value })}
-              options={(projects || []).map((p) => ({ value: p, label: p }))}
-              placeholder="Project"
-            />
-            <Combobox
-              value={filters.manager || ""}
-              onValueChange={(value) => setFilters({ ...filters, manager: value })}
-              options={(managers || []).map((m) => ({ value: m, label: m }))}
-              placeholder="Manager"
-            />
-            <Combobox
-              value={filters.month || ""}
-              onValueChange={(value) => setFilters({ ...filters, month: value })}
-              options={months.map((m) => ({ value: m, label: m }))}
-              placeholder="Month"
-            />
-          </div>
-          <div className="flex justify-end">
-            <Button variant="ghost" onClick={handleResetFilters} className="text-gray-600">
+      <Card className="p-5 md:p-6 border border-[#EAEAEA] rounded-2xl bg-white shadow-sm">
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Input
+                placeholder="Search by name, project, manager…"
+                value={filters.search || ""}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                className="pl-11 h-11 bg-gray-50 border-[#EAEAEA] rounded-lg w-full text-sm"
+              />
+            </div>
+            <Button variant="ghost" onClick={handleResetFilters} className="text-gray-600 h-11 flex items-center gap-2 px-4 hover:bg-gray-50 rounded-lg whitespace-nowrap border border-[#EAEAEA]">
+              <RotateCcw className="w-4 h-4" />
               Reset Filters
             </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Contractor Type</label>
+              <Combobox
+                value={filters.contractorType || ""}
+                onValueChange={(value) => setFilters({ ...filters, contractorType: value })}
+                options={[
+                  { value: "Hourly", label: "Hourly" },
+                  { value: "Fixed", label: "Fixed" },
+                ]}
+                placeholder="All Types"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Status</label>
+              <Combobox
+                value={filters.status || ""}
+                onValueChange={(value) => setFilters({ ...filters, status: value })}
+                options={[
+                  { value: "submitted", label: "Pending Manager Approval" },
+                  { value: "approved", label: "Awaiting Finance Officer Payment" },
+                  { value: "paid", label: "Paid" },
+                  { value: "rejected", label: "Rejected" },
+                  { value: "needs_clarification", label: "Needs Clarification" },
+                ]}
+                placeholder="All Statuses"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Project</label>
+              <Combobox
+                value={filters.project || ""}
+                onValueChange={(value) => setFilters({ ...filters, project: value })}
+                options={(projects || []).map((p) => ({ value: p, label: p }))}
+                placeholder="All Projects"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Manager</label>
+              <Combobox
+                value={filters.manager || ""}
+                onValueChange={(value) => setFilters({ ...filters, manager: value })}
+                options={(managers || []).map((m) => ({ value: m, label: m }))}
+                placeholder="All Managers"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Month</label>
+              <Combobox
+                value={filters.month || ""}
+                onValueChange={(value) => setFilters({ ...filters, month: value })}
+                options={months.map((m) => ({ value: m, label: m }))}
+                placeholder="All Months"
+              />
+            </div>
           </div>
         </div>
       </Card>
@@ -374,7 +394,7 @@ export function AdminDashboard() {
             <TableBody>
               {submissionsLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-64 text-center">
+                  <TableCell colSpan={8} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <Loader2 className="w-8 h-8 mb-3 animate-spin" />
                       <div className="text-gray-600 font-medium">Loading submissions...</div>
@@ -383,7 +403,7 @@ export function AdminDashboard() {
                 </TableRow>
               ) : submissionsError ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-64 text-center">
+                  <TableCell colSpan={8} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <AlertCircle className="w-16 h-16 mb-3 text-red-500" />
                       <div className="text-gray-600 font-medium mb-2">Failed to load submissions</div>
@@ -396,10 +416,15 @@ export function AdminDashboard() {
               ) : !submissions || submissions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="h-64 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-400">
-                      <FileX className="w-16 h-16 mb-3" strokeWidth={1.5} />
-                      <div className="text-gray-600 font-medium">No submissions match your filters</div>
-                      <div className="text-sm text-gray-500 mt-1">Try adjusting your search criteria</div>
+                    <div className="flex flex-col items-center justify-center text-[#9CA3AF]">
+                      <div className="relative w-20 h-20 bg-[#F3F4F6] rounded-full flex items-center justify-center mb-4">
+                        <FileText className="w-8 h-8 text-gray-400" strokeWidth={1.5} />
+                        <div className="absolute bottom-3 right-3 bg-blue-600 rounded-lg p-1.5 border-2 border-white">
+                          <Search className="w-3 h-3 text-white" strokeWidth={3} />
+                        </div>
+                      </div>
+                      <div className="text-gray-900 font-semibold text-lg">No data found</div>
+                      <div className="text-sm text-gray-500 mt-1">Try adjusting your filters or check back later.</div>
                     </div>
                   </TableCell>
                 </TableRow>
