@@ -34,6 +34,7 @@ interface RoleChangeConfirmationModalProps {
 function capitalizeRole(role: UserRole): string {
   // "admin" is presented to users as "Finance Officer" (internal value unchanged).
   if (role.toLowerCase() === "admin") return "Finance Officer";
+  if (role.toLowerCase() === "superadmin") return "Admin";
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 

@@ -8,7 +8,7 @@
 import { getSupabaseClient, supabase } from "../client";
 import { markUserActivated } from "../../data/userAccess";
 
-export type UserRole = "UNASSIGNED" | "ADMIN" | "MANAGER" | "CONTRACTOR";
+export type UserRole = "UNASSIGNED" | "ADMIN" | "MANAGER" | "CONTRACTOR" | "SUPERADMIN";
 
 export interface UserProfile {
   id: string;

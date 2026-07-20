@@ -11,9 +11,9 @@ import type { UserAccessUser } from './userAccess.types';
  */
 export function mapDbUserToUserAccessUser(dbUser: any): UserAccessUser {
   const rawRole = dbUser.role?.toLowerCase() ?? 'unassigned';
-  const validRoles = ['unassigned', 'admin', 'manager', 'contractor'] as const;
+  const validRoles = ['unassigned', 'admin', 'manager', 'contractor', 'superadmin'] as const;
   const role = validRoles.includes(rawRole as typeof validRoles[number]) 
-    ? (rawRole as 'unassigned' | 'admin' | 'manager' | 'contractor')
+    ? (rawRole as 'unassigned' | 'admin' | 'manager' | 'contractor' | 'superadmin')
     : 'unassigned';
     
   return {

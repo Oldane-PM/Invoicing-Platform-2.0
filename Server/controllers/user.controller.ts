@@ -6,7 +6,7 @@ interface CreateUserRequest {
   firstName: string;
   lastName: string;
   email: string;
-  role: "unassigned" | "contractor" | "manager" | "admin";
+  role: "unassigned" | "contractor" | "manager" | "admin" | "superadmin";
   contractStartDate?: string; // ISO date string
   contractEndDate?: string; // ISO date string
 }
@@ -42,7 +42,7 @@ export async function createUser(req: Request, res: Response) {
     }
 
     // Validate role
-    const validRoles = ["unassigned", "contractor", "manager", "admin"];
+    const validRoles = ["unassigned", "contractor", "manager", "admin", "superadmin"];
     if (!validRoles.includes(role)) {
       return res.status(400).json({
         error: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
