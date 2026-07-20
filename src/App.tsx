@@ -19,7 +19,7 @@ import {
   Bell,
   Moon,
   ChevronDown,
-  FileSignature,
+  Menu,
 } from "lucide-react";
 import { Login } from "./pages/auth/Login";
 import { OAuthCallback } from "./pages/auth/OAuthCallback";
@@ -61,7 +61,7 @@ function roleToUserRole(role: string | null | undefined): UserRole {
   }
 }
 
-type Screen = "dashboard" | "directory" | "access" | "work_orders";
+type Screen = "dashboard" | "directory" | "work_orders";
 type ManagerScreen = "dashboard" | "team";
 type ContractorScreen =
   | "dashboard"
@@ -97,6 +97,7 @@ function App() {
   const [selectedEmployee, setSelectedEmployee] =
     React.useState<EmployeeDirectoryRow | null>(null);
   const [employees, setEmployees] = React.useState<EmployeeDirectoryRow[]>([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   // We fetch onboarding at the top level so we can use it to block contractor access
   const { data: onboardingData, isLoading: onboardingLoading } = useVendorOnboarding();
@@ -644,23 +645,59 @@ function App() {
   }
 
   // Admin Portal - Full Access
+  const adminPageInfo = (() => {
+    switch (currentScreen) {
+      case "dashboard":
+        return {
+          title: `Welcome, ${displayName}`,
+          subtitle: "Finance Officer Dashboard — System overview and financial monitoring",
+        };
+      case "directory":
+        return {
+          title: "Employee Directory",
+          subtitle: "Manage contractor information and contracts",
+        };
+      case "work_orders":
+        return {
+          title: "Work Orders",
+          subtitle: "Manage work orders and requests",
+        };
+      default:
+        return {
+          title: `Welcome, ${displayName}`,
+          subtitle: "Finance Officer Dashboard",
+        };
+    }
+  })();
+
   return (
     <div className="h-screen overflow-hidden bg-[#F9FAFB] flex">
       <Toaster position="top-right" />
 
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className="w-64 bg-white border-r border-[#EAEAEA] flex flex-col hidden md:flex h-full">
-        <div className="p-6 pb-4">
+      <aside className={`w-64 bg-white border-r border-[#EAEAEA] flex flex-col h-full fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-6 pb-4 flex flex-col h-full">
           <div className="flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
-              <FileSignature className="text-blue-600 w-7 h-7" strokeWidth={1.5} />
+            <div className="w-8 h-8 flex items-center justify-center">
+              <img src="/intellibus-logo.png" alt="Intellibus Logo" className="w-8 h-8 object-contain" />
             </div>
             <span className="font-semibold text-lg text-gray-900">Invoice App</span>
           </div>
 
-          <nav className="space-y-1">
+          <nav className="space-y-1 flex-1">
             <button
-              onClick={() => setCurrentScreen("dashboard")}
+              onClick={() => {
+                setCurrentScreen("dashboard");
+                setMobileMenuOpen(false);
+              }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                 currentScreen === "dashboard"
                   ? "bg-[#F3F4F6] text-blue-600 font-medium"
@@ -671,7 +708,10 @@ function App() {
               <span>Dashboard</span>
             </button>
             <button
-              onClick={() => setCurrentScreen("directory")}
+              onClick={() => {
+                setCurrentScreen("directory");
+                setMobileMenuOpen(false);
+              }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                 currentScreen === "directory"
                   ? "bg-[#F3F4F6] text-blue-600 font-medium"
@@ -682,18 +722,10 @@ function App() {
               <span>Employee Directory</span>
             </button>
             <button
-              onClick={() => setCurrentScreen("access")}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
-                currentScreen === "access"
-                  ? "bg-[#F3F4F6] text-blue-600 font-medium"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`}
-            >
-              <Shield className="w-5 h-5" />
-              <span>User Access</span>
-            </button>
-            <button
-              onClick={() => setCurrentScreen("work_orders")}
+              onClick={() => {
+                setCurrentScreen("work_orders");
+                setMobileMenuOpen(false);
+              }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                 currentScreen === "work_orders"
                   ? "bg-[#F3F4F6] text-blue-600 font-medium"
@@ -755,18 +787,28 @@ function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
         {/* Header */}
-        <header className="sticky top-0 z-40 bg-[#F9FAFB] pt-6 pb-4 border-b border-[#EAEAEA] mb-6">
-          <div className="max-w-[1440px] mx-auto px-4 md:px-8 flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900 mb-1">
-                Welcome back, {displayName}
-              </h1>
-              <p className="text-sm text-gray-500">
-                Here's what's happening with your invoicing platform today.
-              </p>
+        <header className="sticky top-0 z-30 bg-[#F9FAFB] pt-6 pb-4 border-b border-[#EAEAEA] mb-6">
+          <div className="max-w-[1440px] mx-auto px-4 md:px-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0">
+            <div className="flex items-start gap-4">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="md:hidden mt-1 text-gray-500 hover:text-gray-900"
+                onClick={() => setMobileMenuOpen(true)}
+              >
+                <Menu className="w-6 h-6" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-semibold text-gray-900 mb-1">
+                  {adminPageInfo.title}
+                </h1>
+                <p className="text-sm text-gray-500">
+                  {adminPageInfo.subtitle}
+                </p>
+              </div>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 self-end md:self-auto">
               <div className="relative">
                 <NotificationBell 
                   onClick={() => setNotificationsOpen(true)}
@@ -811,7 +853,6 @@ function App() {
           {currentScreen === "directory" && (
             <EmployeeDirectory onEmployeeClick={handleEmployeeClick} />
           )}
-          {currentScreen === "access" && <UserAccessManagement />}
           {currentScreen === "work_orders" && <AdminWorkOrders />}
         </main>
       </div>

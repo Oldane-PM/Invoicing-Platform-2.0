@@ -389,15 +389,12 @@ export function AdminDashboard() {
                 <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium">
                   Status
                 </TableHead>
-                <TableHead className="h-12 text-xs uppercase tracking-wide text-gray-600 font-medium text-right">
-                  Actions
-                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {submissionsLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-64 text-center">
+                  <TableCell colSpan={8} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <Loader2 className="w-8 h-8 mb-3 animate-spin" />
                       <div className="text-gray-600 font-medium">Loading submissions...</div>
@@ -406,7 +403,7 @@ export function AdminDashboard() {
                 </TableRow>
               ) : submissionsError ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-64 text-center">
+                  <TableCell colSpan={8} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <AlertCircle className="w-16 h-16 mb-3 text-red-500" />
                       <div className="text-gray-600 font-medium mb-2">Failed to load submissions</div>
@@ -418,7 +415,7 @@ export function AdminDashboard() {
                 </TableRow>
               ) : !submissions || submissions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-64 text-center">
+                  <TableCell colSpan={8} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center text-[#9CA3AF]">
                       <div className="relative w-20 h-20 bg-[#F3F4F6] rounded-full flex items-center justify-center mb-4">
                         <FileText className="w-8 h-8 text-gray-400" strokeWidth={1.5} />
@@ -477,9 +474,6 @@ export function AdminDashboard() {
                       >
                         {statusLabels[submission.status] || submission.status}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {/* Placeholder for actions */}
                     </TableCell>
                   </TableRow>
                   );
